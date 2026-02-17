@@ -1,17 +1,23 @@
 import dbConnect from "@/lib/mongo";
 import User from "@/models/User";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 
 
 
-export async function POST() {
+
+export async function POST(req: NextRequest) {
 
     if (process.env.NODE_ENV !== "development") {
         return NextResponse.json(
             { ok: false, message: "Esta ruta solo está disponible en modo desarrollo" },
             { status: 403 } // 403 Forbidden
         );
+    }
+
+    const secret = req.headers.get("x-seed-secret") 
+    if (process.env.SEED_SECRET && secret !== process.env.SEED_SECRET) {
+        return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 })
     }
 
     try {
@@ -28,7 +34,7 @@ export async function POST() {
 
         const password = process.env.MONGO_PSW_ADMIN_TEST;
         if (!password) {
-             throw new Error("❌ FALTA LA VARIABLE DE ENTORNO: MONGO_PSW_ADMIN_TEST");
+             throw new Error("FALTA LA VARIABLE DE ENTORNO: MONGO_PSW_ADMIN_TEST");
         }
         const passwordHash = await bcrypt.hash(password, 10);
 

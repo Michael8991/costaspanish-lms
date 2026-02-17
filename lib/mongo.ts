@@ -23,7 +23,7 @@ async function dbConnect() {
   }
 
   if (!cached.promise) {
-    cached.promise = mongoose.connect(MONGO_URI).then((mongoose) => {
+    cached.promise = mongoose.connect(fullUri).then((mongoose) => {
       return mongoose;
     });
   }
