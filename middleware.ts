@@ -2,6 +2,13 @@ import { getToken } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
 
 const PUBLIC_FILE = /\.(.*)$/;
+const LOCALES = ["es", "en"] as const;
+type Locale = (typeof LOCALES)[number];
+
+function getLocaleFromPath(pathname: string): Locale | null{
+    const seg = pathname.split("/")[1];
+    return (LOCALES as readonly string[]).includes(seg) ? (seg as Locale) : null;
+}
 
 export async function middleware(req: NextRequest) {
     const { pathname } = req.nextUrl;
@@ -22,11 +29,15 @@ export async function middleware(req: NextRequest) {
         return NextResponse.next();
     }
 
+    const locale = getLocaleFromPath(pathname);
+    const effectivePath = locale ? (pathname.replace(`/${locale}`, "") || "/") : pathname;
+
+
     //Definimos las zonas protegidas
     const isProtectedPage =
-        pathname.startsWith("/dashboard") ||
-        pathname.startsWith("/admin") ||
-        pathname.startsWith("/teacher");
+        effectivePath.startsWith("/dashboard") ||
+        effectivePath.startsWith("/admin") ||
+        effectivePath.startsWith("/teacher");
     
     const isProtectedApi =
         pathname.startsWith("/api/") &&
@@ -44,16 +55,17 @@ export async function middleware(req: NextRequest) {
         if (isProtectedApi) {
             return NextResponse.json({ok: false, message: "Unauthorized"}, {status: 401})
         }
+        
         const loginUrl = req.nextUrl.clone();
-        loginUrl.pathname = "/login";
-        loginUrl.searchParams.set("callbackUrl", pathname);
+        loginUrl.pathname = `/login`;
+        loginUrl.searchParams.set("callbackUrl", req.nextUrl.href);
         return NextResponse.redirect(loginUrl);
     }
 
     const role = token.role as "admin" | "teacher" | "student" | undefined; 
 
     const adminOnly =
-        pathname.startsWith("/dashboard/admin") ||
+        effectivePath.startsWith("/dashboard/admin") ||
         pathname.startsWith("/api/admin");
     
     if (adminOnly && role !== "admin") {
@@ -63,13 +75,14 @@ export async function middleware(req: NextRequest) {
                 { status: 403 }
             )
         }
+        const loc = locale ?? "es";
         const url = req.nextUrl.clone();
-        url.pathname = "/dashboard";
+        url.pathname = `/${loc}/dashboard`;
         return NextResponse.redirect(url);
     }
 
     const teacherOnly =
-        pathname.startsWith("/dashboard/teacher") || pathname.startsWith("/api/teacher");
+        effectivePath.startsWith("/dashboard/teacher") || pathname.startsWith("/api/teacher");
     
     if (teacherOnly && role !== "admin" && role !== "teacher") {
         if (isProtectedApi) {
@@ -78,8 +91,9 @@ export async function middleware(req: NextRequest) {
                 { status: 403 }
             )
         }
+        const loc = locale ?? "es";
         const url = req.nextUrl.clone();
-        url.pathname = "/dashboard";
+        url.pathname = `/${loc}/dashboard`;
         return NextResponse.redirect(url);
     }
 
@@ -88,12 +102,13 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-     matcher: [
-    
+  matcher: [
+    "/(es|en)/dashboard/:path*",
+    "/(es|en)/admin/:path*",
+    "/(es|en)/teacher/:path*",
     "/dashboard/:path*",
     "/admin/:path*",
     "/teacher/:path*",
-
     "/api/:path*",
   ],
 }
