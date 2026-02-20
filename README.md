@@ -34,3 +34,55 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+```
+costaspanish-lms
+├─ README.md
+├─ app
+│  ├─ (public)
+│  │  ├─ layout.tsx
+│  │  └─ login
+│  │     ├─ LoginForm.tsx
+│  │     └─ page.tsx
+│  ├─ [locale]
+│  │  ├─ dashboard
+│  │  │  └─ page.tsx
+│  │  ├─ layout.tsx
+│  │  └─ page.tsx
+│  ├─ api
+│  │  ├─ auth
+│  │  ├─ seed-admin
+│  │  │  └─ route.ts
+│  │  ├─ test-db
+│  │  │  └─ route.ts
+│  │  └─ users-test
+│  │     └─ route.ts
+│  ├─ favicon.ico
+│  ├─ globals.css
+│  ├─ layout.tsx
+│  └─ page.tsx
+├─ components
+│  └─ ui
+│     └─ Switch.tsx
+├─ eslint.config.mjs
+├─ lib
+│  ├─ auth.ts
+│  ├─ mongo.ts
+│  └─ types
+│     ├─ global.d.ts
+│     └─ next-auth.d.ts
+├─ middleware.ts
+├─ models
+│  └─ User.ts
+├─ next.config.ts
+├─ package-lock.json
+├─ package.json
+├─ postcss.config.mjs
+├─ public
+│  └─ assets
+│     ├─ LogoCostaSpanishRojoCoralFuerte.png
+│     └─ sloganLogoRojoCoralFuerte.png
+├─ tailwind.config.js
+└─ tsconfig.json
+
+```

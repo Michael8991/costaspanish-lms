@@ -1,9 +1,11 @@
-"use client"
+"use client";
 
-import { LoginForm } from "./LoginForm"
+import { LoginForm } from "./LoginForm";
 
-export default function Login() {
-  return (
-    <LoginForm/>
-  )
-};
+export default function Login({
+  searchParams,
+}: {
+  searchParams: { callbackUrl?: string };
+}) {
+  return <LoginForm callbackUrl={searchParams.callbackUrl} />;
+}
