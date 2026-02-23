@@ -1,5 +1,12 @@
 import { notFound } from "next/navigation";
 
+import { Varela_Round } from "next/font/google";
+
+const varela = Varela_Round({
+  subsets: ["latin"],
+  weight: ["400"], // Los grosores que vayas a usar
+});
+
 const SUPPORTED = ["en", "es"] as const;
 type SupportedLocale = (typeof SUPPORTED)[number];
 
@@ -20,7 +27,7 @@ export default async function LocaleLayout({
 
   return (
     <html lang={locale}>
-      <body>{children}</body>
+      <body className={varela.className}>{children}</body>
     </html>
   );
 }
