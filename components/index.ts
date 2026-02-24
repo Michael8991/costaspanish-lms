@@ -1,3 +1,5 @@
 export * from "./dashboard/Topbar"
 export * from "./dashboard/DashboardShell"
 export * from "./3dIcons/Hello"
+export * from "./dashboard/teacher/TeacherTodaySchedule"
+export * from "./dashboard/teacher/GoogleConnected"

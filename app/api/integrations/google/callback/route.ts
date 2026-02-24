@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/mongo";
 import User from "@/models/User";
 import { verifyState } from "@/lib/googleOAuthState";
@@ -10,8 +8,6 @@ type TokenResponse = {
   expires_in: number;
   refresh_token?: string;
   scope?: string;
-  token_type?: string;
-  id_token?: string;
 };
 
 export async function GET(req: Request) {
@@ -23,14 +19,13 @@ export async function GET(req: Request) {
   if (error) return NextResponse.json({ error }, { status: 400 });
   if (!code || !state) return NextResponse.json({ error: "Missing code/state" }, { status: 400 });
 
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (session.user.role !== "teacher") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
   const decoded = verifyState(state, process.env.NEXTAUTH_SECRET!);
-  if (!decoded || decoded.uid !== session.user.id) {
-    return NextResponse.json({ error: "Invalid state" }, { status: 400 });
-  }
+  if (!decoded?.uid) return NextResponse.json({ error: "Invalid state" }, { status: 400 });
+
+  await dbConnect();
+  const user = await User.findById(decoded.uid).select("role");
+  if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+  if (user.role !== "teacher") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const redirectUri = `${process.env.NEXTAUTH_URL}/api/integrations/google/callback`;
 
@@ -53,7 +48,6 @@ export async function GET(req: Request) {
 
   const expiresAt = Date.now() + tokenJson.expires_in * 1000;
 
-  await dbConnect();
   const update: Record<string, unknown> = {
     "google.connected": true,
     "google.scope": tokenJson.scope ?? null,
@@ -62,13 +56,10 @@ export async function GET(req: Request) {
     "google.updatedAt": new Date(),
   };
 
-
   if (tokenJson.refresh_token) update["google.refreshToken"] = tokenJson.refresh_token;
 
-  await User.updateOne({ _id: session.user.id }, { $set: update });
-
-
-  return NextResponse.redirect(
-  `${process.env.NEXTAUTH_URL}/es/dashboard?google=connected`
-);
+  await User.updateOne({ _id: decoded.uid }, { $set: update });
+ 
+  const locale = "es";
+  return NextResponse.redirect(`${process.env.NEXTAUTH_URL}/${locale}/dashboard?google=connected`);
 }

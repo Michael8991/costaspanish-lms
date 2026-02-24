@@ -111,26 +111,39 @@ export async function GET(req: Request) {
   const from = searchParams.get("from");
   const to = searchParams.get("to");
 
-  const fromDate = from ? new Date(from) : new Date();
-  const toDate = to ? new Date(to) : new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const now = new Date();
+
+const startOfDay = new Date(now);
+startOfDay.setHours(0, 0, 0, 0);
+
+const endOfDay = new Date(now);
+endOfDay.setHours(23, 59, 59, 999);
+
+const fromDate = from ? new Date(from) : startOfDay;
+const toDate = to ? new Date(to) : endOfDay;
 
   const google = await loadGoogleTokens(userId);
+if (!google?.connected || !google.accessToken) {
+  return NextResponse.json({ connected: false, events: [] satisfies CalendarEventDTO[] });
+}
 
-  if (!google?.connected || !google.refreshToken) {
-    return NextResponse.json({ connected: false, events: [] satisfies CalendarEventDTO[] });
+let accessToken = google.accessToken;
+const isExpired = !google.expiresAt || google.expiresAt <= Date.now() + 30_000;
+
+if (isExpired) {
+  if (!google.refreshToken) {
+    return NextResponse.json(
+      { connected: false, error: "missing_refresh_token", events: [] satisfies CalendarEventDTO[] },
+      { status: 401 }
+    );
   }
-
-  let accessToken = google.accessToken;
-  const isExpired = !google.expiresAt || google.expiresAt <= Date.now() + 30_000;
-
-  if (!accessToken || isExpired) {
-    const refreshed = await refreshGoogleAccessToken(google.refreshToken);
-    accessToken = refreshed.accessToken;
-    await saveGoogleAccessToken(userId, refreshed.accessToken, refreshed.expiresAt);
-  }
-
+  const refreshed = await refreshGoogleAccessToken(google.refreshToken);
+  accessToken = refreshed.accessToken;
+  await saveGoogleAccessToken(userId, refreshed.accessToken, refreshed.expiresAt);
+}
   const calendarId = encodeURIComponent(google.calendarId);
   const url = new URL(`https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events`);
+  url.searchParams.set("timeZone", "Europe/Madrid");
   url.searchParams.set("timeMin", toISO(fromDate));
   url.searchParams.set("timeMax", toISO(toDate));
   url.searchParams.set("singleEvents", "true");

@@ -1,7 +1,7 @@
-import { Hello } from "@/components";
+import { GoogleConnected, Hello } from "@/components";
+import TeacherTodaySchedule from "@/components/dashboard/teacher/TeacherTodaySchedule";
 import { authOptions } from "@/lib/auth";
 import { getServerSession } from "next-auth";
-import Link from "next/link";
 
 export default async function TeacherHome({ locale }: { locale: string }) {
   const session = await getServerSession(authOptions);
@@ -27,15 +27,14 @@ export default async function TeacherHome({ locale }: { locale: string }) {
         </h1>
         <p className="text-sm text-gray-500 italic">{formattedDate}</p>
       </div>
-      <div className="w-full my-4 text-black flex flex-col">
-        <p className="font-bold my-2">Today&apos;s Schedule</p>
+      <div className="w-full my-4 text-black flex flex-col bg-[#30343f] p-3 rounded-lg shadow-xs">
+        <div className="flex mb-2 items-center justify-between">
+          <p className="font-semibold my-2 text-white">Today&apos;s Schedule</p>
+          <GoogleConnected />
+        </div>
+
         <div>
-          <Link
-            href="/api/integrations/google/start"
-            className="inline-flex items-center rounded-md border px-4 py-2 text-sm"
-          >
-            Connect Google Calendar
-          </Link>
+          <TeacherTodaySchedule />
         </div>
       </div>
     </div>
