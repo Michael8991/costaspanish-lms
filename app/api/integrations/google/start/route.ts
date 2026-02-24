@@ -29,7 +29,7 @@ export async function GET() {
       "openid",
       "email",
       "profile",
-      "https://www.googleapis.com/auth/calendar.events", // o readonly en fase 1
+      "https://www.googleapis.com/auth/calendar.events",
     ].join(" ")
   );
   url.searchParams.set("state", state);

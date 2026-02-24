@@ -7,15 +7,17 @@ import StudentHome from "./home/StudentHome";
 export default async function DashboardPage({
   params,
 }: {
-  params: { locale: string };
+  params: Promise<{ locale: string }>;
 }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return null;
 
+  const { locale } = await params;
+
   const role = session.user.role;
 
-  if (role === "admin") return <AdminHome locale={params.locale} />;
-  if (role === "teacher") return <TeacherHome locale={params.locale} />;
+  if (role === "admin") return <AdminHome locale={locale} />;
+  if (role === "teacher") return <TeacherHome locale={locale} />;
 
-  return <StudentHome locale={params.locale} />;
+  return <StudentHome locale={locale} />;
 }
