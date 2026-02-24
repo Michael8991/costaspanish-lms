@@ -8,12 +8,11 @@ export default async function DashboardLayout({
   params,
 }: {
   children: React.ReactNode;
-  params: { locale: string };
+  params: Promise<{ locale: string }>;
 }) {
-  const session = await getServerSession(authOptions);
-  if (!session) redirect(`/login?callbackUrl=/${params.locale}/dashboard`);
-
   const { locale } = await params;
+  const session = await getServerSession(authOptions);
+  if (!session) redirect(`/login?callbackUrl=/${locale}/dashboard`);
 
   return (
     <DashboardShell
