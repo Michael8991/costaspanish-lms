@@ -47,7 +47,8 @@ export async function middleware(req: NextRequest) {
   const isProtectedApi =
     pathname.startsWith("/api/") &&
     !pathname.startsWith("/api/auth") &&
-    !pathname.startsWith("/api/seed-admin");
+    !pathname.startsWith("/api/seed-admin") &&
+    !pathname.startsWith("/api/seed-teacher");
 
   if (!isProtectedPage && !isProtectedApi) {
     return NextResponse.next();

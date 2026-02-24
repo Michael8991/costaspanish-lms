@@ -47,7 +47,7 @@ export const LoginForm = ({ callbackUrl }: { callbackUrl?: string }) => {
   }
 
   return (
-    <div className="bg-gray-50 flex w-full min-h-screen items-center align-middle">
+    <div className="bg-gray-50 flex w-full min-h-screen items-center align-middle text-black">
       <div className="login-wrap max-xl:mx-auto w-200 min-h-125 mx-auto shadow-lg rounded-lg bg-white p-2">
         <div className="grid grid-cols-2 xl:grid-cols-12 xl:gap-0 xl:w-full xl:h-full p-5">
           <div className="flex flex-col max-xl:mb-5 px-5 col-span-7 items-center justify-center align-middle">

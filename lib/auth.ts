@@ -3,6 +3,7 @@ import User from "@/models/User";
 import bcrypt from "bcryptjs";
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import GoogleProvider from "next-auth/providers/google"
 
 export const authOptions: NextAuthOptions = {
   session: {
@@ -42,7 +43,24 @@ export const authOptions: NextAuthOptions = {
         };
       },
     }),
+    // GoogleProvider({
+    //   clientId: process.env.GOOGLE_CLIENT_ID!,
+    //   clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    //   authorization: {
+    //     params: {
+    //       scope: [
+    //         "openid",
+    //         "email",
+    //         "profile",
+    //         "https://www.googleapis.com/auth/calendar.events",
+    //       ].join(" "),
+    //       access_type: "offline",
+    //       prompt: "consent",
+    //     },
+    //   },
+    // }),
   ],
+
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
@@ -64,4 +82,66 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: "/login",
   },
+  //**Callback para inicio con google */
+//  callbacks: {
+//   async jwt({ token, user, account }) {
+//     // Credentials login
+//     if (user) {
+//       token.uid = user.id;
+//       token.role = user.role;
+//       token.preferredLanguage = user.preferredLanguage;
+//       token.name = user.name ?? token.name;
+//       token.email = user.email ?? token.email;
+//     }
+
+//     // Google connect
+//     if (account?.provider === "google") {
+//       token.googleConnected = true;
+//       token.googleExpiresAt = account.expires_at
+//         ? account.expires_at * 1000
+//         : undefined;
+
+//       if (token.uid) {
+//         await dbConnect();
+
+//         const update: Record<string, unknown> = {
+//           "google.connected": true,
+//           "google.email": token.email,
+//           "google.scope": account.scope,
+//           "google.expiresAt": account.expires_at
+//             ? account.expires_at * 1000
+//             : undefined,
+//           "google.updatedAt": new Date(),
+//         };
+
+//         if (account.access_token) {
+//           update["google.accessToken"] = account.access_token;
+//         }
+
+//         if (account.refresh_token) {
+//           update["google.refreshToken"] = account.refresh_token;
+//         }
+
+//         await User.updateOne({ _id: token.uid }, { $set: update });
+//       }
+//     }
+
+//     return token;
+//   },
+
+//   async session({ session, token }) {
+//     if (session.user) {
+//       session.user.id = token.uid;
+//       session.user.role = token.role;
+//       session.user.preferredLanguage = token.preferredLanguage;
+//     }
+
+//     session.googleConnected = Boolean(token.googleConnected);
+
+//     return session;
+//   },
+// },
+//   pages: {
+//     signIn: "/login",
+//   },
 };

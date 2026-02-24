@@ -13,11 +13,13 @@ export default async function DashboardLayout({
   const session = await getServerSession(authOptions);
   if (!session) redirect(`/login?callbackUrl=/${params.locale}/dashboard`);
 
+  const { locale } = await params;
+
   return (
     <DashboardShell
-      locale={params.locale}
+      locale={locale}
       role={session.user.role}
-      userName={session.user.name ?? session.user.name ?? "User"}
+      userName={session.user.name ?? session.user.email ?? "User"}
     >
       {children}
     </DashboardShell>
