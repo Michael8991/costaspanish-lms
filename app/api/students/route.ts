@@ -1,7 +1,10 @@
 import { requireAuth, requireRole } from "@/lib/auth/apiAuth"
 import dbConnect from "@/lib/mongo";
-import { StudentProfile } from "@/models/StudentProfile";
+import { StudentProfile, StudentProfileDoc } from "@/models/StudentProfile";
 import { NextRequest, NextResponse } from "next/server"
+import mongoose from "mongoose";
+
+
 
 export async function POST(req: NextRequest){
     const user = await requireAuth(req);
@@ -12,8 +15,8 @@ export async function POST(req: NextRequest){
     const body = await req.json().catch(() => null);
     if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
     
-    const { fullName, email, name, billingType, classType, validUntil } = body; //? Si estoy creando no puedo meter userId como requerido en estas validaciones no?
-
+    const { fullName, email, name, billingType, classType, validUntil } = body; 
+    
     if (!fullName) {
         return NextResponse.json({error: "Full name is required"}, {status: 400})
     }
@@ -82,4 +85,59 @@ export async function POST(req: NextRequest){
             { status: 500 }
         );
     }
+}
+
+export async function GET(req: NextRequest) {
+    const user = await requireAuth(req);
+    if (!requireRole(user, ["admin", "teacher"])) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    } 
+
+    await dbConnect();
+
+    const searchParams = req.nextUrl.searchParams;
+    
+    const q = (searchParams.get("q") || "").trim();
+    const statusPlan = (searchParams.get("statusPlan") || "").trim();
+    const academicLevel = (searchParams.get("academicLevel") || "").trim();
+    const classType = (searchParams.get("classType") || "").trim();
+
+    const page = Math.max(1, Number(searchParams.get("page") || 1));
+    const limit = Math.min(50, Math.max(1, Number(searchParams.get("limit") || 20)))
+    
+    const skip = (page - 1) * limit;
+
+   const filter: mongoose.QueryFilter<StudentProfileDoc> = {};
+
+    if (q) {
+        filter.fullName = { $regex: q, $options: "i" };
+    }
+
+    if (academicLevel) {
+        filter.level = academicLevel; 
+    }
+
+    if (statusPlan) {
+        filter["activePlans.status"] = statusPlan;
+    }
+
+    if (classType) {
+        filter["activePlans.classType"] = classType;
+    }
+
+        const[items, total] = await Promise.all([
+            StudentProfile.find(filter)
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+        StudentProfile.countDocuments(filter)
+    ]);
+
+    return NextResponse.json({
+        page,
+        limit,
+        total,
+        items,
+    })
 }
