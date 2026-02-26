@@ -7,6 +7,7 @@ export type PlanStatus = "active" | "exhausted" | "expired" | "canceled";
 export type AcademicLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | "Evaluando";
 
 export interface PlanDoc { 
+        _id: Types.ObjectId;
     name: string;
     billingType: PlanBillingType;
     classType: ClassType;
