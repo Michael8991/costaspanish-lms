@@ -28,7 +28,18 @@ export async function PATCH(req: NextRequest, {
     };
 
     if (typeof body.fullName === "string") patch.$set!.fullName = body.fullName.trim();
-    if (typeof body.email === "string") patch.$set!.email = body.email.trim().toLowerCase();
+    if (typeof body.contactEmail === "string") {
+        const e = body.contactEmail.trim();
+        patch.$set!.contactEmail = e;
+        patch.$set!.contactEmailLower = e.toLowerCase();
+    }
+
+
+    if (typeof body.email === "string" && typeof body.contactEmail !== "string") {
+        const e = body.email.trim();
+        patch.$set!.contactEmail = e;
+        patch.$set!.contactEmailLower = e.toLowerCase();
+    }
     if (typeof body.phone === "string") patch.$set!.phone = body.phone.trim();
     if (typeof body.country === "string") patch.$set!.country = body.country.trim();
     if (typeof body.timezone === "string") patch.$set!.timezone = body.timezone.trim();

@@ -15,14 +15,15 @@ export async function POST(req: NextRequest){
     const body = await req.json().catch(() => null);
     if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
     
-    const { fullName, email, name, billingType, classType, validUntil } = body; 
+    const { fullName,contactEmail, email, name, billingType, classType, validUntil } = body; 
+
+    const rawEmail = (typeof contactEmail === "string" ? contactEmail : typeof email === "string" ? email : "").trim();
+    const contactEmailLower = rawEmail.toLowerCase();
     
     if (!fullName) {
         return NextResponse.json({error: "Full name is required"}, {status: 400})
     }
-    if (!email) {
-        return NextResponse.json({error: "Email is required"}, {status: 400})
-    }
+    if (!rawEmail) return NextResponse.json({ error: "Contact email is required" }, { status: 400 });
     if (!name) {
         return NextResponse.json({error: "Plan name is required"}, {status: 400})
     }
@@ -40,7 +41,8 @@ export async function POST(req: NextRequest){
 
     try {
         const newStudent = await StudentProfile.create({
-            email: body.email,
+            contactEmail: rawEmail,
+            contactEmailLower,
             fullName: body.fullName,
             phone: body.phone,
             country: body.country,

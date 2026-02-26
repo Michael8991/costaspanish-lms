@@ -20,7 +20,8 @@ export interface PlanDoc {
 export interface StudentProfileDoc{
     _id: Types.ObjectId;
     userId?: Types.ObjectId;
-    email: string;
+    contactEmail: string;
+    contactEmailLower: string;
     fullName: string;
     phone?: string;
     country?: string;
@@ -43,12 +44,13 @@ const PlanSchema = new Schema<PlanDoc>({
     creditsRemaining: { type: Number },
     validFrom: { type: Date, default: () => new Date() },
     validUntil: { type: Date, required: true },
-    status:{type: String, enum:[ "active" , "exhausted" , "expired" , "canceled"], defult: "active"}
+    status: { type: String, enum: ["active", "exhausted", "expired", "canceled"], default: "active" }
 })
 
 const StudentProfileSchema = new Schema<StudentProfileDoc>({
     userId: { type: Schema.Types.ObjectId, ref: "User", index: true },
-    email: { type: String, required: true, unique: true, trim: true, lowercase: true },
+    contactEmail: { type: String, required: true, trim: true },
+    contactEmailLower: {type: String, required: true, unique: true, index: true, trim: true},
     fullName: { type: String, required: true, trim: true, maxlength: 120 },
     
     phone: { type: String, trim: true, maxlength: 30 },
@@ -64,5 +66,10 @@ const StudentProfileSchema = new Schema<StudentProfileDoc>({
 
     isActive: { type: Boolean, default: true, index: true},
 }, { timestamps: true });
+
+StudentProfileSchema.index(
+    { userId: 1 },
+    {unique: true, partialFilterExpression:{userId:{$exists: true}}}
+)
 
 export const StudentProfile: Model<StudentProfileDoc> = models.StudentProfile || model<StudentProfileDoc>("StudentProfile", StudentProfileSchema) 
