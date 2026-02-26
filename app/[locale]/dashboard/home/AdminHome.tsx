@@ -18,7 +18,7 @@ export default async function AdminHome({ locale }: { locale: string }) {
   );
 
   return (
-    <div className="w-full container mx-auto my-10">
+    <div className="container mx-auto py-8 px-4 md:px-8 text-gray-800 max-w-6xl">
       <div className="text-black">
         <h1 className="flex items-center gap-2 text-xl font-bold">
           Hola, {session.user.name}!

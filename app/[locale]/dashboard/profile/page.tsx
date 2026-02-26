@@ -6,7 +6,7 @@ export default async function ProfilePage() {
   if (!session) return null;
 
   return (
-    <div className="container my-10 w-full flex align-middle mx-auto min-h-screen">
+    <div className="container mx-auto py-8 px-4 md:px-8 text-gray-800 max-w-6xl">
       <div className="w-full flex flex-col items-start">
         <h1 className="w-full text-2xl text-black font-bold">
           Account Settings

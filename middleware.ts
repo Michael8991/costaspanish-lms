@@ -95,7 +95,9 @@ export async function middleware(req: NextRequest) {
   const teacherOnly =
     effectivePath.startsWith("/teacher") ||
     effectivePath.startsWith("/dashboard/teacher") ||
-    pathname.startsWith("/api/teacher");
+    effectivePath.startsWith("/dashboard/students") || 
+    pathname.startsWith("/api/teacher") ||
+    pathname.startsWith("/api/students");
 
   if (teacherOnly && role !== "admin" && role !== "teacher") {
     if (isProtectedApi) {
