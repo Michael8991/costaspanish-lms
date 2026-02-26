@@ -4,13 +4,17 @@ import { StudentProfile, StudentProfileDoc } from "@/models/StudentProfile";
 import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, {
+    params
+}: {
+        params: Promise<{ id: string }>;
+}) {
     const user = await requireAuth(req);
     if (!requireRole(user, ["admin", "teacher"])) {
         return NextResponse.json({error: "Unauthorized"}, {status: 401})
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     if (!mongoose.isValidObjectId(id)) {
         return NextResponse.json({ error: "Invalid id"}, { status: 400 });
