@@ -23,7 +23,7 @@ export default async function StudentsPage({
         A quick summary of all ours students, their information and plans
       </p>
       <SummaryStudentsData />
-      <StudentsTable />
+      <StudentsTable locale={locale} />
     </div>
   );
 }

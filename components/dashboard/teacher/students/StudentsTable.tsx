@@ -1,6 +1,18 @@
 "use client";
 
-import { Search, Plus, MoreVertical, Mail } from "lucide-react";
+import {
+  Search,
+  Plus,
+  MoreVertical,
+  Mail,
+  LucideIcon,
+  FileUser,
+  CreditCard,
+  UserRoundPen,
+  Send,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {Link} from "next/link";
 
 const mockStudents = [
   {
@@ -113,6 +125,35 @@ const mockStudents = [
   },
 ];
 
+type QuickOptionsMenu = {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+};
+
+const quickOptionsMenu: QuickOptionsMenu[] = [
+  {
+    label: "Profile details",
+    href: `/dashboard/students/`,
+    icon: FileUser,
+  },
+  {
+    label: "Renew voucher",
+    href: `/dashboard/students/`,
+    icon: CreditCard,
+  },
+  {
+    label: "Edit profile",
+    href: `/dashboard/students/`,
+    icon: UserRoundPen,
+  },
+  {
+    label: "Send email",
+    href: `/dashboard/students/`,
+    icon: Send,
+  },
+];
+
 const getLevelBadge = (level: string) => {
   if (level === "Evaluando")
     return "bg-amber-100 text-amber-700 border-amber-200";
@@ -123,7 +164,27 @@ const getLevelBadge = (level: string) => {
   return "bg-purple-100 text-purple-700 border-purple-200";
 };
 
-export default function StudentsTable() {
+export default function StudentsTable({ locale }: { locale: string }) {
+  const withLocale = (path: string) =>
+    `/${locale}${path.startsWith("/") ? path : `/${path}`}`;
+
+  const [isOpenQO, setIsOpenQO] = useState(false);
+  const toggleQuickOptionsMenu = () => setIsOpenQO((prev) => !prev);
+
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        setIsOpenQO(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-5 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4 bg-gray-50/50">
@@ -210,10 +271,19 @@ export default function StudentsTable() {
                 </td>
 
                 <td className="px-6 py-4 text-right">
-                  <button className="p-2 text-gray-400 hover:text-[#9e2727] hover:bg-red-50 rounded-lg transition-colors">
+                  <button
+                    onClick={toggleQuickOptionsMenu}
+                    className="p-2 text-gray-400 hover:text-[#9e2727] hover:bg-red-50 rounded-lg transition-colors"
+                  >
                     <MoreVertical size={20} />
                   </button>
                 </td>
+                <div className="absolute right-0 mt-3 min-w-50 z-50 flex flex-col rounded-lg bg-white shdow-xl gap-2 origin-top-right ">
+                  {quickOptionsMenu.map((item) => {
+                    const Icon = item.icon;
+                    return <Link key={student.id}>item.label</Link>;
+                  })}
+                </div>
               </tr>
             ))}
           </tbody>

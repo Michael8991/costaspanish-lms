@@ -127,7 +127,7 @@ export const Topbar = ({
               className="relative  hover:cursor-pointer flex rounded-lg bg-[#9e2727] py-2 px-3 md:px-6 items-center gap-2 hover:bg-[#9e4141] transition duration-200 ease-in-out text-white"
             >
               <div className="hidden sm:flex flex-col text-left">
-                <p className="font-semibold text-sm md:text-base truncate max-w-[100px] xl:max-w-full">
+                <p className="font-semibold text-sm md:text-base truncate max-w-25 xl:max-w-full">
                   {userName}
                 </p>
                 <p className="text-gray-200 italic text-xs capitalize hidden md:block">
@@ -146,7 +146,7 @@ export const Topbar = ({
             {/* Dropdown del Perfil */}
             <div
               className={`
-                absolute right-0 mt-3 min-w-[200px] z-50
+                absolute right-0 mt-3 min-w-50 z-50
                 flex flex-col rounded-lg bg-[#9e2727] py-3 px-4 shadow-xl gap-2
                 origin-top-right transform transition-all duration-200 ease-out text-white border border-[#b84242]
                 ${isOpen ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 -translate-y-2 pointer-events-none"}
@@ -186,7 +186,7 @@ export const Topbar = ({
       <div
         className={`
           lg:hidden w-full bg-[#272a33] border-t border-gray-700 overflow-hidden transition-all duration-300 ease-in-out
-          ${isMobileMenuOpen ? "max-h-[400px] opacity-100 border-opacity-100" : "max-h-0 opacity-0 border-opacity-0"}
+          ${isMobileMenuOpen ? "max-h-100 opacity-100 border-opacity-100" : "max-h-0 opacity-0 border-opacity-0"}
         `}
       >
         <div className="flex flex-col px-4 py-4 gap-2">
