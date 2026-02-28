@@ -7,12 +7,14 @@ import {
   Settings,
   SquareArrowRightExit,
   User,
-  Menu, // 🔥 Añadido para el menú hamburguesa
-  X, // 🔥 Añadido para cerrar el menú hamburguesa
+  Menu,
+  X,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+
+import { signOut } from "next-auth/react";
 
 type MenuItem = {
   label: string;
@@ -83,7 +85,7 @@ export const Topbar = ({
 
   return (
     <div className="relative flex flex-col w-full bg-[#30343f] shadow-md z-50">
-      <div className="flex justify-between items-center lg:grid lg:grid-cols-3 py-2 px-4 md:px-10 w-full min-h-25 max-w-7xl mx-auto">
+      <div className="flex justify-between items-center lg:grid lg:grid-cols-4 py-2 px-4 md:px-10 w-full min-h-25 max-w-8xl mx-auto">
         <div className="flex items-center gap-4">
           <div className="relative w-30 h-20 md:w-37.5 md:h-20">
             <Image
@@ -102,7 +104,7 @@ export const Topbar = ({
           </button>
         </div>
 
-        <div className="hidden lg:flex w-full items-center justify-center gap-6 xl:gap-5">
+        <div className="hidden col-span-2 lg:flex w-full items-center justify-center gap-6 xl:gap-5">
           {activeNavItems.map((item, index) => (
             <Link
               key={index}
@@ -122,7 +124,7 @@ export const Topbar = ({
           <div ref={ref} className="relative inline-block text-center">
             <button
               onClick={toggleMenu}
-              className="relative flex rounded-lg bg-[#9e2727] py-2 px-3 md:px-6 items-center gap-2 hover:bg-[#9e4141] transition duration-200 ease-in-out text-white"
+              className="relative  hover:cursor-pointer flex rounded-lg bg-[#9e2727] py-2 px-3 md:px-6 items-center gap-2 hover:bg-[#9e4141] transition duration-200 ease-in-out text-white"
             >
               <div className="hidden sm:flex flex-col text-left">
                 <p className="font-semibold text-sm md:text-base truncate max-w-[100px] xl:max-w-full">
@@ -133,7 +135,6 @@ export const Topbar = ({
                 </p>
               </div>
 
-              {/* Icono por defecto visible solo en móvil cuando se oculta el texto */}
               <User size={20} className="sm:hidden" />
 
               <ChevronDown
@@ -153,6 +154,18 @@ export const Topbar = ({
             >
               {menuItems.map((item) => {
                 const Icon = item.icon;
+                if (item.label === "Log out") {
+                  return (
+                    <button
+                      key={item.href}
+                      onClick={() => signOut({ callbackUrl: "/login" })}
+                      className="hover:cursor-pointer flex gap-3 items-center px-3 py-2 hover:bg-[#a85d5d] rounded-lg transition duration-200 ease-in-out"
+                    >
+                      <Icon size={18} />
+                      <span className="text-sm">{item.label}</span>
+                    </button>
+                  );
+                }
                 return (
                   <Link
                     key={item.href}

@@ -13,7 +13,7 @@ const mockStudents = [
     creditsRemaining: 4,
   },
   {
-    id: "2",
+    id: "14",
     name: "John Smith",
     email: "john.smith@yahoo.com",
     level: "A1",
@@ -22,7 +22,88 @@ const mockStudents = [
     creditsRemaining: 8,
   },
   {
-    id: "3",
+    id: "13",
+    name: "Sophie Martin",
+    email: "sophie.m@outlook.com",
+    level: "Evaluando",
+    status: "exhausted",
+    planType: "Bono 5 Clases",
+    creditsRemaining: 0,
+  },
+  {
+    id: "12",
+    name: "Sophie Martin",
+    email: "sophie.m@outlook.com",
+    level: "Evaluando",
+    status: "exhausted",
+    planType: "Bono 5 Clases",
+    creditsRemaining: 0,
+  },
+  {
+    id: "11",
+    name: "Sophie Martin",
+    email: "sophie.m@outlook.com",
+    level: "Evaluando",
+    status: "exhausted",
+    planType: "Bono 5 Clases",
+    creditsRemaining: 0,
+  },
+  {
+    id: "10",
+    name: "Sophie Martin",
+    email: "sophie.m@outlook.com",
+    level: "Evaluando",
+    status: "exhausted",
+    planType: "Bono 5 Clases",
+    creditsRemaining: 0,
+  },
+  {
+    id: "9",
+    name: "Sophie Martin",
+    email: "sophie.m@outlook.com",
+    level: "Evaluando",
+    status: "exhausted",
+    planType: "Bono 5 Clases",
+    creditsRemaining: 0,
+  },
+  {
+    id: "8",
+    name: "Sophie Martin",
+    email: "sophie.m@outlook.com",
+    level: "Evaluando",
+    status: "exhausted",
+    planType: "Bono 5 Clases",
+    creditsRemaining: 0,
+  },
+  {
+    id: "7",
+    name: "Sophie Martin",
+    email: "sophie.m@outlook.com",
+    level: "Evaluando",
+    status: "exhausted",
+    planType: "Bono 5 Clases",
+    creditsRemaining: 0,
+  },
+  {
+    id: "6",
+    name: "Sophie Martin",
+    email: "sophie.m@outlook.com",
+    level: "Evaluando",
+    status: "exhausted",
+    planType: "Bono 5 Clases",
+    creditsRemaining: 0,
+  },
+  {
+    id: "5",
+    name: "Sophie Martin",
+    email: "sophie.m@outlook.com",
+    level: "Evaluando",
+    status: "exhausted",
+    planType: "Bono 5 Clases",
+    creditsRemaining: 0,
+  },
+  {
+    id: "4",
     name: "Sophie Martin",
     email: "sophie.m@outlook.com",
     level: "Evaluando",
@@ -46,7 +127,7 @@ export default function StudentsTable() {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-5 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4 bg-gray-50/50">
-        <h2 className="font-semibold text-gray-800 text-lg">Directorio</h2>
+        <h2 className="font-semibold text-gray-800 text-lg">Students</h2>
 
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
           <div className="relative w-full sm:w-72">
