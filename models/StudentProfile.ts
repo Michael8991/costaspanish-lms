@@ -25,14 +25,19 @@ export interface StudentProfileDoc{
     contactEmailLower: string;
     fullName: string;
     phone?: string;
+    
     country?: string;
+    nativeLanguage?: string;
     timezone: string;
     level: AcademicLevel;
-    nativeLanguage?: string;
     goals: string[];
+    
     internalNotes?: string;
+    
     activePlans: PlanDoc[];
+    
     isActive: boolean;
+    
     createdAt: Date;
     updatedAt: Date;
 }

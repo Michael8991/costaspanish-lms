@@ -180,7 +180,6 @@ export default function StudentsTable({ locale }: { locale: string }) {
   };
 
   useEffect(() => {
-    // Escuchamos los clics en toda la ventana
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
       if (
