@@ -18,7 +18,7 @@ export default async function StudentHome({ locale }: { locale: string }) {
   );
 
   return (
-    <div className="container mx-auto py-8 px-4 md:px-8 text-gray-800 max-w-6xl">
+    <div className="container mx-auto py-8 px-4 md:px-8 text-gray-800 max-w-6xl overflow-hidden">
       <div className="text-black">
         <h1 className="flex items-center gap-2 text-xl font-bold">
           Hola, {session.user.name}!

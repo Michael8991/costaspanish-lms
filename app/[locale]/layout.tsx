@@ -27,7 +27,7 @@ export default async function LocaleLayout({
 
   return (
     <html lang={locale}>
-      <body className={varela.className}>{children}</body>
+      <body className={`${varela.className}`}>{children}</body>
     </html>
   );
 }

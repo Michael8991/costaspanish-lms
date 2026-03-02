@@ -1,3 +1,6 @@
+//! TODO-1
+//! TODO-2
+
 "use client";
 
 import {
@@ -11,8 +14,10 @@ import {
   UserRoundPen,
   Send,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import {Link} from "next/link";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+
+//TODO 2 Borrar todos estos mocks y conectar a la base de datos
 
 const mockStudents = [
   {
@@ -131,6 +136,7 @@ type QuickOptionsMenu = {
   icon: LucideIcon;
 };
 
+//TODO 1
 const quickOptionsMenu: QuickOptionsMenu[] = [
   {
     label: "Profile details",
@@ -168,17 +174,23 @@ export default function StudentsTable({ locale }: { locale: string }) {
   const withLocale = (path: string) =>
     `/${locale}${path.startsWith("/") ? path : `/${path}`}`;
 
-  const [isOpenQO, setIsOpenQO] = useState(false);
-  const toggleQuickOptionsMenu = () => setIsOpenQO((prev) => !prev);
-
-  const ref = useRef<HTMLDivElement>(null);
+  const [isOpenQO, setIsOpenQO] = useState<string | null>(null);
+  const toggleQuickOptionsMenu = (studentId: string) => {
+    setIsOpenQO((prev) => (prev === studentId ? null : studentId));
+  };
 
   useEffect(() => {
+    // Escuchamos los clics en toda la ventana
     const handleClickOutside = (event: MouseEvent) => {
-      if (ref.current && !ref.current.contains(event.target as Node)) {
-        setIsOpenQO(false);
+      const target = event.target as Element;
+      if (
+        !target.closest(".menu-button") &&
+        !target.closest(".menu-dropdown")
+      ) {
+        setIsOpenQO(null);
       }
     };
+
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
@@ -203,12 +215,17 @@ export default function StudentsTable({ locale }: { locale: string }) {
             />
           </div>
 
-          <button className="w-full sm:w-auto bg-[#9e2727] hover:bg-[#a85d5d] text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-all shadow-sm font-medium text-sm">
+          <Link
+            href={`/${locale}/dashboard/students/newStudent`}
+            className="w-full sm:w-auto bg-[#9e2727] hover:bg-[#a85d5d] text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-all shadow-sm font-medium text-sm"
+          >
             <Plus size={18} />
             <span>Nuevo Alumno</span>
-          </button>
+          </Link>
         </div>
       </div>
+
+      {/* Tabla de alumnos */}
 
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
@@ -222,70 +239,86 @@ export default function StudentsTable({ locale }: { locale: string }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {mockStudents.map((student) => (
-              <tr
-                key={student.id}
-                className="hover:bg-gray-50/50 transition-colors group"
-              >
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center font-bold text-sm">
-                      {student.name.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">
-                        {student.name}
-                      </p>
-                      <div className="flex items-center gap-1 text-gray-500 text-sm">
-                        <Mail size={12} />
-                        <span>{student.email}</span>
+            {mockStudents.map((student, index) => {
+              const isLastRows = index >= mockStudents.length - 3;
+              return (
+                <tr
+                  key={student.id}
+                  className="hover:bg-gray-50/50 transition-colors group"
+                >
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center font-bold text-sm">
+                        {student.name.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">
+                          {student.name}
+                        </p>
+                        <div className="flex items-center gap-1 text-gray-500 text-sm">
+                          <Mail size={12} />
+                          <span>{student.email}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </td>
+                  </td>
 
-                <td className="px-6 py-4">
-                  <span
-                    className={`px-3 py-1 text-xs font-semibold rounded-full border ${getLevelBadge(student.level)}`}
-                  >
-                    {student.level}
-                  </span>
-                </td>
-
-                <td className="px-6 py-4 text-sm text-gray-600">
-                  {student.planType}
-                </td>
-
-                <td className="px-6 py-4">
-                  {student.creditsRemaining > 0 ? (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 text-green-700 text-sm font-medium border border-green-100">
-                      <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                      {student.creditsRemaining} clases
+                  <td className="px-6 py-4">
+                    <span
+                      className={`px-3 py-1 text-xs font-semibold rounded-full border ${getLevelBadge(student.level)}`}
+                    >
+                      {student.level}
                     </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 text-red-700 text-sm font-medium border border-red-100">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
-                      Agotado
-                    </span>
-                  )}
-                </td>
+                  </td>
 
-                <td className="px-6 py-4 text-right">
-                  <button
-                    onClick={toggleQuickOptionsMenu}
-                    className="p-2 text-gray-400 hover:text-[#9e2727] hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    <MoreVertical size={20} />
-                  </button>
-                </td>
-                <div className="absolute right-0 mt-3 min-w-50 z-50 flex flex-col rounded-lg bg-white shdow-xl gap-2 origin-top-right ">
-                  {quickOptionsMenu.map((item) => {
-                    const Icon = item.icon;
-                    return <Link key={student.id}>item.label</Link>;
-                  })}
-                </div>
-              </tr>
-            ))}
+                  <td className="px-6 py-4 text-sm text-gray-600">
+                    {student.planType}
+                  </td>
+
+                  <td className="px-6 py-4">
+                    {student.creditsRemaining > 0 ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 text-green-700 text-sm font-medium border border-green-100">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                        {student.creditsRemaining} clases
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 text-red-700 text-sm font-medium border border-red-100">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                        Agotado
+                      </span>
+                    )}
+                  </td>
+
+                  <td className="px-6 py-4 text-right relative">
+                    <button
+                      onClick={() => toggleQuickOptionsMenu(student.id)}
+                      className={`p-2 text-gray-400 hover:text-[#9e2727] hover:bg-red-50 rounded-lg transition-colors hover:cursor-pointer`}
+                    >
+                      <MoreVertical size={20} />
+                    </button>
+                    <div
+                      className={`py-4 px-4 absolute right-0 mt-3 min-w-55 z-50 flex flex-col rounded-lg bg-[#9e2727] gap-3 origin-top-right shadow-xl transform transition-all duration-200 ease-in-out -translate-x-5 justify-center
+                                ${isLastRows ? "bottom-10 origin-bottom-right" : "top-12 origin-top-right"}
+                                ${isOpenQO === student.id ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 -translate-y-2 pointer-events-none"}`}
+                    >
+                      {quickOptionsMenu.map((object, index) => {
+                        const Icon = object.icon;
+                        return (
+                          <Link
+                            key={index}
+                            href={withLocale(object.href)}
+                            className="flex items-center hover:bg-[#a85d5d] py-2 px-4 rounded-lg text-white transform transition-all duration-200 ease-in-out"
+                          >
+                            <Icon size={18} className="me-2" />
+                            {object.label}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
