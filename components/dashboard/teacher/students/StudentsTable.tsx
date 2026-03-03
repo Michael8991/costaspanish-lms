@@ -13,6 +13,7 @@ import {
   CreditCard,
   UserRoundPen,
   Send,
+  CalendarPlus,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -132,7 +133,7 @@ const mockStudents = [
 
 type QuickOptionsMenu = {
   label: string;
-  href: string;
+  href: (id: string) => string;
   icon: LucideIcon;
 };
 
@@ -140,22 +141,27 @@ type QuickOptionsMenu = {
 const quickOptionsMenu: QuickOptionsMenu[] = [
   {
     label: "Profile details",
-    href: `/dashboard/students/`,
+    href: (id) => `/dashboard/students/${id}`,
     icon: FileUser,
   },
   {
     label: "Renew voucher",
-    href: `/dashboard/students/`,
+    href: (id) => `/dashboard/students/${id}?action=renew`,
     icon: CreditCard,
   },
   {
+    label: "New Lesson",
+    href: (id) => `/dashboard/students/${id}/lessons/newLesson`,
+    icon: CalendarPlus,
+  },
+  {
     label: "Edit profile",
-    href: `/dashboard/students/`,
+    href: (id) => `/dashboard/students/${id}/edit`,
     icon: UserRoundPen,
   },
   {
     label: "Send email",
-    href: `/dashboard/students/`,
+    href: (id) => `/dashboard/students/${id}?action=email`,
     icon: Send,
   },
 ];
@@ -291,12 +297,12 @@ export default function StudentsTable({ locale }: { locale: string }) {
                   <td className="px-6 py-4 text-right relative">
                     <button
                       onClick={() => toggleQuickOptionsMenu(student.id)}
-                      className={`p-2 text-gray-400 hover:text-[#9e2727] hover:bg-red-50 rounded-lg transition-colors hover:cursor-pointer`}
+                      className={`menu-button p-2 text-gray-400 hover:text-[#9e2727] hover:bg-red-50 rounded-lg transition-colors hover:cursor-pointer`}
                     >
                       <MoreVertical size={20} />
                     </button>
                     <div
-                      className={`py-4 px-4 absolute right-0 mt-3 min-w-55 z-50 flex flex-col rounded-lg bg-[#9e2727] gap-3 origin-top-right shadow-xl transform transition-all duration-200 ease-in-out -translate-x-5 justify-center
+                      className={`menu-dropdown py-4 px-4 absolute right-0 mt-3 min-w-55 z-50 flex flex-col rounded-lg bg-[#9e2727] gap-3 origin-top-right shadow-xl transform transition-all duration-200 ease-in-out -translate-x-5 justify-center
                                 ${isLastRows ? "bottom-10 origin-bottom-right" : "top-12 origin-top-right"}
                                 ${isOpenQO === student.id ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 -translate-y-2 pointer-events-none"}`}
                     >
@@ -305,7 +311,8 @@ export default function StudentsTable({ locale }: { locale: string }) {
                         return (
                           <Link
                             key={index}
-                            href={withLocale(object.href)}
+                            onClick={() => setIsOpenQO(null)}
+                            href={withLocale(object.href(student.id))}
                             className="flex items-center hover:bg-[#a85d5d] py-2 px-4 rounded-lg text-white transform transition-all duration-200 ease-in-out"
                           >
                             <Icon size={18} className="me-2" />
