@@ -1,5 +1,13 @@
 import Breadcrumbs from "@/components/ui/Breadcrumbs";
-import { AlertTriangle, Calendar, CreditCard, Mail, Plus } from "lucide-react";
+import {
+  AlertTriangle,
+  Calendar,
+  CreditCard,
+  Mail,
+  Pencil,
+  Plus,
+} from "lucide-react";
+import Link from "next/link";
 // TODO: Esto vendrá de la base de datos usando el [id] de la URL
 const mockStudent = {
   id: "1",
@@ -82,27 +90,36 @@ export default async function StudentPage({
             </div>
           </div>
         </div>
-
-        {/* Botón de Cambiar Estado (Preparado para el Modal) */}
-        <button
-          className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-medium transition-colors shadow-sm ${
-            mockStudent.status === "active"
-              ? "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
-              : "bg-[#9e2727] border-[#9e2727] text-white hover:bg-[#8a2222]"
-          }`}
-        >
-          <AlertTriangle
-            size={16}
-            className={
-              mockStudent.status === "active" ? "text-amber-500" : "text-white"
-            }
-          />
-          {mockStudent.status === "active"
-            ? "Deactivate Student"
-            : "Activate Student"}
-        </button>
+        <div className="flex flex-col items-center justify-end gap-4">
+          {/* Botón de Cambiar Estado (Preparado para el Modal) */}
+          <button
+            className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-medium shadow-sm hover:cursor-pointer hover:bg-[#9e2727]! hover:border-[#9e2727] hover:text-white transition-colors transform duration-150 ease-in-out ${
+              mockStudent.status === "active"
+                ? "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                : "bg-[#9e2727] border-[#9e2727] text-white hover:bg-[#8a2222]"
+            }`}
+          >
+            <AlertTriangle
+              size={16}
+              className={
+                mockStudent.status === "active"
+                  ? "text-amber-500"
+                  : "text-white"
+              }
+            />
+            {mockStudent.status === "active"
+              ? "Deactivate Student"
+              : "Activate Student"}
+          </button>
+          <Link
+            className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-medium transition-colors shadow-sm bg-white border-gray-300 text-gray-700 hover:bg-green-800! hover:border-green-900 hover:text-white transform duration-150 ease-in-out`}
+            href={"#"}
+          >
+            <Pencil size={16} />
+            Edit Student
+          </Link>
+        </div>
       </section>
-      {/* COLUMNA IZQUIERDA: Planes Activos (Ocupa 2/3 en escritorio) */}
       <div className="xl:col-span-2 flex flex-col gap-6 my-5">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           {/* Header de la sección */}
@@ -182,6 +199,17 @@ export default async function StudentPage({
                 </div>
               );
             })}
+          </div>
+        </div>
+      </div>
+      <div className="xl:col-span-2 flex flex-col gap-6 my-5">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          {/* Header de la sección */}
+          <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+            <div className="flex items-center gap-2">
+              <CreditCard size={18} className="text-[#9e2727]" />
+              <h2 className="font-semibold text-gray-900">Basic information</h2>
+            </div>
           </div>
         </div>
       </div>
