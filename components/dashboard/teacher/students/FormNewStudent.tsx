@@ -1,3 +1,5 @@
+"use client";
+
 import { Switch } from "@/components/ui/Switch";
 import {
   Clock,
@@ -9,8 +11,12 @@ import {
   User,
   MapPin,
   GraduationCap,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { toast } from "sonner";
 
 const COUNTRIES = [
   "Australia",
@@ -73,10 +79,56 @@ const GOALS = [
   "Pronunciation & Accent",
   "Hobby / Just for fun",
 ];
-export default function FormNewStudent() {
+
+export default function FormNewStudent({ locale }: { locale: string }) {
+  const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    const formData = new FormData(e.currentTarget);
+    const goals = formData.getAll("goals");
+
+    const payload = {
+      fullName: formData.get("fullName"),
+      contactEmail: formData.get("contactEmail"),
+      phone: formData.get("phone"),
+      country: formData.get("country"),
+      nativeLanguage: formData.get("nativeLanguage"),
+      timezone: formData.get("timezone"),
+      level: formData.get("level"),
+      goals: goals,
+      internalNotes: formData.get("internalNotes"),
+      isActive: formData.get("isActive") === "on",
+    };
+
+    const saveStudentPromise = new Promise((resolve, reject) => {
+      //TODO: fetch reals
+      setTimeout(resolve, 2000);
+    });
+
+    toast.promise(saveStudentPromise, {
+      loading: "Creating student...",
+      success: "Student created successfully!",
+      error: "Error creating student. Please try again.",
+    });
+
+    try {
+      await saveStudentPromise;
+      router.push(`/${locale}/dashboard/students`);
+    } catch (error: unknown) {
+      console.log(error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <form
       action=""
+      onSubmit={handleSubmit}
       method="post"
       className="flex flex-col gap-8 p-4 max-w-4xl mx-auto text-gray-800"
     >
@@ -276,10 +328,18 @@ export default function FormNewStudent() {
             Cancel
           </Link>
           <button
+            disabled={isSubmitting}
             type="submit"
-            className="px-5 py-2.5 text-sm font-medium text-white bg-[#9e2727] rounded-lg hover:bg-[#8a2222] shadow-sm transition-colors"
+            className={`px-5 py-2.5 text-sm font-medium text-white bg-[#9e2727] rounded-lg hover:bg-[#8a2222] shadow-sm transition-colors hover:cursor-pointer flex items-center gap-2`}
           >
-            Save Student
+            {isSubmitting ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                Saving...
+              </>
+            ) : (
+              "Save Student"
+            )}
           </button>
         </div>
       </section>

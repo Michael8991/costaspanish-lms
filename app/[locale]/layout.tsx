@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { Varela_Round } from "next/font/google";
+import { Toaster } from "sonner";
 
 const varela = Varela_Round({
   subsets: ["latin"],
@@ -27,7 +28,10 @@ export default async function LocaleLayout({
 
   return (
     <html lang={locale}>
-      <body className={`${varela.className}`}>{children}</body>
+      <body className={`${varela.className}`}>
+        {children}
+        <Toaster richColors position="bottom-right" />
+      </body>
     </html>
   );
 }
