@@ -189,8 +189,8 @@ export default function StudentsTable({ locale }: { locale: string }) {
 
       {/* Tabla de alumnos */}
       {!isLoading && !error && students.length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="overflow-x-auto min-h-100">
+          <table className="w-full text-left border-collapse ">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 text-xs uppercase tracking-wider">
                 <th className="px-6 py-4 font-medium">Alumno</th>
@@ -202,7 +202,8 @@ export default function StudentsTable({ locale }: { locale: string }) {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {students.map((student, index) => {
-                const isLastRows = index >= students.length - 3;
+                const isLastRows =
+                  students.length > 4 && index >= students.length - 2;
                 return (
                   <tr
                     key={student.id}

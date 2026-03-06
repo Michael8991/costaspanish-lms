@@ -3,6 +3,7 @@ import Breadcrumbs from "@/components/ui/Breadcrumbs";
 import {
   AlertCircle,
   AlertTriangle,
+  ArrowLeft,
   ArrowRight,
   Calendar,
   CheckCircle,
@@ -123,6 +124,18 @@ export default async function StudentPage({
   return (
     <div className="container mx-auto py-8 px-4 md:px-8 text-gray-800 max-w-6xl">
       <Breadcrumbs items={breadcrumbItems} locale={locale} />
+      <div className="flex items-center justify-end">
+        <Link
+          href={`/${locale}/dashboard/students`}
+          className="flex items-center gap-2 text-sm group border rounded-lg px-2 py-1 border-gray-400 hover:bg-[#9e2727] hover:text-white transition-all transform duration-150 ease-in-out hover:border-[#9e2727]"
+        >
+          <ArrowLeft
+            size={12}
+            className="group-hover:-translate-x-1 transition-all transform duration-150 ease-in-out"
+          />
+          Volver
+        </Link>
+      </div>
       {/* 2. HEADER DEL PERFIL */}
       <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mt-6">
         <div className="flex flex-wrap items-center gap-6 max-md:justify-center ">

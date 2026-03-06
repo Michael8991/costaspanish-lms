@@ -145,21 +145,40 @@ export default function FormNewStudent({ locale }: { locale: string }) {
     const validPlayload = result.data;
 
     try {
-      const saveStudentPromise = new Promise((resolve) => {
-        //TODO: fetch reals
-        setTimeout(resolve, 2000);
-      });
+      const saveStudentPromise = fetch("/api/students", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
 
+        body: JSON.stringify({
+          ...validPlayload,
+          name: "Plan Inicial por Defecto",
+          billingType: "single",
+          classType: "private",
+          validUntil: new Date(
+            new Date().setFullYear(new Date().getFullYear() + 1),
+          ).toISOString(),
+        }),
+      }).then(async (res) => {
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(
+            errorData.error || "Error creating student. Please try again.",
+          );
+        }
+        return res.json();
+      });
       toast.promise(saveStudentPromise, {
         loading: "Creating student...",
         success: "Student created successfully!",
-        error: "Error creating student. Please try again.",
+        error: (err) =>
+          err.message || "Error creating student. Please try again.",
       });
 
       await saveStudentPromise;
       router.push(`/${locale}/dashboard/students`);
-    } catch (error: unknown) {
-      toast.error("Error creating student. Please try again.");
+    } catch (error) {
       console.log(error);
     } finally {
       setIsSubmitting(false);
@@ -167,9 +186,7 @@ export default function FormNewStudent({ locale }: { locale: string }) {
   };
   return (
     <form
-      action=""
       onSubmit={handleSubmit}
-      method="post"
       className="flex flex-col gap-8 p-4 max-w-4xl mx-auto text-gray-800"
     >
       {/* SECCIÓN 1: CONTACTO */}
