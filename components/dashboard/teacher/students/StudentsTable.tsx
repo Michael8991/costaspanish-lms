@@ -1,8 +1,6 @@
-//! TODO-1
-//! TODO-2
-
 "use client";
 
+import { DBStudent, TableStudent } from "@/lib/types/student";
 import {
   Search,
   Plus,
@@ -14,130 +12,18 @@ import {
   UserRoundPen,
   Send,
   CalendarPlus,
+  AlertCircle,
+  BrushCleaning,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-
-//TODO 2 Borrar todos estos mocks y conectar a la base de datos
-
-const mockStudents = [
-  {
-    id: "1",
-    name: "María García",
-    email: "maria.garcia@gmail.com",
-    level: "B2",
-    status: "active",
-    planType: "Bono 10 Clases",
-    creditsRemaining: 4,
-  },
-  {
-    id: "14",
-    name: "John Smith",
-    email: "john.smith@yahoo.com",
-    level: "A1",
-    status: "active",
-    planType: "Suscripción Mensual",
-    creditsRemaining: 8,
-  },
-  {
-    id: "13",
-    name: "Sophie Martin",
-    email: "sophie.m@outlook.com",
-    level: "Evaluando",
-    status: "exhausted",
-    planType: "Bono 5 Clases",
-    creditsRemaining: 0,
-  },
-  {
-    id: "12",
-    name: "Sophie Martin",
-    email: "sophie.m@outlook.com",
-    level: "Evaluando",
-    status: "exhausted",
-    planType: "Bono 5 Clases",
-    creditsRemaining: 0,
-  },
-  {
-    id: "11",
-    name: "Sophie Martin",
-    email: "sophie.m@outlook.com",
-    level: "Evaluando",
-    status: "exhausted",
-    planType: "Bono 5 Clases",
-    creditsRemaining: 0,
-  },
-  {
-    id: "10",
-    name: "Sophie Martin",
-    email: "sophie.m@outlook.com",
-    level: "Evaluando",
-    status: "exhausted",
-    planType: "Bono 5 Clases",
-    creditsRemaining: 0,
-  },
-  {
-    id: "9",
-    name: "Sophie Martin",
-    email: "sophie.m@outlook.com",
-    level: "Evaluando",
-    status: "exhausted",
-    planType: "Bono 5 Clases",
-    creditsRemaining: 0,
-  },
-  {
-    id: "8",
-    name: "Sophie Martin",
-    email: "sophie.m@outlook.com",
-    level: "Evaluando",
-    status: "exhausted",
-    planType: "Bono 5 Clases",
-    creditsRemaining: 0,
-  },
-  {
-    id: "7",
-    name: "Sophie Martin",
-    email: "sophie.m@outlook.com",
-    level: "Evaluando",
-    status: "exhausted",
-    planType: "Bono 5 Clases",
-    creditsRemaining: 0,
-  },
-  {
-    id: "6",
-    name: "Sophie Martin",
-    email: "sophie.m@outlook.com",
-    level: "Evaluando",
-    status: "exhausted",
-    planType: "Bono 5 Clases",
-    creditsRemaining: 0,
-  },
-  {
-    id: "5",
-    name: "Sophie Martin",
-    email: "sophie.m@outlook.com",
-    level: "Evaluando",
-    status: "exhausted",
-    planType: "Bono 5 Clases",
-    creditsRemaining: 0,
-  },
-  {
-    id: "4",
-    name: "Sophie Martin",
-    email: "sophie.m@outlook.com",
-    level: "Evaluando",
-    status: "exhausted",
-    planType: "Bono 5 Clases",
-    creditsRemaining: 0,
-  },
-];
 
 type QuickOptionsMenu = {
   label: string;
   href: (id: string) => string;
   icon: LucideIcon;
 };
-
-//TODO 1
+//TODO
 const quickOptionsMenu: QuickOptionsMenu[] = [
   {
     label: "Profile details",
@@ -179,6 +65,56 @@ const getLevelBadge = (level: string) => {
 export default function StudentsTable({ locale }: { locale: string }) {
   const withLocale = (path: string) =>
     `/${locale}${path.startsWith("/") ? path : `/${path}`}`;
+
+  const [students, setStudents] = useState<TableStudent[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchStudent = async () => {
+      try {
+        setIsLoading(true);
+        const response = await fetch("/api/students");
+        if (!response.ok) {
+          throw new Error("Error al cargar los alumnos");
+        }
+        const data = await response.json();
+
+        const formattedData: TableStudent[] = data.items.map(
+          (student: DBStudent) => {
+            const currentPlan =
+              student.activePlans && student.activePlans.length > 0
+                ? student.activePlans[0]
+                : null;
+
+            return {
+              id: student._id,
+              name: student.fullName,
+              email: student.contactEmail,
+              level: student.level,
+              status: student.isActive ? "active" : "exhausted",
+              planType: currentPlan ? currentPlan.name : "Sin plan",
+              creditsRemaining:
+                currentPlan && currentPlan.creditsRemaining
+                  ? currentPlan.creditsRemaining
+                  : 0,
+            };
+          },
+        );
+
+        setStudents(formattedData);
+      } catch (error) {
+        if (error instanceof Error) {
+          setError(error.message);
+        } else {
+          setError("Ocurrio un error inesperado");
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchStudent();
+  }, []);
 
   const [isOpenQO, setIsOpenQO] = useState<string | null>(null);
   const toggleQuickOptionsMenu = (studentId: string) => {
@@ -230,104 +166,126 @@ export default function StudentsTable({ locale }: { locale: string }) {
         </div>
       </div>
 
-      {/* Tabla de alumnos */}
+      {isLoading && (
+        <div className="p-8 text-center text-gray-500">
+          <p className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#9e2727] mx-auto mb-4"></p>
+          Cargando alumnos...
+        </div>
+      )}
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 text-xs uppercase tracking-wider">
-              <th className="px-6 py-4 font-medium">Alumno</th>
-              <th className="px-6 py-4 font-medium">Nivel</th>
-              <th className="px-6 py-4 font-medium">Plan Actual</th>
-              <th className="px-6 py-4 font-medium">Clases Restantes</th>
-              <th className="px-6 py-4 font-medium text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {mockStudents.map((student, index) => {
-              const isLastRows = index >= mockStudents.length - 3;
-              return (
-                <tr
-                  key={student.id}
-                  className="hover:bg-gray-50/50 transition-colors group"
-                >
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center font-bold text-sm">
-                        {student.name.charAt(0)}
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {student.name}
-                        </p>
-                        <div className="flex items-center gap-1 text-gray-500 text-sm">
-                          <Mail size={12} />
-                          <span>{student.email}</span>
+      {error && (
+        <div className="w-full flex items-center justify-center py-4 gap-2 text-red-500">
+          <AlertCircle size={16} />
+          Ocurrio un error {error}
+        </div>
+      )}
+
+      {!isLoading && !error && students.length <= 0 && (
+        <div className="flex items-center justify-center py-5 gap-2 text-green-900">
+          No hay alumnos registrados
+          <BrushCleaning size={16} />
+        </div>
+      )}
+
+      {/* Tabla de alumnos */}
+      {!isLoading && !error && students.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 text-xs uppercase tracking-wider">
+                <th className="px-6 py-4 font-medium">Alumno</th>
+                <th className="px-6 py-4 font-medium">Nivel</th>
+                <th className="px-6 py-4 font-medium">Plan Actual</th>
+                <th className="px-6 py-4 font-medium">Clases Restantes</th>
+                <th className="px-6 py-4 font-medium text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {students.map((student, index) => {
+                const isLastRows = index >= students.length - 3;
+                return (
+                  <tr
+                    key={student.id}
+                    className="hover:bg-gray-50/50 transition-colors group"
+                  >
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center font-bold text-sm">
+                          {student.name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900">
+                            {student.name}
+                          </p>
+                          <div className="flex items-center gap-1 text-gray-500 text-sm">
+                            <Mail size={12} />
+                            <span>{student.email}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </td>
+                    </td>
 
-                  <td className="px-6 py-4">
-                    <span
-                      className={`px-3 py-1 text-xs font-semibold rounded-full border ${getLevelBadge(student.level)}`}
-                    >
-                      {student.level}
-                    </span>
-                  </td>
-
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {student.planType}
-                  </td>
-
-                  <td className="px-6 py-4">
-                    {student.creditsRemaining > 0 ? (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 text-green-700 text-sm font-medium border border-green-100">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                        {student.creditsRemaining} clases
+                    <td className="px-6 py-4">
+                      <span
+                        className={`px-3 py-1 text-xs font-semibold rounded-full border ${getLevelBadge(student.level)}`}
+                      >
+                        {student.level}
                       </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 text-red-700 text-sm font-medium border border-red-100">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
-                        Agotado
-                      </span>
-                    )}
-                  </td>
+                    </td>
 
-                  <td className="px-6 py-4 text-right relative">
-                    <button
-                      onClick={() => toggleQuickOptionsMenu(student.id)}
-                      className={`menu-button p-2 text-gray-400 hover:text-[#9e2727] hover:bg-red-50 rounded-lg transition-colors hover:cursor-pointer`}
-                    >
-                      <MoreVertical size={20} />
-                    </button>
-                    <div
-                      className={`menu-dropdown py-4 px-4 absolute right-0 mt-3 min-w-55 z-50 flex flex-col rounded-lg bg-[#9e2727] gap-3 origin-top-right shadow-xl transform transition-all duration-200 ease-in-out -translate-x-5 justify-center
+                    <td className="px-6 py-4 text-sm text-gray-600">
+                      {student.planType}
+                    </td>
+
+                    <td className="px-6 py-4">
+                      {student.creditsRemaining > 0 ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 text-green-700 text-sm font-medium border border-green-100">
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                          {student.creditsRemaining} clases
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 text-red-700 text-sm font-medium border border-red-100">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                          Agotado
+                        </span>
+                      )}
+                    </td>
+
+                    <td className="px-6 py-4 text-right relative">
+                      <button
+                        onClick={() => toggleQuickOptionsMenu(student.id)}
+                        className={`menu-button p-2 text-gray-400 hover:text-[#9e2727] hover:bg-red-50 rounded-lg transition-colors hover:cursor-pointer`}
+                      >
+                        <MoreVertical size={20} />
+                      </button>
+                      <div
+                        className={`menu-dropdown py-4 px-4 absolute right-0 mt-3 min-w-55 z-50 flex flex-col rounded-lg bg-[#9e2727] gap-3 origin-top-right shadow-xl transform transition-all duration-200 ease-in-out -translate-x-5 justify-center
                                 ${isLastRows ? "bottom-10 origin-bottom-right" : "top-12 origin-top-right"}
                                 ${isOpenQO === student.id ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 -translate-y-2 pointer-events-none"}`}
-                    >
-                      {quickOptionsMenu.map((object, index) => {
-                        const Icon = object.icon;
-                        return (
-                          <Link
-                            key={index}
-                            onClick={() => setIsOpenQO(null)}
-                            href={withLocale(object.href(student.id))}
-                            className="flex items-center hover:bg-[#a85d5d] py-2 px-4 rounded-lg text-white transform transition-all duration-200 ease-in-out"
-                          >
-                            <Icon size={18} className="me-2" />
-                            {object.label}
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                      >
+                        {quickOptionsMenu.map((object, index) => {
+                          const Icon = object.icon;
+                          return (
+                            <Link
+                              key={index}
+                              onClick={() => setIsOpenQO(null)}
+                              href={withLocale(object.href(student.id))}
+                              className="flex items-center hover:bg-[#a85d5d] py-2 px-4 rounded-lg text-white transform transition-all duration-200 ease-in-out"
+                            >
+                              <Icon size={18} className="me-2" />
+                              {object.label}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

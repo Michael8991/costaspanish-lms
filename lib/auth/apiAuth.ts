@@ -4,10 +4,10 @@ import { NextRequest } from "next/server";
 export type Role = "admin" | "teacher" | "student";
 export async function requireAuth(req: NextRequest) {
     const token = await getToken({ req });
-    if (!token?.id) return null;
+    if (!token?.uid) return null;
 
     return {
-        id: String(token.id),
+        id: String(token.uid),
         role: token.role as Role,
     };
 }

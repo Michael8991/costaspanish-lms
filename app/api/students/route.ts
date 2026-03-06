@@ -8,6 +8,7 @@ import mongoose from "mongoose";
 
 export async function POST(req: NextRequest){
     const user = await requireAuth(req);
+
     if (!requireRole(user, ["admin", "teacher"])) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
