@@ -1,5 +1,7 @@
-//TODO: Agergar todos los enlaces corectos
 import Breadcrumbs from "@/components/ui/Breadcrumbs";
+import dbConnect from "@/lib/mongo";
+import { DBStudent } from "@/lib/types/student";
+import { StudentProfile } from "@/models/StudentProfile";
 import {
   AlertCircle,
   AlertTriangle,
@@ -18,45 +20,11 @@ import {
   Plus,
   Presentation,
 } from "lucide-react";
+import { Types } from "mongoose";
 import Link from "next/link";
-// TODO: Esto vendrá de la base de datos usando el [id] de la URL
-const mockStudent = {
-  id: "1",
-  name: "María García",
-  email: "maria.garcia@gmail.com",
-  phone: "694902740",
-  status: "active",
-  goals: [
-    "Conversation & Fluency",
-    "Business & Work",
-    "Pronunciation & Accent",
-  ],
-  country: "England",
-  timezone: "Reino Unido (GMT+0)",
-  level: "B1",
-  internalNotes:
-    "El alumno es muy aplicado. Le cuesta un poco entender la diferencia entre 'por' y 'para'. Repasar vocabulario de negocios para su próxima entrevista.",
-  nativeLanguage: "German",
-};
+import { notFound } from "next/navigation";
+
 //TODO: ELiminar esto y crear la conexion real
-const mockPlans = [
-  {
-    id: "p1",
-    name: "Bono 10 Clases",
-    totalCredits: 10,
-    remainingCredits: 2,
-    expiryDate: "15 Jun 2026",
-    status: "active",
-  },
-  {
-    id: "p2",
-    name: "Bono 5 Clases",
-    totalCredits: 5,
-    remainingCredits: 0,
-    expiryDate: "10 Feb 2026",
-    status: "exhausted",
-  },
-];
 
 //!Mock lessons
 //TODO Eliminar y crear la conexion real
@@ -112,13 +80,51 @@ const statusStyles: Record<string, string> = {
 export default async function StudentPage({
   params,
 }: {
-  params: Promise<{ locale: string }>;
+  params: Promise<{ locale: string; id: string }>;
 }) {
-  const { locale } = await params;
+  const { locale, id } = await params;
+
+  if (!Types.ObjectId.isValid(id)) {
+    notFound();
+  }
+
+  await dbConnect();
+  const rawStudent = await StudentProfile.findById(id).lean();
+
+  if (!rawStudent) {
+    notFound();
+  }
+
+  const student = {
+    id: rawStudent._id.toString(),
+    name: rawStudent.fullName,
+    email: rawStudent.contactEmail,
+    phone: rawStudent.phone || "No phone",
+    status: rawStudent.isActive ? "active" : "inactive",
+    goals: rawStudent.goals || [],
+    country: rawStudent.country || "Unknown",
+    timezone: rawStudent.timezone,
+    level: rawStudent.level,
+    internalNotes: rawStudent.internalNotes || "No notes available.",
+    nativeLanguage: rawStudent.nativeLanguage || "Unknown",
+  };
+
+  const plans = (rawStudent.activePlans || []).map((plan) => ({
+    id: plan._id.toString(),
+    name: plan.name,
+    totalCredits: plan.creditsTotal || 0,
+    remainingCredits: plan.creditsRemaining || 0,
+    expiryDate: new Date(plan.validUntil).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }),
+    status: plan.status,
+  }));
 
   const breadcrumbItems = [
     { label: "Students", href: `/${locale}/dashboard/students` },
-    { label: mockStudent.name }, // Sin href, para que sea el texto final truncado
+    { label: student.name }, // Sin href, para que sea el texto final truncado
   ];
 
   return (
@@ -141,30 +147,28 @@ export default async function StudentPage({
         <div className="flex flex-wrap items-center gap-6 max-md:justify-center ">
           {/* Avatar con la inicial */}
           <div className="w-20 h-20 rounded-full bg-[#9e2727]/10 border-2 border-[#9e2727]/20 flex items-center justify-center text-[#9e2727]">
-            <span className="text-3xl font-bold">
-              {mockStudent.name.charAt(0)}
-            </span>
+            <span className="text-3xl font-bold">{student.name.charAt(0)}</span>
           </div>
 
           {/* Info principal */}
           <div className="flex flex-col max-md:items-center">
             <div className="flex flex-wrap gap-2">
               <h1 className="text-2xl font-bold text-gray-900">
-                {mockStudent.name}
+                {student.name}
               </h1>
               {/* Badge de Estado */}
               <div className="flex items-center gap-2">
                 <span
                   className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full border ${
-                    mockStudent.status === "active"
+                    student.status === "active"
                       ? "bg-green-50 text-green-700 border-green-200"
                       : "bg-gray-50 text-gray-700 border-gray-200"
                   }`}
                 >
-                  {mockStudent.status === "active" && (
+                  {student.status === "active" && (
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
                   )}
-                  {mockStudent.status === "active"
+                  {student.status === "active"
                     ? "Active Student"
                     : "Inactive Student"}
                 </span>
@@ -174,29 +178,28 @@ export default async function StudentPage({
             <div className="flex flex-wrap items-center gap-2 text-gray-500 text-sm mt-1 mb-1 max-md:justify-center">
               <div className="flex items-center gap-2">
                 <Mail size={14} />
-                <p>{mockStudent.email}</p>
+                <p>{student.email}</p>
               </div>
               <div className="flex items-center gap-2">
                 <Phone className="" size={14} />
-                <p>{mockStudent.phone}</p>
+                <p>{student.phone}</p>
               </div>
             </div>
 
             <div className="flex items-center gap-2 text-gray-500 italic text-xs mb-3">
               <p>
-                {mockStudent.country ? mockStudent.country : ""},{" "}
-                {mockStudent.timezone}
+                {student.country ? student.country : ""}, {student.timezone}
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 text-gray-500 text-sm mt-1 mb-3 max-md:justify-center">
               <p className="py-1 px-2 bg-orange-200 rounded-lg text-black text-xs">
-                {mockStudent.nativeLanguage}
+                {student.nativeLanguage}
               </p>
               <p className="py-1 px-2 bg-blue-200 rounded-lg text-black text-xs">
-                {mockStudent.level}
+                {student.level}
               </p>
-              {mockStudent.goals.map((goal, index) => (
+              {student.goals.map((goal, index) => (
                 <p
                   key={index}
                   className="py-1 px-2 bg-gray-200 rounded-lg text-black text-xs"
@@ -211,7 +214,7 @@ export default async function StudentPage({
           {/* Botón de Cambiar Estado (Preparado para el Modal) */}
           <button
             className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-medium shadow-sm hover:cursor-pointer hover:bg-[#9e2727]! hover:border-[#9e2727] hover:text-white transition-colors transform duration-150 ease-in-out ${
-              mockStudent.status === "active"
+              student.status === "active"
                 ? "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
                 : "bg-[#9e2727] border-[#9e2727] text-white hover:bg-[#8a2222]"
             }`}
@@ -219,12 +222,10 @@ export default async function StudentPage({
             <AlertTriangle
               size={16}
               className={
-                mockStudent.status === "active"
-                  ? "text-amber-500"
-                  : "text-white"
+                student.status === "active" ? "text-amber-500" : "text-white"
               }
             />
-            {mockStudent.status === "active"
+            {student.status === "active"
               ? "Deactivate Student"
               : "Activate Student"}
           </button>
@@ -258,7 +259,7 @@ export default async function StudentPage({
 
           {/* Lista de Planes */}
           <div className="p-5 flex flex-col gap-4">
-            {mockPlans.map((plan) => {
+            {plans.map((plan) => {
               const percentage =
                 (plan.remainingCredits / plan.totalCredits) * 100;
               const isLow =
@@ -447,7 +448,7 @@ export default async function StudentPage({
 
           {/* 3. El contenido (solo se muestra cuando está abierto) */}
           <div className="p-5 bg-amber-50/50 text-gray-700 text-sm leading-relaxed border-t border-amber-100">
-            {mockStudent.internalNotes || "Nada que mostrar"}
+            {student.internalNotes || "Nada que mostrar"}
           </div>
         </details>
       </div>

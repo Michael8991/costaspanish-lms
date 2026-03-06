@@ -4,6 +4,30 @@ import { StudentProfile, StudentProfileDoc } from "@/models/StudentProfile";
 import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const user = await requireAuth(req);
+    if (!requireRole(user, ["admin", "teacher"])) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const { id } = await params;
+    if (!mongoose.isValidObjectId(id)) {
+        return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+    }
+
+    try {
+        await dbConnect();
+
+        const student = await StudentProfile.findById(id).lean();
+        if (!student) {
+            return NextResponse.json({ error: "Student did not find" }, { status: 400 });
+        }
+        return NextResponse.json(student)
+    } catch (error) {
+        console.error("Error fetching student:", error);
+    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
+    }
+}
+
 export async function PATCH(req: NextRequest, {
     params
 }: {
