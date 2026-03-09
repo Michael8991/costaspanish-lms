@@ -139,7 +139,7 @@ export default async function StudentPage({
             size={12}
             className="group-hover:-translate-x-1 transition-all transform duration-150 ease-in-out"
           />
-          Volver
+          Back
         </Link>
       </div>
       {/* 2. HEADER DEL PERFIL */}
@@ -252,7 +252,7 @@ export default async function StudentPage({
             <div className="flex flex-wrap gap-2 items-center">
               <button className="flex items-center gap-1.5 px-3 py-1.5 bg-[#9e2727] text-white text-sm font-medium rounded-lg hover:bg-[#8a2222] transition-colors shadow-sm cursor-pointer">
                 <Plus size={16} />
-                Add New Plan
+                Add New Voucher
               </button>
             </div>
           </div>
@@ -328,6 +328,19 @@ export default async function StudentPage({
                 </div>
               );
             })}
+            <div className="flex w-full items-center justify-end">
+              {/* //TODO: Agregar enlace real al historial de clases */}
+              <Link
+                href={`/${locale}/dashboard/students/${id}/vouchersHistory`}
+                className="text-[#9e2727] text-sm flex items-center gap-2 group"
+              >
+                See Full Vouchers History
+                <ArrowRight
+                  size={14}
+                  className="group-hover:translate-x-1 transition-all transform duration-100 ease-in"
+                />
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -416,7 +429,7 @@ export default async function StudentPage({
                 href={"#"}
                 className="text-[#9e2727] text-sm flex items-center gap-2 group"
               >
-                Full History
+                See Full Lessons History
                 <ArrowRight
                   size={14}
                   className="group-hover:translate-x-1 transition-all transform duration-100 ease-in"

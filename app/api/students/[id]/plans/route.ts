@@ -84,3 +84,30 @@ export async function POST(req: NextRequest, { params }: Ctx) {
 
 
 }
+
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const user = await requireAuth(req);
+        if (!requireRole(user, ["admin", "teacher"])) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+        const { id } = await params;
+        if (!mongoose.isValidObjectId(id)) {
+            return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+        }
+    try {
+        await dbConnect();
+        const student = await StudentProfile.findById(id).select('activePlans').lean();
+        if(!student) return NextResponse.json({error: "Student does not found"}, {status: 400})
+
+        const history = (student.activePlans || []).sort((a, b) => 
+        new Date(b.validFrom).getTime() - new Date(a.validFrom).getTime()
+    );
+        if (!history) {
+            return NextResponse.json({error: "No Vouchers"}, {status: 404})
+        }
+        return NextResponse.json(history, {status: 200})
+    } catch (error) {
+        console.log("Error fetching student voucher:", error);
+        return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
+    }
+}

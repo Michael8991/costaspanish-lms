@@ -7,7 +7,7 @@ export type DBAcademicLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | "Evaluan
 
 
 export interface DBPlanDoc { 
-        _id: string;
+        _id?: string;
     name: string;
     billingType: DBPlanBillingType;
     classType: DBClassType;
