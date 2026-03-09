@@ -6,13 +6,20 @@ import { DBPlanDoc } from "@/lib/types/student";
 import {
   AlertCircle,
   AlertTriangle,
+  Archive,
   ArrowLeft,
   Mail,
   Phone,
   Plus,
+  RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import DeactiveStudentForm, {
+  DeactiveStudentFormData,
+} from "../forms/DeactiveStudentForm";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 interface StudentProps {
   id: string;
@@ -35,14 +42,49 @@ export default function BasicStudentHeader({
   const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
 
+  const [isSubmittingStatus, setIsSubmittingStatus] = useState(false);
+
+  const router = useRouter();
+
   const hasActiveCredits = student.activePlans.some(
     (plan) => plan.creditsRemaining! > 0 && plan.status === "active",
   );
+
   const breadcrumbItems = [
     { label: "Students", href: `/${locale}/dashboard/students` },
     { label: student.name, href: `/${locale}/dashboard/students/${id}` },
     { label: "Vouchers History" },
   ];
+
+  const handleToggleStatus = async (formData: DeactiveStudentFormData) => {
+    try {
+      setIsSubmittingStatus(true);
+
+      const res = await fetch(`/api/students/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+
+      if (!res.ok) {
+        throw new Error("Error en la respuesta del servidor");
+      }
+
+      toast.success(
+        formData.isActive
+          ? "Estudiante activado correctamente"
+          : "Estudiante desactivado correctamente",
+      );
+
+      setIsStatusModalOpen(false);
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      toast.error("Error interno cambiando el estado del estudiante");
+    } finally {
+      setIsSubmittingStatus(false);
+    }
+  };
   return (
     <div className="container mx-auto py-8 px-4 md:px-8 text-gray-800 max-w-6xl">
       <Breadcrumbs items={breadcrumbItems} locale={locale} />
@@ -114,22 +156,45 @@ export default function BasicStudentHeader({
         <div className="flex flex-col items-center justify-end gap-4 max-md:mx-auto">
           {/* Botón de Cambiar Estado (Preparado para el Modal) */}
           <button
-            onClick={() => setIsStatusModalOpen(true)}
-            className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-medium shadow-sm hover:cursor-pointer hover:bg-[#9e2727]! hover:border-[#9e2727] hover:text-white transition-colors transform duration-150 ease-in-out ${
-              student.status === "active"
-                ? "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
-                : "bg-[#9e2727] border-[#9e2727] text-white hover:bg-[#8a2222]"
-            }`}
-          >
-            <AlertTriangle
-              size={16}
-              className={
-                student.status === "active" ? "text-amber-500" : "text-white"
+            onClick={() => {
+              if (student.status === "active") {
+                setIsStatusModalOpen(true);
+              } else {
+                handleToggleStatus({ isActive: true });
               }
-            />
-            {student.status === "active"
-              ? "Deactivate Student"
-              : "Activate Student"}
+            }}
+            disabled={isSubmittingStatus}
+            className={`
+    group flex items-center gap-1.5 px-3 py-1.5 border rounded-md text-sm font-medium shadow-sm transition-all duration-200 bg-white
+    ${isSubmittingStatus ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+    ${
+      student.status === "active"
+        ? "border-gray-200 text-gray-600 hover:border-red-300 hover:text-red-700 hover:bg-red-50" // Hover Rojo (Archivar)
+        : "border-gray-200 text-gray-600 hover:border-green-300 hover:text-green-700 hover:bg-green-50" // Hover Verde (Reactivar)
+    }
+  `}
+          >
+            {/* Icono dinámico: Si está cargando, damos vueltas. Si no, mostramos Archivo o Flechas */}
+            {isSubmittingStatus ? (
+              <RefreshCw size={14} className="animate-spin text-gray-400" />
+            ) : student.status === "active" ? (
+              <Archive
+                size={14}
+                className="transition-transform group-hover:scale-110"
+              />
+            ) : (
+              <RefreshCw
+                size={14}
+                className="transition-transform group-hover:rotate-180"
+              />
+            )}
+
+            {/* Texto dinámico */}
+            {isSubmittingStatus && student.status !== "active"
+              ? "Activating..."
+              : student.status === "active"
+                ? "Archive Student"
+                : "Reactivate Student"}
           </button>
           {/* //TODO: Poner enlace correcto */}
           <button className="flex items-center gap-1.5 px-3 py-1.5 bg-[#9e2727] text-white text-sm font-medium rounded-lg hover:bg-[#8a2222] transition-colors shadow-sm cursor-pointer">
@@ -138,19 +203,22 @@ export default function BasicStudentHeader({
           </button>
         </div>
       </section>
+
+      {/* Modals */}
       <CustomModal
         isOpen={isVoucherModalOpen}
         onClose={() => setIsVoucherModalOpen(false)}
         title="Add New Voucher"
       >
         <div className="p-4">
-          {/* Aquí irá tu formulario más adelante */}
+          {/* //TODO: Formulario */}
           <p className="text-gray-600">
             Formulario para crear un nuevo bono de clases.
           </p>
         </div>
       </CustomModal>
 
+      {/* Modal de cambio de estado de estudiante */}
       <CustomModal
         isOpen={isStatusModalOpen}
         onClose={() => setIsStatusModalOpen(false)}
@@ -161,9 +229,12 @@ export default function BasicStudentHeader({
         }
       >
         <div className="p-4">
-          <p className="text-gray-600">
-            ¿Estás seguro de que deseas cambiar el estado de {student.name}?
-          </p>
+          <DeactiveStudentForm
+            student={student.name}
+            onSubmitForm={handleToggleStatus}
+            isSubmitting={isSubmittingStatus}
+            onClose={() => setIsStatusModalOpen(false)}
+          />
         </div>
       </CustomModal>
     </div>

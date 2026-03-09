@@ -1,6 +1,5 @@
 "use client";
 
-import CustomModal from "@/components/ui/CustomModal";
 import { DBPlanDoc } from "@/lib/types/student";
 import { PlanDoc } from "@/models/StudentProfile";
 import { Pencil, Trash } from "lucide-react";
