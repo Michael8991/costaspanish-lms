@@ -16,6 +16,7 @@ export interface PlanDoc {
     validFrom: Date;
     validUntil: Date;
     status: PlanStatus;
+    price: number;
 }
 
 export interface StudentProfileDoc{
@@ -50,7 +51,8 @@ const PlanSchema = new Schema<PlanDoc>({
     creditsRemaining: { type: Number },
     validFrom: { type: Date, default: () => new Date() },
     validUntil: { type: Date, required: true },
-    status: { type: String, enum: ["active", "exhausted", "expired", "canceled"], default: "active" }
+    status: { type: String, enum: ["active", "exhausted", "expired", "canceled"], default: "active" },
+    price: { type: Number, required: true, default: 0 }
 })
 
 const StudentProfileSchema = new Schema<StudentProfileDoc>({

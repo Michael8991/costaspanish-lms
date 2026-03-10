@@ -32,6 +32,7 @@ export default function VouchersTable({ id }: { id: string }) {
             validFrom: plan.validFrom,
             validUntil: plan.validUntil,
             status: plan.status,
+            price: plan.price,
           };
         });
         setVouchers(formattedData);
@@ -55,9 +56,12 @@ export default function VouchersTable({ id }: { id: string }) {
         <thead className="bg-gray-50 text-gray-600 font-medium border-b">
           <tr>
             <th className="px-6 py-3">Plan</th>
+            <th className="px-6 py-3">Tipo de bono</th>
+            <th className="px-6 py-3">Modelo de clase</th>
             <th className="px-6 py-3">Créditos</th>
             <th className="px-6 py-3">Inicio</th>
             <th className="px-6 py-3">Vencimiento</th>
+            <th className="px-6 py-3">Precio</th>
             <th className="px-6 py-3">Estado</th>
             <th className="px-6 py-3">Acciones</th>
           </tr>
@@ -90,6 +94,12 @@ export default function VouchersTable({ id }: { id: string }) {
                     <td className="px-6 py-4 font-medium text-gray-900">
                       {v.name}
                     </td>
+                    <td className="px-6 py-4 font-medium text-gray-900">
+                      {v.billingType}
+                    </td>
+                    <td className="px-6 py-4 font-medium text-gray-900">
+                      {v.classType}
+                    </td>
                     <td className="px-6 py-4 text-gray-600">
                       {v.creditsRemaining} / {v.creditsTotal}
                     </td>
@@ -99,6 +109,15 @@ export default function VouchersTable({ id }: { id: string }) {
                     <td className="px-6 py-4 text-gray-600">
                       {new Date(v.validUntil).toLocaleDateString()}
                     </td>
+                    <td className="px-6 py-4 text-gray-600">
+                      {v.price > 0 ? (
+                        <p>{v.price} €</p>
+                      ) : (
+                        <p className="font-light italic text-gray-400">
+                          sin valor
+                        </p>
+                      )}
+                    </td>
                     <td className="px-6 py-4">
                       <span
                         className={`px-2 py-1 rounded-full text-xs font-semibold ${
@@ -107,7 +126,7 @@ export default function VouchersTable({ id }: { id: string }) {
                             : "bg-green-100 text-green-700"
                         }`}
                       >
-                        {v.status === "active" ? "Finalizado" : "Activo"}
+                        {v.status === "active" ? "Activo" : "Finalizado"}
                       </span>
                     </td>
                     <td className="px-6 py-4 flex items-center justify-center gap-2">

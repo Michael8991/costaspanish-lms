@@ -16,6 +16,7 @@ export interface DBPlanDoc {
     validFrom: Date;
     validUntil: Date;
     status: DBPlanStatus;
+    price: number;
 }
 
 export interface DBStudent {

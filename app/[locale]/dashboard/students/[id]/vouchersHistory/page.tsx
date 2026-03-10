@@ -6,6 +6,9 @@ import VouchersTable from "@/components/dashboard/teacher/students/VouchersTable
 import BasicStudentHeader from "@/components/dashboard/teacher/students/BasicStudentHeader";
 import { DBPlanDoc } from "@/lib/types/student";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function VouchersHistory({
   params,
 }: {
@@ -16,9 +19,9 @@ export default async function VouchersHistory({
   if (!Types.ObjectId.isValid(id)) {
     notFound();
   }
+  await dbConnect();
   const rawStudent = await StudentProfile.findById(id).lean();
 
-  await dbConnect();
   if (!rawStudent) {
     notFound();
   }
@@ -46,6 +49,7 @@ export default async function VouchersHistory({
         validFrom: plan.validFrom,
         validUntil: plan.validUntil,
         status: plan.status,
+        price: plan.price,
       }),
     ),
   };

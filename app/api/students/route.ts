@@ -16,10 +16,14 @@ export async function POST(req: NextRequest){
     const body = await req.json().catch(() => null);
     if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
     
-    const { fullName,contactEmail, email, name, billingType, classType, validUntil } = body; 
+    const { fullName,contactEmail, email, name, billingType, classType, validUntil, price } = body; 
 
     const rawEmail = (typeof contactEmail === "string" ? contactEmail : typeof email === "string" ? email : "").trim();
     const contactEmailLower = rawEmail.toLowerCase();
+
+   if (price === undefined || isNaN(Number(price))) {
+        return NextResponse.json({error: "Price is required and must be a valid number"}, {status: 400});
+    }
     
     if (!fullName) {
         return NextResponse.json({error: "Full name is required"}, {status: 400})
@@ -61,7 +65,8 @@ export async function POST(req: NextRequest){
                     validUntil: new Date(validUntil),
                     creditsTotal: body.creditsTotal || 0,
                     creditsRemaining: body.creditsRemaining || 0,
-                    status: "active"
+                    status: "active",
+                    price: price,
                 }
             ]
         });

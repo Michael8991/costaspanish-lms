@@ -5,7 +5,6 @@ import CustomModal from "@/components/ui/CustomModal";
 import { DBPlanDoc } from "@/lib/types/student";
 import {
   AlertCircle,
-  AlertTriangle,
   Archive,
   ArrowLeft,
   Mail,
@@ -20,6 +19,8 @@ import DeactiveStudentForm, {
 } from "../forms/DeactiveStudentForm";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { NewVoucherFormData } from "../forms";
+import NewVoucherForm from "../forms/NewVoucherForm";
 
 interface StudentProps {
   id: string;
@@ -39,10 +40,11 @@ export default function BasicStudentHeader({
   id: string;
   student: StudentProps;
 }) {
-  const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
-
   const [isSubmittingStatus, setIsSubmittingStatus] = useState(false);
+
+  const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
+  const [isSubmittingNewVoucher, setIsSubmittingNewVoucher] = useState(false);
 
   const router = useRouter();
 
@@ -64,11 +66,11 @@ export default function BasicStudentHeader({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
+        cache: "no-store",
       });
 
-      if (!res.ok) {
-        throw new Error("Error en la respuesta del servidor");
-      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message ?? "Error del servidor");
 
       toast.success(
         formData.isActive
@@ -85,6 +87,42 @@ export default function BasicStudentHeader({
       setIsSubmittingStatus(false);
     }
   };
+
+  const handleNewVoucher = async (formData: NewVoucherFormData) => {
+    try {
+      setIsSubmittingNewVoucher(true);
+      const res = await fetch(`/api/students/${id}/plans`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+        cache: "no-store",
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || "Error al crear el bono.");
+      }
+
+      toast.success("Nuevo bono creado con exito.");
+
+      setIsVoucherModalOpen(false);
+
+      router.refresh();
+      window.location.reload();
+    } catch (error: unknown) {
+      //   console.error(error);
+      if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error("Ocurrió un error inesperado al crear el bono.");
+      }
+    } finally {
+      setIsSubmittingNewVoucher(false);
+    }
+  };
+  const activeVouchersCount = student.activePlans.filter(
+    (plan) => plan.status === "active",
+  ).length;
   return (
     <div className="container mx-auto py-8 px-4 md:px-8 text-gray-800 max-w-6xl">
       <Breadcrumbs items={breadcrumbItems} locale={locale} />
@@ -154,7 +192,6 @@ export default function BasicStudentHeader({
           </div>
         </div>
         <div className="flex flex-col items-center justify-end gap-4 max-md:mx-auto">
-          {/* Botón de Cambiar Estado (Preparado para el Modal) */}
           <button
             onClick={() => {
               if (student.status === "active") {
@@ -165,16 +202,15 @@ export default function BasicStudentHeader({
             }}
             disabled={isSubmittingStatus}
             className={`
-    group flex items-center gap-1.5 px-3 py-1.5 border rounded-md text-sm font-medium shadow-sm transition-all duration-200 bg-white
-    ${isSubmittingStatus ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
-    ${
-      student.status === "active"
-        ? "border-gray-200 text-gray-600 hover:border-red-300 hover:text-red-700 hover:bg-red-50" // Hover Rojo (Archivar)
-        : "border-gray-200 text-gray-600 hover:border-green-300 hover:text-green-700 hover:bg-green-50" // Hover Verde (Reactivar)
-    }
-  `}
+                    group flex items-center gap-1.5 px-3 py-1.5 border rounded-md text-sm font-medium shadow-sm transition-all duration-200 bg-white
+                    ${isSubmittingStatus ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+                    ${
+                      student.status === "active"
+                        ? "border-gray-200 text-gray-600 hover:border-red-300 hover:text-red-700 hover:bg-red-50"
+                        : "border-gray-200 text-gray-600 hover:border-green-300 hover:text-green-700 hover:bg-green-50"
+                    }
+                `}
           >
-            {/* Icono dinámico: Si está cargando, damos vueltas. Si no, mostramos Archivo o Flechas */}
             {isSubmittingStatus ? (
               <RefreshCw size={14} className="animate-spin text-gray-400" />
             ) : student.status === "active" ? (
@@ -197,7 +233,11 @@ export default function BasicStudentHeader({
                 : "Reactivate Student"}
           </button>
           {/* //TODO: Poner enlace correcto */}
-          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-[#9e2727] text-white text-sm font-medium rounded-lg hover:bg-[#8a2222] transition-colors shadow-sm cursor-pointer">
+          <button
+            disabled={isSubmittingNewVoucher}
+            onClick={() => setIsVoucherModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#9e2727] text-white text-sm font-medium rounded-lg hover:bg-[#8a2222] transition-colors shadow-sm cursor-pointer"
+          >
             <Plus size={16} />
             Add New Voucher
           </button>
@@ -211,10 +251,13 @@ export default function BasicStudentHeader({
         title="Add New Voucher"
       >
         <div className="p-4">
-          {/* //TODO: Formulario */}
-          <p className="text-gray-600">
-            Formulario para crear un nuevo bono de clases.
-          </p>
+          <NewVoucherForm
+            student={student.name}
+            onSubmitForm={handleNewVoucher}
+            isSubmitting={isSubmittingNewVoucher}
+            onClose={() => setIsVoucherModalOpen(false)}
+            activeVouchersCount={activeVouchersCount}
+          />
         </div>
       </CustomModal>
 
