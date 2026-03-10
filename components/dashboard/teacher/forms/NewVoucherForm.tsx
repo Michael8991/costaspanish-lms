@@ -18,7 +18,6 @@ const ClassTypes = [
 
 const BillingTypes = ["single", "package", "subscription"];
 
-// 1. Ajustamos las fechas a string para que encajen con los inputs de HTML
 export interface NewVoucherFormData {
   name: string;
   billingType: DBPlanBillingType | "";

@@ -31,8 +31,8 @@ const quickOptionsMenu: QuickOptionsMenu[] = [
     icon: FileUser,
   },
   {
-    label: "Renew voucher",
-    href: (id) => `/dashboard/students/${id}?action=renew`,
+    label: "View Vouchers",
+    href: (id) => `/dashboard/students/${id}/vouchersHistory`,
     icon: CreditCard,
   },
   {
@@ -139,7 +139,7 @@ export default function StudentsTable({ locale }: { locale: string }) {
   }, []);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200">
       <div className="p-5 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4 bg-gray-50/50">
         <h2 className="font-semibold text-gray-800 text-lg">Students</h2>
 
@@ -189,7 +189,7 @@ export default function StudentsTable({ locale }: { locale: string }) {
 
       {/* Tabla de alumnos */}
       {!isLoading && !error && students.length > 0 && (
-        <div className="overflow-x-auto min-h-100">
+        <div className="overflow-y-visible">
           <table className="w-full text-left border-collapse ">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 text-xs uppercase tracking-wider">

@@ -11,9 +11,7 @@ import {
   Calendar,
   CheckCircle,
   ChevronDown,
-  CircleAlert,
   Clock,
-  CreditCard,
   Lock,
   Mail,
   Pencil,
@@ -112,13 +110,23 @@ export default async function StudentPage({
     id: plan._id.toString(),
     name: plan.name,
     totalCredits: plan.creditsTotal || 0,
+    billingType: plan.billingType,
+    classType: plan.classType,
     remainingCredits: plan.creditsRemaining || 0,
     expiryDate: new Date(plan.validUntil).toLocaleDateString("en-GB", {
       day: "2-digit",
       month: "short",
       year: "numeric",
     }),
+
     status: plan.status,
+    validFrom: plan.validFrom
+      ? new Date(plan.validFrom).toISOString().split("T")[0]
+      : "",
+    validUntil: plan.validUntil
+      ? new Date(plan.validUntil).toISOString().split("T")[0]
+      : "",
+    price: plan.price || 0,
   }));
 
   const breadcrumbItems = [
@@ -239,6 +247,7 @@ export default async function StudentPage({
         </div>
       </section>
       <ActiveVouchersPanel
+        locale={locale}
         studentId={student.id}
         studentName={student.name}
         activePlans={plans}

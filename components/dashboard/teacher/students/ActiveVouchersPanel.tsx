@@ -1,5 +1,10 @@
 "use client";
-import { DBPlanDoc } from "@/lib/types/student";
+import {
+  DBClassType,
+  DBPlanBillingType,
+  DBPlanDoc,
+  DBPlanStatus,
+} from "@/lib/types/student";
 import {
   ArrowRight,
   Calendar,
@@ -15,14 +20,19 @@ import { NewVoucherFormData } from "../forms";
 import { toast } from "sonner";
 import CustomModal from "@/components/ui/CustomModal";
 import NewVoucherForm from "../forms/NewVoucherForm";
+import EditVoucherForm, { EditVoucherFormData } from "../forms/EditVoucherForm";
 
 export interface FormattedPlan {
   id: string;
   name: string;
   totalCredits: number;
   remainingCredits: number;
-  expiryDate: string;
-  status: string;
+  status: DBPlanStatus;
+  billingType: DBPlanBillingType;
+  classType: DBClassType;
+  validFrom: string;
+  validUntil: string;
+  price: number;
 }
 
 interface ActivePlansPanelProps {
@@ -41,11 +51,14 @@ export default function ActiveVouchersPanel({
   const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
   const [isSubmittingNewVoucher, setIsSubmittingNewVoucher] = useState(false);
 
+  const [isEditVoucherModalOpen, setIsEditVoucherModalOpen] = useState(false);
+  const [isSubmittingEditVoucher, setIsSubmittingEditVoucher] = useState(false);
+
+  const [planToEdit, setPlanToEdit] = useState<FormattedPlan | null>(null);
+
   const router = useRouter();
 
-  const hasActiveCredits = activePlans.some(
-    (plan) => plan.remainingCredits! > 0 && plan.status === "active",
-  );
+  const handleEditVoucher = async (formData: EditVoucherFormData) => [];
 
   const handleNewVoucher = async (formData: NewVoucherFormData) => {
     try {
@@ -133,7 +146,10 @@ export default function ActiveVouchersPanel({
                     </h3>
                     <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-1">
                       <Calendar size={12} />
-                      <span>Expires: {plan.expiryDate}</span>
+                      <span>
+                        Expires:{" "}
+                        {new Date(plan.validUntil).toLocaleDateString()}
+                      </span>
                     </div>
                   </div>
 
@@ -163,20 +179,22 @@ export default function ActiveVouchersPanel({
                     remind the student to renew.
                   </p>
                 )}
-                {/* //TODO: Enlaces reales */}
                 <div className="flex w-full items-center justify-end mt-3">
-                  <Link
-                    href={"#"}
+                  <button
+                    disabled={isSubmittingEditVoucher}
+                    onClick={() => {
+                      setPlanToEdit(plan);
+                      setIsEditVoucherModalOpen(true);
+                    }}
                     className="items-center text-[11px] font-medium text-gray-400 hover:text-[#9e2727] transition-colors flex gap-1 mt-1 border rounded-lg border-gray-300 px-2 py-1 hover:border-[#9e2727]"
                   >
                     <Pencil size={12} /> Edit Voucher
-                  </Link>
+                  </button>
                 </div>
               </div>
             );
           })}
           <div className="flex w-full items-center justify-end">
-            {/* //TODO: Agregar enlace real al historial de clases */}
             <Link
               href={`/${locale}/dashboard/students/${studentId}/vouchersHistory`}
               className="text-[#9e2727] text-sm flex items-center gap-2 group"
@@ -190,6 +208,25 @@ export default function ActiveVouchersPanel({
           </div>
         </div>
       </div>
+
+      <CustomModal
+        isOpen={isEditVoucherModalOpen}
+        onClose={() => setIsEditVoucherModalOpen(false)}
+        title="Edit Voucher"
+      >
+        <div className="p-4">
+          {planToEdit && (
+            <EditVoucherForm
+              student={studentName}
+              plan={planToEdit}
+              onSubmitForm={handleEditVoucher}
+              isSubmitting={isSubmittingEditVoucher}
+              onClose={() => setIsEditVoucherModalOpen(false)}
+            />
+          )}
+        </div>
+      </CustomModal>
+
       <CustomModal
         isOpen={isVoucherModalOpen}
         onClose={() => setIsVoucherModalOpen(false)}
