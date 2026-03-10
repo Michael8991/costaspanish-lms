@@ -65,7 +65,7 @@ export async function POST(req: NextRequest){
                     validUntil: new Date(validUntil),
                     creditsTotal: body.creditsTotal || 0,
                     creditsRemaining: body.creditsRemaining || 0,
-                    status: "active",
+                    status: "exhausted",
                     price: price,
                 }
             ]

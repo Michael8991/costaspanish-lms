@@ -162,6 +162,7 @@ export default function FormNewStudent({ locale }: { locale: string }) {
             new Date().setFullYear(new Date().getFullYear() + 1),
           ).toISOString(),
           price: 0,
+          status: "exhausted",
         }),
       }).then(async (res) => {
         if (!res.ok) {
