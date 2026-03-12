@@ -197,3 +197,34 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest, { params }: Ctx) {
+  const user = await requireAuth(req);
+  if (!requireRole(user, ["teacher", "admin"])) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id, planId } = await params;
+
+  if (!mongoose.isValidObjectId(id) || !mongoose.isValidObjectId(planId)) {
+    return NextResponse.json({ error: "Invalid IDs" }, { status: 400 });
+  }
+
+  await dbConnect();
+
+  const updateStudent = await StudentProfile.findOneAndUpdate({
+    _id: id,
+    "activePlans._id": planId
+  },
+    {
+      $set: {
+        "activePlans.$.status": "canceled",
+        "activePlans.$.creditsRemaining": 0,
+      }
+    }, { new: true }).lean();
+  
+  if (!updateStudent) {
+    return NextResponse.json({ error: "Alumno o plan no encontrado." }, { status: 404 });
+  }
+  return NextResponse.json({success:true},{status: 200})
+}

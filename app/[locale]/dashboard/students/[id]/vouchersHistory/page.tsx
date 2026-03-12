@@ -56,7 +56,7 @@ export default async function VouchersHistory({
   return (
     <div className="container mx-auto py-8 px-4 md:px-8 text-gray-800 max-w-6xl">
       <BasicStudentHeader locale={locale} id={id} student={student} />
-      <VouchersTable id={id} />
+      <VouchersTable id={id} student={student.name} />
     </div>
   );
 }

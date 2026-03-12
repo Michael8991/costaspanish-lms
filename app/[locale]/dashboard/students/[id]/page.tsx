@@ -132,7 +132,7 @@ export default async function StudentPage({
 
   const breadcrumbItems = [
     { label: "Students", href: `/${locale}/dashboard/students` },
-    { label: student.name }, // Sin href, para que sea el texto final truncado
+    { label: student.name },
   ];
 
   return (
@@ -152,6 +152,7 @@ export default async function StudentPage({
       </div>
       {/* 2. HEADER DEL PERFIL */}
       <ComplexStudentHeader student={student} />
+      {/* 2. PANELES DE PLANES ACTIVOS */}
       <ActiveVouchersPanel
         locale={locale}
         studentId={student.id}
