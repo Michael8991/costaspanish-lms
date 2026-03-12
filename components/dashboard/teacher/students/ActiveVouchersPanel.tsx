@@ -58,7 +58,37 @@ export default function ActiveVouchersPanel({
 
   const router = useRouter();
 
-  const handleEditVoucher = async (formData: EditVoucherFormData) => [];
+  const handleEditVoucher = async (
+    planId: string,
+    formData: EditVoucherFormData,
+  ) => {
+    setIsSubmittingEditVoucher(true);
+    try {
+      const res = await fetch(`/api/students/${studentId}/plans/${planId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+        cache: "no-store",
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || "Error al actualizar el bono.");
+      }
+
+      toast.success("Bono actualizado con exito.");
+      // router.refresh();
+      window.location.reload();
+    } catch (error) {
+      if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error("Ocurrió un error inesperado al actualizar el bono.");
+      }
+    } finally {
+      setIsSubmittingEditVoucher(false);
+    }
+  };
 
   const handleNewVoucher = async (formData: NewVoucherFormData) => {
     try {
@@ -186,7 +216,7 @@ export default function ActiveVouchersPanel({
                       setPlanToEdit(plan);
                       setIsEditVoucherModalOpen(true);
                     }}
-                    className="items-center text-[11px] font-medium text-gray-400 hover:text-[#9e2727] transition-colors flex gap-1 mt-1 border rounded-lg border-gray-300 px-2 py-1 hover:border-[#9e2727]"
+                    className="cursor-pointer items-center text-[11px] font-medium text-gray-400 hover:text-[#9e2727] transition-colors flex gap-1 mt-1 border rounded-lg border-gray-300 px-2 py-1 hover:border-[#9e2727]"
                   >
                     <Pencil size={12} /> Edit Voucher
                   </button>
