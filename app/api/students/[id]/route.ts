@@ -2,6 +2,7 @@ import { requireAuth, requireRole } from "@/lib/auth/apiAuth";
 import dbConnect from "@/lib/mongo";
 import { StudentProfile, StudentProfileDoc } from "@/models/StudentProfile";
 import mongoose from "mongoose";
+import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -93,6 +94,7 @@ export async function PATCH(req: NextRequest, {
     }).lean();
        
        if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
+       revalidatePath("/", "layout");
        return NextResponse.json(updated);
     
    } catch {

@@ -23,7 +23,6 @@ type QuickOptionsMenu = {
   href: (id: string) => string;
   icon: LucideIcon;
 };
-//TODO
 const quickOptionsMenu: QuickOptionsMenu[] = [
   {
     label: "Profile details",
@@ -41,8 +40,8 @@ const quickOptionsMenu: QuickOptionsMenu[] = [
     icon: CalendarPlus,
   },
   {
-    label: "Edit profile",
-    href: (id) => `/dashboard/students/${id}/edit`,
+    label: "Edit Student",
+    href: (id) => `/dashboard/students/${id}/editStudent`,
     icon: UserRoundPen,
   },
   {
@@ -50,6 +49,7 @@ const quickOptionsMenu: QuickOptionsMenu[] = [
     href: (id) => `/dashboard/students/${id}?action=email`,
     icon: Send,
   },
+  //TODO:send email and whatsapp
 ];
 
 const getLevelBadge = (level: string) => {

@@ -26,8 +26,10 @@ interface studentProps {
 
 export default function ComplexStudentHeader({
   student,
+  locale,
 }: {
   student: studentProps;
+  locale: string;
 }) {
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isSubmittingStatus, setIsSubmittingStatus] = useState(false);
@@ -172,10 +174,9 @@ export default function ComplexStudentHeader({
               ? "Archive Student"
               : "Reactivate Student"}
         </button>
-        {/* //TODO: Poner enlace correcto */}
         <Link
-          className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-medium transition-colors shadow-sm bg-white border-gray-300 text-gray-700 hover:bg-green-800! hover:border-green-900 hover:text-white transform duration-150 ease-in-out`}
-          href={"#"}
+          className={`" text-gray-600 hover:border-green-300 hover:text-green-700 hover:bg-green-50 group flex items-center gap-1.5 px-3 py-1.5 border rounded-md text-sm font-medium shadow-sm transition-all duration-200 bg-white border-gray-200`}
+          href={`/${locale}/dashboard/students/${student.id}/editStudent`}
         >
           <Pencil size={16} />
           Edit Student

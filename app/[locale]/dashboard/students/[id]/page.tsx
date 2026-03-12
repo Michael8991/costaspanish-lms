@@ -151,7 +151,7 @@ export default async function StudentPage({
         </Link>
       </div>
       {/* 2. HEADER DEL PERFIL */}
-      <ComplexStudentHeader student={student} />
+      <ComplexStudentHeader student={student} locale={locale} />
       {/* 2. PANELES DE PLANES ACTIVOS */}
       <ActiveVouchersPanel
         locale={locale}
