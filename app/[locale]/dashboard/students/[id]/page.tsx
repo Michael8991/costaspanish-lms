@@ -1,4 +1,5 @@
 import ActiveVouchersPanel from "@/components/dashboard/teacher/students/ActiveVouchersPanel";
+import ComplexStudentHeader from "@/components/dashboard/teacher/students/ComplexStudentHeader";
 import Breadcrumbs from "@/components/ui/Breadcrumbs";
 import dbConnect from "@/lib/mongo";
 import { DBStudent } from "@/lib/types/student";
@@ -150,102 +151,7 @@ export default async function StudentPage({
         </Link>
       </div>
       {/* 2. HEADER DEL PERFIL */}
-      <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mt-6">
-        <div className="flex flex-wrap items-center gap-6 max-md:justify-center ">
-          {/* Avatar con la inicial */}
-          <div className="w-20 h-20 rounded-full bg-[#9e2727]/10 border-2 border-[#9e2727]/20 flex items-center justify-center text-[#9e2727]">
-            <span className="text-3xl font-bold">{student.name.charAt(0)}</span>
-          </div>
-
-          {/* Info principal */}
-          <div className="flex flex-col max-md:items-center">
-            <div className="flex flex-wrap gap-2">
-              <h1 className="text-2xl font-bold text-gray-900">
-                {student.name}
-              </h1>
-              {/* Badge de Estado */}
-              <div className="flex items-center gap-2">
-                <span
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full border ${
-                    student.status === "active"
-                      ? "bg-green-50 text-green-700 border-green-200"
-                      : "bg-gray-50 text-gray-700 border-gray-200"
-                  }`}
-                >
-                  {student.status === "active" && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                  )}
-                  {student.status === "active"
-                    ? "Active Student"
-                    : "Inactive Student"}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 text-gray-500 text-sm mt-1 mb-1 max-md:justify-center">
-              <div className="flex items-center gap-2">
-                <Mail size={14} />
-                <p>{student.email}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Phone className="" size={14} />
-                <p>{student.phone}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 text-gray-500 italic text-xs mb-3">
-              <p>
-                {student.country ? student.country : ""}, {student.timezone}
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 text-gray-500 text-sm mt-1 mb-3 max-md:justify-center">
-              <p className="py-1 px-2 bg-orange-200 rounded-lg text-black text-xs">
-                {student.nativeLanguage}
-              </p>
-              <p className="py-1 px-2 bg-blue-200 rounded-lg text-black text-xs">
-                {student.level}
-              </p>
-              {student.goals.map((goal, index) => (
-                <p
-                  key={index}
-                  className="py-1 px-2 bg-gray-200 rounded-lg text-black text-xs"
-                >
-                  {goal}
-                </p>
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className="flex flex-col items-center justify-end gap-4 max-md:mx-auto">
-          {/* Botón de Cambiar Estado (Preparado para el Modal) */}
-          <button
-            className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-medium shadow-sm hover:cursor-pointer hover:bg-[#9e2727]! hover:border-[#9e2727] hover:text-white transition-colors transform duration-150 ease-in-out ${
-              student.status === "active"
-                ? "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
-                : "bg-[#9e2727] border-[#9e2727] text-white hover:bg-[#8a2222]"
-            }`}
-          >
-            <AlertTriangle
-              size={16}
-              className={
-                student.status === "active" ? "text-amber-500" : "text-white"
-              }
-            />
-            {student.status === "active"
-              ? "Deactivate Student"
-              : "Activate Student"}
-          </button>
-          {/* //TODO: Poner enlace correcto */}
-          <Link
-            className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-medium transition-colors shadow-sm bg-white border-gray-300 text-gray-700 hover:bg-green-800! hover:border-green-900 hover:text-white transform duration-150 ease-in-out`}
-            href={"#"}
-          >
-            <Pencil size={16} />
-            Edit Student
-          </Link>
-        </div>
-      </section>
+      <ComplexStudentHeader student={student} />
       <ActiveVouchersPanel
         locale={locale}
         studentId={student.id}
