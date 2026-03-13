@@ -49,7 +49,6 @@ const quickOptionsMenu: QuickOptionsMenu[] = [
     href: (id) => `/dashboard/students/${id}?action=email`,
     icon: Send,
   },
-  //TODO:send email and whatsapp
 ];
 
 const getLevelBadge = (level: string) => {
@@ -117,8 +116,31 @@ export default function StudentsTable({ locale }: { locale: string }) {
   }, []);
 
   const [isOpenQO, setIsOpenQO] = useState<string | null>(null);
-  const toggleQuickOptionsMenu = (studentId: string) => {
-    setIsOpenQO((prev) => (prev === studentId ? null : studentId));
+  const [menuPosition, setMenuPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
+
+  const toggleQuickOptionsMenu = (
+    studentId: string,
+    event: React.MouseEvent<HTMLButtonElement>,
+  ) => {
+    if (isOpenQO === studentId) {
+      setIsOpenQO(null);
+      setMenuPosition(null);
+    } else {
+      const rect = event.currentTarget.getBoundingClientRect();
+      const menuHeight = 260;
+      const menuWidth = 220;
+      const spaceBelow = window.innerHeight - rect.bottom;
+
+      setMenuPosition({
+        top:
+          spaceBelow > menuHeight ? rect.bottom + 4 : rect.top - menuHeight - 4,
+        left: rect.right - menuWidth,
+      });
+      setIsOpenQO(studentId);
+    }
   };
 
   useEffect(() => {
@@ -129,6 +151,7 @@ export default function StudentsTable({ locale }: { locale: string }) {
         !target.closest(".menu-dropdown")
       ) {
         setIsOpenQO(null);
+        setMenuPosition(null);
       }
     };
 
@@ -187,10 +210,9 @@ export default function StudentsTable({ locale }: { locale: string }) {
         </div>
       )}
 
-      {/* Tabla de alumnos */}
       {!isLoading && !error && students.length > 0 && (
-        <div className="overflow-y-visible">
-          <table className="w-full text-left border-collapse ">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 text-xs uppercase tracking-wider">
                 <th className="px-6 py-4 font-medium">Alumno</th>
@@ -201,90 +223,91 @@ export default function StudentsTable({ locale }: { locale: string }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {students.map((student, index) => {
-                const isLastRows =
-                  students.length > 4 && index >= students.length - 2;
-                return (
-                  <tr
-                    key={student.id}
-                    className="hover:bg-gray-50/50 transition-colors group"
-                  >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center font-bold text-sm">
-                          {student.name.charAt(0)}
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">
-                            {student.name}
-                          </p>
-                          <div className="flex items-center gap-1 text-gray-500 text-sm">
-                            <Mail size={12} />
-                            <span>{student.email}</span>
-                          </div>
+              {students.map((student) => (
+                <tr
+                  key={student.id}
+                  className="hover:bg-gray-50/50 transition-colors group"
+                >
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center font-bold text-sm">
+                        {student.name.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">
+                          {student.name}
+                        </p>
+                        <div className="flex items-center gap-1 text-gray-500 text-sm">
+                          <Mail size={12} />
+                          <span>{student.email}</span>
                         </div>
                       </div>
-                    </td>
+                    </div>
+                  </td>
 
-                    <td className="px-6 py-4">
-                      <span
-                        className={`px-3 py-1 text-xs font-semibold rounded-full border ${getLevelBadge(student.level)}`}
-                      >
-                        {student.level}
+                  <td className="px-6 py-4">
+                    <span
+                      className={`px-3 py-1 text-xs font-semibold rounded-full border ${getLevelBadge(student.level)}`}
+                    >
+                      {student.level}
+                    </span>
+                  </td>
+
+                  <td className="px-6 py-4 text-sm text-gray-600">
+                    {student.planType}
+                  </td>
+
+                  <td className="px-6 py-4">
+                    {student.creditsRemaining > 0 ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 text-green-700 text-sm font-medium border border-green-100">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                        {student.creditsRemaining} clases
                       </span>
-                    </td>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 text-red-700 text-sm font-medium border border-red-100">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                        Agotado
+                      </span>
+                    )}
+                  </td>
 
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {student.planType}
-                    </td>
-
-                    <td className="px-6 py-4">
-                      {student.creditsRemaining > 0 ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 text-green-700 text-sm font-medium border border-green-100">
-                          <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                          {student.creditsRemaining} clases
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 text-red-700 text-sm font-medium border border-red-100">
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
-                          Agotado
-                        </span>
-                      )}
-                    </td>
-
-                    <td className="px-6 py-4 text-right relative">
-                      <button
-                        onClick={() => toggleQuickOptionsMenu(student.id)}
-                        className={`menu-button p-2 text-gray-400 hover:text-[#9e2727] hover:bg-red-50 rounded-lg transition-colors hover:cursor-pointer`}
-                      >
-                        <MoreVertical size={20} />
-                      </button>
-                      <div
-                        className={`menu-dropdown py-4 px-4 absolute right-0 mt-3 min-w-55 z-50 flex flex-col rounded-lg bg-[#9e2727] gap-3 origin-top-right shadow-xl transform transition-all duration-200 ease-in-out -translate-x-5 justify-center
-                                ${isLastRows ? "bottom-10 origin-bottom-right" : "top-12 origin-top-right"}
-                                ${isOpenQO === student.id ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 -translate-y-2 pointer-events-none"}`}
-                      >
-                        {quickOptionsMenu.map((object, index) => {
-                          const Icon = object.icon;
-                          return (
-                            <Link
-                              key={index}
-                              onClick={() => setIsOpenQO(null)}
-                              href={withLocale(object.href(student.id))}
-                              className="flex items-center hover:bg-[#a85d5d] py-2 px-4 rounded-lg text-white transform transition-all duration-200 ease-in-out"
-                            >
-                              <Icon size={18} className="me-2" />
-                              {object.label}
-                            </Link>
-                          );
-                        })}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                  <td className="px-6 py-4 text-right">
+                    <button
+                      onClick={(e) => toggleQuickOptionsMenu(student.id, e)}
+                      className="menu-button p-2 text-gray-400 hover:text-[#9e2727] hover:bg-red-50 rounded-lg transition-colors hover:cursor-pointer"
+                    >
+                      <MoreVertical size={20} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {isOpenQO && menuPosition && (
+        <div
+          className="menu-dropdown fixed z-[9999] py-4 px-4 min-w-[220px] flex flex-col rounded-lg bg-[#9e2727] gap-3 shadow-xl"
+          style={{ top: menuPosition.top, left: menuPosition.left }}
+        >
+          {quickOptionsMenu.map((object, index) => {
+            const Icon = object.icon;
+            return (
+              <Link
+                key={index}
+                onClick={() => {
+                  setIsOpenQO(null);
+                  setMenuPosition(null);
+                }}
+                href={withLocale(object.href(isOpenQO))}
+                className="flex items-center hover:bg-[#a85d5d] py-2 px-4 rounded-lg text-white transition-all duration-200"
+              >
+                <Icon size={18} className="me-2" />
+                {object.label}
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>

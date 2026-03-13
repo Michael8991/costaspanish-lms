@@ -2,8 +2,10 @@ import { getToken } from "next-auth/jwt";
 import { NextRequest } from "next/server";
 
 export type Role = "admin" | "teacher" | "student";
-export async function requireAuth(req: NextRequest) {
+
+export async function requireAuth(req: NextRequest){
     const token = await getToken({ req });
+
     if (!token?.uid) return null;
 
     return {
