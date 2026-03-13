@@ -125,12 +125,14 @@ export type ResourceDoc = mongoose.HydratedDocument<IResource>;
 function normalizeLooseStringArray(values: unknown): string[] {
   if (!Array.isArray(values)) return [];
 
-  return [...new Set(
-    values
-      .filter((v): v is string => typeof v === "string")
-      .map((v) => v.trim().toLowerCase())
-      .filter(Boolean)
-  )];
+  return [
+    ...new Set(
+      values
+        .filter((v): v is string => typeof v === "string")
+        .map((v) => v.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  ];
 }
 
 function dedupeEnumArray<T>(values: unknown): T[] {
@@ -289,7 +291,7 @@ const ResourceSchema = new Schema<IResource>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 /* =========================================================
@@ -315,28 +317,28 @@ ResourceSchema.pre(
       if (!this.externalUrl) {
         this.invalidate(
           "externalUrl",
-          "externalUrl is required when format is 'external_link'."
+          "externalUrl is required when format is 'external_link'.",
         );
       }
 
       if (this.storagePath || this.fileUrl) {
         this.invalidate(
           "format",
-          "External resources must not contain storagePath or fileUrl."
+          "External resources must not contain storagePath or fileUrl.",
         );
       }
     } else {
       if (!this.storagePath && !this.fileUrl) {
         this.invalidate(
           "storagePath",
-          "A non-external resource must contain at least storagePath or fileUrl."
+          "A non-external resource must contain at least storagePath or fileUrl.",
         );
       }
 
       if (this.externalUrl) {
         this.invalidate(
           "externalUrl",
-          "externalUrl is only allowed when format is 'external_link'."
+          "externalUrl is only allowed when format is 'external_link'.",
         );
       }
     }
@@ -344,7 +346,7 @@ ResourceSchema.pre(
     if (this.format === "pdf" && this.durationSeconds) {
       this.invalidate(
         "durationSeconds",
-        "durationSeconds only applies to audio/video resources."
+        "durationSeconds only applies to audio/video resources.",
       );
     }
 
@@ -353,12 +355,9 @@ ResourceSchema.pre(
       typeof this.pageCount === "number" &&
       this.pageCount > 0
     ) {
-      this.invalidate(
-        "pageCount",
-        "pageCount only applies to pdf resources."
-      );
+      this.invalidate("pageCount", "pageCount only applies to pdf resources.");
     }
-  }
+  },
 );
 /* =========================================================
  * ÍNDICES
@@ -408,7 +407,7 @@ ResourceSchema.index(
       description: 3,
     },
     name: "resource_text_search",
-  }
+  },
 );
 
 /* =========================================================

@@ -1,7 +1,7 @@
 import { Types } from "mongoose";
 import { IResource } from "@/models/ResourceProfile";
 
-type ResourceListSource = Pick<
+export type ResourceListSource = Pick<
   IResource,
   | "title"
   | "description"
@@ -135,7 +135,7 @@ export interface PaginatedResponse<T> {
 
 export function toResourceListItemDTO(
   resource: ResourceListSource,
-  currentUserId?: string
+  currentUserId?: string,
 ): ResourceListItemDTO {
   const ownerId = resource.ownerTeacherId
     ? String(resource.ownerTeacherId)
@@ -187,7 +187,7 @@ export function toResourceListItemDTO(
 
 export function toResourceDetailDTO(
   resource: ResourceDetailSource,
-  currentUserId?: string
+  currentUserId?: string,
 ): ResourceDetailDTO {
   const base = toResourceListItemDTO(resource, currentUserId);
 
@@ -205,7 +205,7 @@ export function toPaginatedResponse<T>(
   items: T[],
   page: number,
   limit: number,
-  total: number
+  total: number,
 ): PaginatedResponse<T> {
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
