@@ -11,6 +11,7 @@
   "dependencies": {
     "@types/mongoose": "^5.11.96",
     "bcryptjs": "^3.0.3",
+    "firebase": "^12.10.0",
     "lucide-react": "^0.575.0",
     "mongodb": "^7.0.0",
     "mongoose": "^9.0.0",
