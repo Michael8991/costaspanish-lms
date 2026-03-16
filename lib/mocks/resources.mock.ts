@@ -1,397 +1,535 @@
-// Interfaz basada en tu DTO completo para que TypeScript no se queje
-export interface MockResource {
-  id: string;
-  title: string;
-  description: string;
-  status: "draft" | "published" | "archived";
-  visibility: "private" | "shared";
-  pedagogicalType: string;
-  levels: string[];
-  skills: string[];
-  deliveryModes: string[];
-  lessonStages: string[];
-  grammarTopics: string[];
-  vocabularyTopics: string[];
-  tags: string[];
-  estimatedDurationMinutes: number;
-  difficulty: "easy" | "medium" | "hard";
-  hasAnswerKey: boolean;
-  requiresTeacherReview: boolean;
-    format: "pdf" | "image" | "audio" | "video" | "external_link";
-  originalFilename?: string;
-  mimeType?: string;
-  fileSizeBytes?: number;
-  storagePath?: string;
-  fileUrl?: string;
-  pageCount?: number;
-  durationSeconds?: number;
-  thumbnailUrl?: string;
-  externalUrl?: string;
-  timesUsed: number;
-  ownerTeacherId: string;
-  createdAt: string;
-  updatedAt: string;
-}
+import type { ResourceListItemDTO } from "@/lib/dto/resource.dto";
 
-export const mockResources: MockResource[] = [
+const CURRENT_TEACHER_ID = "67d1a1b2c3d4e5f607182930";
+const OTHER_TEACHER_ID = "67d1a1b2c3d4e5f607182931";
+
+export const mockResources: ResourceListItemDTO[] = [
   {
-    id: "res_001",
-    title: "La Rutina Diaria - Verbos Reflexivos",
-    description: "Hoja de ejercicios para practicar los verbos reflexivos en presente con vocabulario de la rutina diaria.",
+    id: "67f100000000000000000001",
+    title: "A1 Greetings and Introductions Worksheet",
+    description:
+      "Printable worksheet for introducing yourself, asking for names, and basic greeting exchanges in beginner Spanish lessons.",
     status: "published",
     visibility: "shared",
     pedagogicalType: "worksheet",
-    levels: ["A2"],
-    skills: ["grammar", "writing"],
-    deliveryModes: ["online", "in-person"],
-    lessonStages: ["practice", "homework"],
-    grammarTopics: ["Verbos Reflexivos", "Presente de Indicativo"],
-    vocabularyTopics: ["Rutina diaria", "Higiene personal"],
-    tags: ["reflexivos", "rutina", "mañana"],
+
+    levels: ["A1"],
+    skills: ["speaking", "writing", "vocabulary"],
+    deliveryModes: ["classwork", "homework"],
+    lessonStages: ["warmup", "guided_practice", "homework"],
+
+    grammarTopics: ["ser", "subject pronouns", "basic questions"],
+    vocabularyTopics: ["greetings", "countries", "nationalities"],
+    tags: ["a1", "introductions", "basics", "starter"],
+
     estimatedDurationMinutes: 20,
-    difficulty: "medium",
+    difficulty: 1,
+
     hasAnswerKey: true,
     requiresTeacherReview: false,
-    format: "pdf",
-    originalFilename: "rutina_reflexivos_A2.pdf",
-    mimeType: "application/pdf",
-    fileSizeBytes: 1048576, // 1MB
-    storagePath: "resources/pdfs/rutina_reflexivos_A2.pdf",
-    fileUrl: "https://firebasestorage.googleapis.com/v0/b/mock/rutina.pdf",
-    pageCount: 2,
-    thumbnailUrl: "https://placehold.co/400x300/e2e8f0/1e293b?text=PDF+Rutina",
-    timesUsed: 145,
-    ownerTeacherId: "teacher_123",
-    createdAt: "2024-01-15T10:30:00Z",
-    updatedAt: "2024-02-01T08:15:00Z"
+    timesUsed: 18,
+
+    asset: {
+      format: "pdf",
+      thumbnailUrl:
+        "https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=1200&q=80",
+      externalUrl: undefined,
+      originalFilename: "a1-greetings-introductions.pdf",
+      mimeType: "application/pdf",
+      pageCount: 4,
+      durationSeconds: undefined,
+    },
+
+    owner: {
+      teacherId: CURRENT_TEACHER_ID,
+      isMine: true,
+    },
+
+    createdAt: "2026-02-01T09:00:00.000Z",
+    updatedAt: "2026-03-10T11:20:00.000Z",
   },
   {
-    id: "res_002",
-    title: "En el Restaurante - Roleplay",
-    description: "Audio nativo pidiendo comida en un restaurante en Madrid, seguido de una actividad de roleplay.",
-    status: "published",
-    visibility: "shared",
-    pedagogicalType: "audio",
-    levels: ["A1", "A2"],
-    skills: ["listening", "speaking"],
-    deliveryModes: ["online", "in-person"],
-    lessonStages: ["presentation", "production"],
-    grammarTopics: ["Verbo Querer", "Me gustaría"],
-    vocabularyTopics: ["Comida", "Bebidas", "Restaurante"],
-    tags: ["roleplay", "tapas", "madrid"],
-    estimatedDurationMinutes: 15,
-    difficulty: "easy",
-    hasAnswerKey: false,
-    requiresTeacherReview: true,
-    format: "audio",
-    originalFilename: "restaurante_madrid.mp3",
-    mimeType: "audio/mpeg",
-    fileSizeBytes: 3145728, // 3MB
-    storagePath: "resources/audios/restaurante_madrid.mp3",
-    fileUrl: "https://firebasestorage.googleapis.com/v0/b/mock/audio.mp3",
-    durationSeconds: 125,
-    thumbnailUrl: "https://placehold.co/400x300/fef08a/854d0e?text=Audio+Restaurante",
-    timesUsed: 89,
-    ownerTeacherId: "teacher_123",
-    createdAt: "2024-02-10T14:20:00Z",
-    updatedAt: "2024-02-10T14:20:00Z"
-  },
-  {
-    id: "res_003",
-    title: "Subjuntivo vs Indicativo (WEIRDO)",
-    description: "Presentación interactiva explicando los disparadores del subjuntivo usando el acrónimo WEIRDO.",
-    status: "published",
-    visibility: "shared",
-    pedagogicalType: "presentation",
-    levels: ["B1", "B2"],
-    skills: ["grammar"],
-    deliveryModes: ["online", "hybrid"],
-    lessonStages: ["presentation"],
-    grammarTopics: ["Presente de Subjuntivo", "Contraste de Modos"],
-    vocabularyTopics: ["Emociones", "Dudas"],
-    tags: ["subjuntivo", "weirdo", "gramática dura"],
-    estimatedDurationMinutes: 45,
-    difficulty: "hard",
-    hasAnswerKey: false,
-    requiresTeacherReview: false,
-    format: "pdf",
-    originalFilename: "subjuntivo_weirdo.pptx",
-    mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    fileSizeBytes: 5242880, // 5MB
-    storagePath: "resources/presentations/subjuntivo.pptx",
-    fileUrl: "https://firebasestorage.googleapis.com/v0/b/mock/pres.pptx",
-    pageCount: 15,
-    thumbnailUrl: "https://placehold.co/400x300/bfdbfe/1e3a8a?text=PPT+Subjuntivo",
-    timesUsed: 312,
-    ownerTeacherId: "teacher_456",
-    createdAt: "2023-11-05T09:00:00Z",
-    updatedAt: "2024-03-01T11:00:00Z"
-  },
-  {
-    id: "res_004",
-    title: "Juego: Pasapalabra del Vocabulario B2",
-    description: "Enlace a un juego interactivo de Genially estilo Pasapalabra para repasar vocabulario avanzado.",
-    status: "draft", // ¡Ojo! Este es un borrador
-    visibility: "private",
-    pedagogicalType: "game",
-    levels: ["B2"],
-    skills: ["vocabulary", "speaking"],
-    deliveryModes: ["online"],
-    lessonStages: ["warm-up", "review"],
-    grammarTopics: [],
-    vocabularyTopics: ["Miscelánea B2", "Modismos"],
-    tags: ["juego", "pasapalabra", "repaso"],
-    estimatedDurationMinutes: 25,
-    difficulty: "medium",
-    hasAnswerKey: true,
-    requiresTeacherReview: false,
-    format: "external_link",
-    externalUrl: "https://view.genial.ly/mock-pasapalabra",
-    thumbnailUrl: "https://placehold.co/400x300/fecdd3/881337?text=Link+Genially",
-    timesUsed: 0,
-    ownerTeacherId: "teacher_123",
-    createdAt: "2024-03-14T16:45:00Z",
-    updatedAt: "2024-03-15T10:12:00Z"
-  },
-  {
-    id: "res_005",
-    title: "Texto Crítico: El impacto de la IA",
-    description: "Artículo de opinión para lectura y debate crítico. Incluye preguntas de comprensión lectora.",
-    status: "published",
-    visibility: "private", // Solo para el profesor que lo creó
-    pedagogicalType: "reading",
-    levels: ["C1", "C2"],
-    skills: ["reading", "speaking"],
-    deliveryModes: ["in-person", "hybrid"],
-    lessonStages: ["presentation", "production"],
-    grammarTopics: ["Conectores discursivos", "Oraciones condicionales irreales"],
-    vocabularyTopics: ["Tecnología", "Ética", "Sociedad"],
-    tags: ["debate", "DELE C1", "tecnología"],
-    estimatedDurationMinutes: 60,
-    difficulty: "hard",
-    hasAnswerKey: true,
-    requiresTeacherReview: true,
-    format: "pdf",
-    originalFilename: "lectura_ia_C1.pdf",
-    mimeType: "application/pdf",
-    fileSizeBytes: 800000,
-    storagePath: "resources/pdfs/ia_C1.pdf",
-    fileUrl: "https://firebasestorage.googleapis.com/v0/b/mock/ia.pdf",
-    pageCount: 4,
-    thumbnailUrl: "https://placehold.co/400x300/e2e8f0/1e293b?text=PDF+IA",
-    timesUsed: 12,
-    ownerTeacherId: "teacher_123",
-    createdAt: "2024-02-28T11:00:00Z",
-    updatedAt: "2024-02-28T11:00:00Z"
-  },
-  {
-    id: "res_006",
-    title: "Video: Receta de Tortilla de Patatas",
-    description: "Video corto explicando la receta tradicional. Ideal para comandos informales.",
-    status: "published",
-    visibility: "shared",
-    pedagogicalType: "video",
-    levels: ["A2", "B1"],
-    skills: ["listening", "vocabulary"],
-    deliveryModes: ["online", "hybrid"],
-    lessonStages: ["warm-up", "presentation"],
-    grammarTopics: ["Imperativo afirmativo"],
-    vocabularyTopics: ["Cocina", "Alimentos"],
-    tags: ["cultura", "gastronomía", "españa"],
-    estimatedDurationMinutes: 10,
-    difficulty: "medium",
-    hasAnswerKey: false,
-    requiresTeacherReview: false,
-    format: "video",
-    originalFilename: "receta_tortilla.mp4",
-    mimeType: "video/mp4",
-    fileSizeBytes: 15728640, // 15MB
-    storagePath: "resources/videos/tortilla.mp4",
-    fileUrl: "https://firebasestorage.googleapis.com/v0/b/mock/video.mp4",
-    durationSeconds: 180,
-    thumbnailUrl: "https://placehold.co/400x300/bbf7d0/14532d?text=Video+Receta",
-    timesUsed: 215,
-    ownerTeacherId: "teacher_789",
-    createdAt: "2023-09-10T12:00:00Z",
-    updatedAt: "2023-09-12T12:00:00Z"
-  },
-  {
-    id: "res_007",
-    title: "Flashcards: Emociones y Sentimientos",
-    description: "Set de 20 tarjetas visuales para trabajar el vocabulario de las emociones con el verbo Estar.",
+    id: "67f100000000000000000002",
+    title: "Food Vocabulary Flashcards",
+    description:
+      "Image-based flashcards to review common food and drink vocabulary with visual support.",
     status: "published",
     visibility: "shared",
     pedagogicalType: "flashcards",
-    levels: ["A1"],
-    skills: ["vocabulary", "speaking"],
-    deliveryModes: ["in-person"],
-    lessonStages: ["practice", "warm-up"],
-    grammarTopics: ["Verbo Estar"],
-    vocabularyTopics: ["Emociones", "Adjetivos"],
-    tags: ["flashcards", "visual", "niños"],
-    estimatedDurationMinutes: 10,
-    difficulty: "easy",
+
+    levels: ["A1", "A2"],
+    skills: ["vocabulary", "speaking", "reading"],
+    deliveryModes: ["classwork", "homework"],
+    lessonStages: ["review", "freer_practice", "homework"],
+
+    grammarTopics: ["articles", "gender and number"],
+    vocabularyTopics: ["food", "drinks", "restaurant items"],
+    tags: ["food", "flashcards", "visual", "a1", "a2"],
+
+    estimatedDurationMinutes: 15,
+    difficulty: 1,
+
     hasAnswerKey: false,
     requiresTeacherReview: false,
-    format: "image",
-    originalFilename: "flashcards_emociones.zip",
-    mimeType: "application/zip",
-    fileSizeBytes: 4194304, // 4MB
-    storagePath: "resources/images/emociones.zip",
-    fileUrl: "https://firebasestorage.googleapis.com/v0/b/mock/emociones.zip",
-    thumbnailUrl: "https://placehold.co/400x300/fbcfe8/831843?text=IMG+Flashcards",
-    timesUsed: 450,
-    ownerTeacherId: "teacher_456",
-    createdAt: "2023-12-01T08:00:00Z",
-    updatedAt: "2023-12-01T08:00:00Z"
+    timesUsed: 27,
+
+    asset: {
+      format: "image",
+      thumbnailUrl:
+        "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1200&q=80",
+      externalUrl: undefined,
+      originalFilename: "food-vocabulary-flashcards.jpg",
+      mimeType: "image/jpeg",
+      pageCount: undefined,
+      durationSeconds: undefined,
+    },
+
+    owner: {
+      teacherId: CURRENT_TEACHER_ID,
+      isMine: true,
+    },
+
+    createdAt: "2026-01-21T10:30:00.000Z",
+    updatedAt: "2026-03-11T08:15:00.000Z",
   },
   {
-    id: "res_008",
-    title: "Quiz: Pretérito Indefinido vs Imperfecto",
-    description: "Cuestionario de 20 preguntas de opción múltiple con feedback automático.",
+    id: "67f100000000000000000003",
+    title: "Slow Spanish Café Dialogue Audio",
+    description:
+      "Listening track with a slow-paced café conversation focused on ordering and polite requests.",
+    status: "published",
+    visibility: "shared",
+    pedagogicalType: "audio_track",
+
+    levels: ["A2"],
+    skills: ["listening", "pronunciation", "vocabulary"],
+    deliveryModes: ["classwork", "homework"],
+    lessonStages: ["input", "guided_practice", "correction"],
+
+    grammarTopics: ["quiero", "me gustaría", "polite requests"],
+    vocabularyTopics: ["café", "ordering", "drinks", "snacks"],
+    tags: ["listening", "cafe", "audio", "a2"],
+
+    estimatedDurationMinutes: 12,
+    difficulty: 2,
+
+    hasAnswerKey: true,
+    requiresTeacherReview: false,
+    timesUsed: 34,
+
+    asset: {
+      format: "audio",
+      thumbnailUrl:
+        "https://images.unsplash.com/photo-1478737270239-2f02b77fc618?auto=format&fit=crop&w=1200&q=80",
+      externalUrl: undefined,
+      originalFilename: "slow-spanish-cafe-dialogue.mp3",
+      mimeType: "audio/mpeg",
+      pageCount: undefined,
+      durationSeconds: 428,
+    },
+
+    owner: {
+      teacherId: CURRENT_TEACHER_ID,
+      isMine: true,
+    },
+
+    createdAt: "2026-02-05T13:10:00.000Z",
+    updatedAt: "2026-03-12T07:40:00.000Z",
+  },
+  {
+    id: "67f100000000000000000004",
+    title: "B1 Past Tenses Video Explanation",
+    description:
+      "Short explainer video comparing pretérito perfecto and indefinido with timeline examples.",
+    status: "published",
+    visibility: "private",
+    pedagogicalType: "video_clip",
+
+    levels: ["B1"],
+    skills: ["listening", "grammar"],
+    deliveryModes: ["classwork", "homework"],
+    lessonStages: ["input", "review", "guided_practice"],
+
+    grammarTopics: ["pretérito perfecto", "pretérito indefinido", "time markers"],
+    vocabularyTopics: ["life experiences", "recent actions"],
+    tags: ["b1", "past tenses", "video", "grammar"],
+
+    estimatedDurationMinutes: 18,
+    difficulty: 3,
+
+    hasAnswerKey: false,
+    requiresTeacherReview: false,
+    timesUsed: 12,
+
+    asset: {
+      format: "video",
+      thumbnailUrl:
+        "https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&w=1200&q=80",
+      externalUrl: undefined,
+      originalFilename: "b1-past-tenses-video.mp4",
+      mimeType: "video/mp4",
+      pageCount: undefined,
+      durationSeconds: 615,
+    },
+
+    owner: {
+      teacherId: CURRENT_TEACHER_ID,
+      isMine: true,
+    },
+
+    createdAt: "2026-01-28T15:00:00.000Z",
+    updatedAt: "2026-03-09T18:00:00.000Z",
+  },
+  {
+    id: "67f100000000000000000005",
+    title: "Present Tense Irregular Verbs Reference",
+    description:
+      "Compact grammar reference sheet for common present tense irregular verbs with usage notes.",
+    status: "draft",
+    visibility: "private",
+    pedagogicalType: "grammar_reference",
+
+    levels: ["A2", "B1"],
+    skills: ["grammar", "reading", "writing"],
+    deliveryModes: ["classwork", "homework"],
+    lessonStages: ["review", "input", "homework"],
+
+    grammarTopics: ["present tense", "irregular verbs", "stem-changing verbs"],
+    vocabularyTopics: ["daily routine", "common actions"],
+    tags: ["grammar", "reference", "verbs", "a2", "b1"],
+
+    estimatedDurationMinutes: 25,
+    difficulty: 2,
+
+    hasAnswerKey: true,
+    requiresTeacherReview: false,
+    timesUsed: 7,
+
+    asset: {
+      format: "pdf",
+      thumbnailUrl:
+        "https://images.unsplash.com/photo-1517842645767-c639042777db?auto=format&fit=crop&w=1200&q=80",
+      externalUrl: undefined,
+      originalFilename: "present-irregular-verbs-reference.pdf",
+      mimeType: "application/pdf",
+      pageCount: 6,
+      durationSeconds: undefined,
+    },
+
+    owner: {
+      teacherId: CURRENT_TEACHER_ID,
+      isMine: true,
+    },
+
+    createdAt: "2026-02-12T08:20:00.000Z",
+    updatedAt: "2026-03-14T12:45:00.000Z",
+  },
+  {
+    id: "67f100000000000000000006",
+    title: "Picture Description Speaking Prompt",
+    description:
+      "Prompt card set for describing scenes, people, and actions in present and past contexts.",
+    status: "published",
+    visibility: "shared",
+    pedagogicalType: "speaking_prompt",
+
+    levels: ["A2", "B1"],
+    skills: ["speaking", "vocabulary", "pronunciation"],
+    deliveryModes: ["classwork"],
+    lessonStages: ["warmup", "freer_practice", "correction"],
+
+    grammarTopics: ["hay", "estar + gerundio", "adjectives"],
+    vocabularyTopics: ["people", "places", "actions", "appearance"],
+    tags: ["speaking", "prompt", "fluency", "a2", "b1"],
+
+    estimatedDurationMinutes: 30,
+    difficulty: 2,
+
+    hasAnswerKey: false,
+    requiresTeacherReview: true,
+    timesUsed: 22,
+
+    asset: {
+      format: "image",
+      thumbnailUrl:
+        "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1200&q=80",
+      externalUrl: undefined,
+      originalFilename: "picture-description-speaking-prompt.png",
+      mimeType: "image/png",
+      pageCount: undefined,
+      durationSeconds: undefined,
+    },
+
+    owner: {
+      teacherId: OTHER_TEACHER_ID,
+      isMine: false,
+    },
+
+    createdAt: "2026-01-18T16:40:00.000Z",
+    updatedAt: "2026-03-08T14:10:00.000Z",
+  },
+  {
+    id: "67f100000000000000000007",
+    title: "B2 Opinion Essay Writing Prompt",
+    description:
+      "Structured prompt and planning guide for opinion essays with connectors and argument scaffolding.",
+    status: "published",
+    visibility: "shared",
+    pedagogicalType: "writing_prompt",
+
+    levels: ["B2"],
+    skills: ["writing", "grammar", "reading"],
+    deliveryModes: ["classwork", "homework"],
+    lessonStages: ["input", "guided_practice", "homework", "assessment"],
+
+    grammarTopics: ["connectors", "subjunctive triggers", "opinion structures"],
+    vocabularyTopics: ["education", "technology", "society"],
+    tags: ["writing", "essay", "b2", "exam"],
+
+    estimatedDurationMinutes: 45,
+    difficulty: 4,
+
+    hasAnswerKey: true,
+    requiresTeacherReview: true,
+    timesUsed: 15,
+
+    asset: {
+      format: "pdf",
+      thumbnailUrl:
+        "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&w=1200&q=80",
+      externalUrl: undefined,
+      originalFilename: "b2-opinion-essay-writing-prompt.pdf",
+      mimeType: "application/pdf",
+      pageCount: 8,
+      durationSeconds: undefined,
+    },
+
+    owner: {
+      teacherId: CURRENT_TEACHER_ID,
+      isMine: true,
+    },
+
+    createdAt: "2026-02-08T09:50:00.000Z",
+    updatedAt: "2026-03-13T17:05:00.000Z",
+  },
+  {
+    id: "67f100000000000000000008",
+    title: "Pronunciation Drill: Rolled R and Soft R",
+    description:
+      "Focused audio practice to contrast the Spanish tapped and rolled R with repetition segments.",
+    status: "archived",
+    visibility: "private",
+    pedagogicalType: "audio_track",
+
+    levels: ["A2", "B1", "B2"],
+    skills: ["pronunciation", "listening", "speaking"],
+    deliveryModes: ["classwork", "homework"],
+    lessonStages: ["input", "guided_practice", "correction"],
+
+    grammarTopics: ["phonetics"],
+    vocabularyTopics: ["minimal pairs", "common words with r"],
+    tags: ["pronunciation", "audio", "rolled-r"],
+
+    estimatedDurationMinutes: 10,
+    difficulty: 3,
+
+    hasAnswerKey: false,
+    requiresTeacherReview: false,
+    timesUsed: 9,
+
+    asset: {
+      format: "audio",
+      thumbnailUrl:
+        "https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1200&q=80",
+      externalUrl: undefined,
+      originalFilename: "pronunciation-r-drill.mp3",
+      mimeType: "audio/mpeg",
+      pageCount: undefined,
+      durationSeconds: 301,
+    },
+
+    owner: {
+      teacherId: OTHER_TEACHER_ID,
+      isMine: false,
+    },
+
+    createdAt: "2025-12-20T11:00:00.000Z",
+    updatedAt: "2026-02-18T09:30:00.000Z",
+  },
+  {
+    id: "67f100000000000000000009",
+    title: "Interactive Quiz: Ser vs Estar",
+    description:
+      "Quick diagnostic quiz to practise and assess contrastive uses of ser and estar.",
     status: "published",
     visibility: "shared",
     pedagogicalType: "quiz",
-    levels: ["B1"],
-    skills: ["grammar"],
-    deliveryModes: ["online"],
-    lessonStages: ["review", "homework"],
-    grammarTopics: ["Pretérito Indefinido", "Pretérito Imperfecto", "Tiempos del pasado"],
-    vocabularyTopics: [],
-    tags: ["pasados", "contraste", "examen"],
+
+    levels: ["A2", "B1"],
+    skills: ["grammar", "reading", "writing"],
+    deliveryModes: ["classwork", "homework"],
+    lessonStages: ["review", "guided_practice", "assessment"],
+
+    grammarTopics: ["ser", "estar", "adjectival meaning changes"],
+    vocabularyTopics: ["states", "identity", "location"],
+    tags: ["quiz", "grammar", "ser-estar"],
+
     estimatedDurationMinutes: 15,
-    difficulty: "hard",
+    difficulty: 2,
+
     hasAnswerKey: true,
     requiresTeacherReview: false,
-    format: "external_link",
-    externalUrl: "https://lms.costaspanish.com/quizzes/mock-123",
-    thumbnailUrl: "https://placehold.co/400x300/ddd6fe/4c1d95?text=Quiz+Interact",
-    timesUsed: 890,
-    ownerTeacherId: "admin_1",
-    createdAt: "2023-06-15T10:00:00Z",
-    updatedAt: "2024-01-20T11:30:00Z"
+    timesUsed: 41,
+
+    asset: {
+      format: "external_link",
+      thumbnailUrl:
+        "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1200&q=80",
+      externalUrl: "https://example.com/resources/ser-vs-estar-quiz",
+      originalFilename: undefined,
+      mimeType: undefined,
+      pageCount: undefined,
+      durationSeconds: undefined,
+    },
+
+    owner: {
+      teacherId: CURRENT_TEACHER_ID,
+      isMine: true,
+    },
+
+    createdAt: "2026-02-03T14:00:00.000Z",
+    updatedAt: "2026-03-15T10:10:00.000Z",
   },
   {
-    id: "res_009",
-    title: "Expresiones Idiomáticas con Colores",
-    description: "Infografía y ejercicios sobre dichos como 'ponerse rojo', 'príncipe azul', etc.",
-    status: "published",
+    id: "67f100000000000000000010",
+    title: "Travel Situations Board Game",
+    description:
+      "Communicative board game with travel scenarios, role-play tasks, and question cards.",
+    status: "draft",
     visibility: "private",
-    pedagogicalType: "worksheet",
-    levels: ["B2", "C1"],
-    skills: ["vocabulary", "reading"],
-    deliveryModes: ["online", "hybrid"],
-    lessonStages: ["presentation", "practice"],
-    grammarTopics: [],
-    vocabularyTopics: ["Colores", "Modismos"],
-    tags: ["expresiones", "coloquial", "infografía"],
-    estimatedDurationMinutes: 20,
-    difficulty: "medium",
-    hasAnswerKey: true,
-    requiresTeacherReview: false,
-    format: "image",
-    originalFilename: "infografia_colores.png",
-    mimeType: "image/png",
-    fileSizeBytes: 2048000,
-    storagePath: "resources/images/colores.png",
-    fileUrl: "https://firebasestorage.googleapis.com/v0/b/mock/colores.png",
-    thumbnailUrl: "https://placehold.co/400x300/fbcfe8/831843?text=IMG+Colores",
-    timesUsed: 56,
-    ownerTeacherId: "teacher_123",
-    createdAt: "2024-03-01T09:00:00Z",
-    updatedAt: "2024-03-01T09:00:00Z"
-  },
-  {
-    id: "res_010",
-    title: "Podcast: Leyendas de Al-Andalus",
-    description: "Episodio de podcast adaptado para estudiantes sobre la historia de la España musulmana.",
-    status: "draft", // Otro borrador
-    visibility: "private",
-    pedagogicalType: "audio",
-    levels: ["B1", "B2"],
-    skills: ["listening", "culture"],
-    deliveryModes: ["online", "homework"],
-    lessonStages: ["homework"],
-    grammarTopics: ["Pretéritos"],
-    vocabularyTopics: ["Historia", "Arquitectura"],
-    tags: ["historia", "andalucía", "cultura"],
-    estimatedDurationMinutes: 25,
-    difficulty: "medium",
-    hasAnswerKey: false,
-    requiresTeacherReview: true,
-    format: "audio",
-    originalFilename: "podcast_alandalus.mp3",
-    mimeType: "audio/mpeg",
-    fileSizeBytes: 8388608, // 8MB
-    storagePath: "resources/audios/alandalus.mp3",
-    fileUrl: "https://firebasestorage.googleapis.com/v0/b/mock/alandalus.mp3",
-    durationSeconds: 900,
-    thumbnailUrl: "https://placehold.co/400x300/fef08a/854d0e?text=Audio+Podcast",
-    timesUsed: 0,
-    ownerTeacherId: "teacher_123",
-    createdAt: "2024-03-16T11:00:00Z",
-    updatedAt: "2024-03-16T11:00:00Z"
-  },
-  {
-    id: "res_011",
-    title: "El Alfabeto y Pronunciación",
-    description: "Guía básica en PDF para la primera clase de español absoluto.",
-    status: "published",
-    visibility: "shared",
-    pedagogicalType: "presentation",
-    levels: ["A1"],
-    skills: ["speaking", "reading"],
-    deliveryModes: ["in-person"],
-    lessonStages: ["presentation"],
-    grammarTopics: [],
-    vocabularyTopics: ["Alfabeto", "Saludos básicos"],
-    tags: ["día 1", "fonética", "básico"],
-    estimatedDurationMinutes: 30,
-    difficulty: "easy",
-    hasAnswerKey: false,
-    requiresTeacherReview: false,
-    format: "pdf",
-    originalFilename: "alfabeto_A1.pdf",
-    mimeType: "application/pdf",
-    fileSizeBytes: 500000,
-    storagePath: "resources/pdfs/alfabeto.pdf",
-    fileUrl: "https://firebasestorage.googleapis.com/v0/b/mock/alfabeto.pdf",
-    pageCount: 5,
-    thumbnailUrl: "https://placehold.co/400x300/e2e8f0/1e293b?text=PDF+Alfabeto",
-    timesUsed: 1200,
-    ownerTeacherId: "admin_1",
-    createdAt: "2023-01-10T08:00:00Z",
-    updatedAt: "2023-01-15T08:00:00Z"
-  },
-  {
-    id: "res_012",
-    title: "Guía de Conversación: Alquilar un piso",
-    description: "Roleplay y expresiones útiles para sobrevivir a la búsqueda de apartamento en España.",
-    status: "published",
-    visibility: "shared",
-    pedagogicalType: "worksheet",
+    pedagogicalType: "game",
+
     levels: ["B1"],
-    skills: ["speaking", "vocabulary"],
-    deliveryModes: ["online", "hybrid"],
-    lessonStages: ["production"],
-    grammarTopics: ["Condicional", "Imperativo"],
-    vocabularyTopics: ["Vivienda", "Muebles", "Dinero"],
-    tags: ["supervivencia", "piso", "conversación"],
-    estimatedDurationMinutes: 40,
-    difficulty: "medium",
+    skills: ["speaking", "listening", "vocabulary"],
+    deliveryModes: ["classwork"],
+    lessonStages: ["warmup", "freer_practice", "wrap_up"],
+
+    grammarTopics: ["future plans", "conditional basics", "questions"],
+    vocabularyTopics: ["travel", "transport", "hotels", "problems"],
+    tags: ["game", "travel", "speaking", "b1"],
+
+    estimatedDurationMinutes: 35,
+    difficulty: 3,
+
     hasAnswerKey: false,
     requiresTeacherReview: true,
-    format: "pdf",
-    originalFilename: "alquiler_piso.docx",
-    mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    fileSizeBytes: 1200000,
-    storagePath: "resources/docs/alquiler.docx",
-    fileUrl: "https://firebasestorage.googleapis.com/v0/b/mock/alquiler.docx",
-    pageCount: 3,
-    thumbnailUrl: "https://placehold.co/400x300/bfdbfe/1e3a8a?text=DOC+Alquiler",
-    timesUsed: 340,
-    ownerTeacherId: "teacher_789",
-    createdAt: "2023-10-22T15:30:00Z",
-    updatedAt: "2024-01-05T09:20:00Z"
-  }
+    timesUsed: 3,
+
+    asset: {
+      format: "pdf",
+      thumbnailUrl:
+        "https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=1200&q=80",
+      externalUrl: undefined,
+      originalFilename: "travel-situations-board-game.pdf",
+      mimeType: "application/pdf",
+      pageCount: 10,
+      durationSeconds: undefined,
+    },
+
+    owner: {
+      teacherId: CURRENT_TEACHER_ID,
+      isMine: true,
+    },
+
+    createdAt: "2026-03-01T08:00:00.000Z",
+    updatedAt: "2026-03-15T18:20:00.000Z",
+  },
+  {
+    id: "67f100000000000000000011",
+    title: "C1 News Analysis Video Clip",
+    description:
+      "Authentic-style news clip for advanced listening, summarising, and critical discussion.",
+    status: "published",
+    visibility: "shared",
+    pedagogicalType: "video_clip",
+
+    levels: ["C1"],
+    skills: ["listening", "speaking", "reading"],
+    deliveryModes: ["classwork", "homework"],
+    lessonStages: ["input", "freer_practice", "assessment"],
+
+    grammarTopics: ["reported speech", "advanced connectors"],
+    vocabularyTopics: ["media", "politics", "current affairs"],
+    tags: ["c1", "news", "video", "debate"],
+
+    estimatedDurationMinutes: 28,
+    difficulty: 5,
+
+    hasAnswerKey: true,
+    requiresTeacherReview: true,
+    timesUsed: 11,
+
+    asset: {
+      format: "video",
+      thumbnailUrl:
+        "https://images.unsplash.com/photo-1495020689067-958852a7765e?auto=format&fit=crop&w=1200&q=80",
+      externalUrl: undefined,
+      originalFilename: "c1-news-analysis-video.mp4",
+      mimeType: "video/mp4",
+      pageCount: undefined,
+      durationSeconds: 840,
+    },
+
+    owner: {
+      teacherId: OTHER_TEACHER_ID,
+      isMine: false,
+    },
+
+    createdAt: "2026-01-07T12:35:00.000Z",
+    updatedAt: "2026-03-10T16:55:00.000Z",
+  },
+  {
+    id: "67f100000000000000000012",
+    title: "Spanish Reading Club Article",
+    description:
+      "External article for intermediate learners with guided comprehension and vocabulary review.",
+    status: "archived",
+    visibility: "shared",
+    pedagogicalType: "reading_text",
+
+    levels: ["B1", "B2"],
+    skills: ["reading", "vocabulary", "speaking"],
+    deliveryModes: ["classwork", "homework"],
+    lessonStages: ["input", "guided_practice", "wrap_up", "homework"],
+
+    grammarTopics: ["relative clauses", "past narration"],
+    vocabularyTopics: ["culture", "lifestyle", "habits"],
+    tags: ["reading", "article", "club", "b1", "b2"],
+
+    estimatedDurationMinutes: 22,
+    difficulty: 3,
+
+    hasAnswerKey: true,
+    requiresTeacherReview: false,
+    timesUsed: 19,
+
+    asset: {
+      format: "external_link",
+      thumbnailUrl:
+        "https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&w=1200&q=80",
+      externalUrl: "https://example.com/resources/spanish-reading-club-article",
+      originalFilename: undefined,
+      mimeType: undefined,
+      pageCount: undefined,
+      durationSeconds: undefined,
+    },
+
+    owner: {
+      teacherId: null,
+      isMine: false,
+    },
+
+    createdAt: "2025-11-14T09:25:00.000Z",
+    updatedAt: "2026-02-22T13:00:00.000Z",
+  },
 ];
