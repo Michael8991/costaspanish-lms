@@ -162,7 +162,6 @@ export default function VouchersTable({
   }, [id]);
 
   const getStatusBadge = (status: string) => {
-    // ... tu switch se queda igual
     switch (status) {
       case "active":
         return (

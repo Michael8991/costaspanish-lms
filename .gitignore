@@ -40,4 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Mis notas temporales (se subirán cuando estén limpias)
+/docs
 /docs
