@@ -37,13 +37,13 @@ const navMenuItems: NavMenuItem[] = [
   { label: "Home", href: "/dashboard" },
   { label: "Course", href: "/course" },
   { label: "Calendar", href: "/calendar" },
-  { label: "Material", href: "/material" },
+  { label: "Resources", href: "/dashboard/resources" },
 ];
 const navMenuItemsTeacher: NavMenuItem[] = [
   { label: "Home", href: "/dashboard" },
   { label: "Course", href: "/course" },
   { label: "Calendar", href: "/calendar" },
-  { label: "Material", href: "/material" },
+  { label: "Resources", href: "/dashboard/resources" },
   { label: "Students", href: "/dashboard/students" },
 ];
 
