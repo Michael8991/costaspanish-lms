@@ -49,7 +49,7 @@ export const SKILL_FOCUS = [
 export type SkillFocus = (typeof SKILL_FOCUS)[number];
 
 export const DELIVERY_MODES = ["classwork", "homework"] as const;
-export type DeliveryMode = (typeof DELIVERY_MODES)[number];
+export type DeliveryModes = (typeof DELIVERY_MODES)[number];
 
 export const LESSON_STAGES = [
   "warmup",
@@ -79,7 +79,7 @@ export interface IResource {
   pedagogicalType: PedagogicalType;
   levels: CEFRLevel[];
   skills: SkillFocus[];
-  deliveryModes: DeliveryMode[];
+  deliveryModes: DeliveryModes[];
   lessonStages: LessonStage[];
 
   grammarTopics: string[];
@@ -304,7 +304,7 @@ ResourceSchema.pre(
   async function () {
     this.levels = dedupeEnumArray<CEFRLevel>(this.levels);
     this.skills = dedupeEnumArray<SkillFocus>(this.skills);
-    this.deliveryModes = dedupeEnumArray<DeliveryMode>(this.deliveryModes);
+    this.deliveryModes = dedupeEnumArray<DeliveryModes>(this.deliveryModes);
     this.lessonStages = dedupeEnumArray<LessonStage>(this.lessonStages);
 
     this.grammarTopics = normalizeLooseStringArray(this.grammarTopics);

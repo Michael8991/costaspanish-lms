@@ -14,7 +14,7 @@ import { useState } from "react";
 import ResourceTableView from "./ResourcesTableView";
 import ResourcesGridView from "./ResourceGridView";
 
-export default function ResourcesTable() {
+export default function ResourcesTable({ locale }: { locale: string }) {
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
   return (
@@ -64,7 +64,7 @@ export default function ResourcesTable() {
           </div>
 
           <Link
-            href="#"
+            href={`/${locale}/dashboard/resources/addResource`}
             title="Create a new resource"
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#9e2727] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:bg-[#8d2323] sm:w-auto"
           >

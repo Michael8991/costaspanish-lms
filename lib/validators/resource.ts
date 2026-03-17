@@ -8,7 +8,7 @@ import {
   RESOURCE_STATUS,
   RESOURCE_VISIBILITY,
   SKILL_FOCUS,
-} from "@/models/ResourceProfile";
+} from "@/lib/constants/resource.constants";
 
 const objectIdRegex = /^[a-f\d]{24}$/i;
 
