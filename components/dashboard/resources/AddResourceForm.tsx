@@ -35,7 +35,7 @@ import {
   Sparkles,
   UploadCloud,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -364,6 +364,7 @@ export default function AddResourceForm({
   const [uploadMessage, setUploadMessage] = useState<string>("");
   const [uploadError, setUploadError] = useState<string>("");
   const inputFileRef = useRef<HTMLInputElement | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const {
     register,
@@ -445,6 +446,69 @@ export default function AddResourceForm({
     if (step > 1) setStep((prev) => (prev - 1) as Step);
   };
 
+  const processFile = async (file: File) => {
+    if (!file || !selectedFormat || selectedFormat === "external_link") return;
+
+    setUploadError("");
+    setUploadMessage("");
+
+    setValue("originalFilename", file.name, { shouldDirty: true });
+    setValue("mimeType", file.type, { shouldDirty: true });
+    setValue("fileSizeBytes", file.size, { shouldDirty: true });
+
+    if (!onUploadFile) {
+      setUploadMessage("Archivo detectado. Falta conectar Firebase.");
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+      const result = await onUploadFile(file, selectedFormat);
+
+      setValue("storagePath", result.storagePath ?? "", {
+        shouldValidate: true,
+      });
+      setValue("fileUrl", result.fileUrl ?? "", { shouldValidate: true });
+      setValue("thumbnailUrl", result.thumbnailUrl ?? "", {
+        shouldValidate: true,
+      });
+
+      if (result.pageCount) setValue("pageCount", result.pageCount);
+      if (result.durationSeconds)
+        setValue("durationSeconds", result.durationSeconds);
+
+      setUploadMessage("¡Archivo procesado con éxito!");
+      await trigger(getStepFields(2, selectedFormat));
+    } catch (error) {
+      setUploadError(
+        error instanceof Error ? error.message : "Error al procesar",
+      );
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDropFinal = (e: React.DragEvent) => {
+    setIsDragging(false);
+    handleDrop(e);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer.files?.[0];
+    if (file) processFile(file);
+  };
+
   const handleFormatSelection = (format: FormatType) => {
     setValue("format", format, { shouldValidate: true, shouldDirty: true });
     if (step === 1) setStep(2);
@@ -479,56 +543,57 @@ export default function AddResourceForm({
 
   const handlePickFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !selectedFormat || selectedFormat === "external_link") return;
-    setUploadError("");
-    setUploadMessage("");
+    if (file) processFile(file);
+    // if (!file || !selectedFormat || selectedFormat === "external_link") return;
+    // setUploadError("");
+    // setUploadMessage("");
 
-    setValue("originalFilename", file.name, { shouldDirty: true });
-    setValue("mimeType", file.type || "", { shouldDirty: true });
-    setValue("fileSizeBytes", file.size, { shouldDirty: true });
+    // setValue("originalFilename", file.name, { shouldDirty: true });
+    // setValue("mimeType", file.type || "", { shouldDirty: true });
+    // setValue("fileSizeBytes", file.size, { shouldDirty: true });
 
-    if (!onUploadFile) {
-      setUploadMessage(
-        "Archivo detectado. Falta conectar onUploadFile para rellenar fileUrl/storagePath automáticamente.",
-      );
-      return;
-    }
-    try {
-      setIsUploading(true);
-      const result = await onUploadFile(file, selectedFormat);
+    // if (!onUploadFile) {
+    //   setUploadMessage(
+    //     "Archivo detectado. Falta conectar onUploadFile para rellenar fileUrl/storagePath automáticamente.",
+    //   );
+    //   return;
+    // }
+    // try {
+    //   setIsUploading(true);
+    //   const result = await onUploadFile(file, selectedFormat);
 
-      setValue("storagePath", result.storagePath ?? "", {
-        shouldValidate: true,
-      });
-      setValue("fileUrl", result.fileUrl ?? "", { shouldValidate: true });
-      setValue("originalFilename", result.originalFilename ?? file.name, {
-        shouldDirty: true,
-      });
-      setValue("mimeType", result.mimeType ?? file.type ?? "", {
-        shouldDirty: true,
-      });
-      setValue("fileSizeBytes", result.fileSizeBytes ?? file.size, {
-        shouldDirty: true,
-      });
-      setValue("pageCount", result.pageCount, { shouldDirty: true });
-      setValue("durationSeconds", result.durationSeconds, {
-        shouldDirty: true,
-      });
-      setValue("thumbnailUrl", result.thumbnailUrl ?? "", {
-        shouldValidate: true,
-      });
+    //   setValue("storagePath", result.storagePath ?? "", {
+    //     shouldValidate: true,
+    //   });
+    //   setValue("fileUrl", result.fileUrl ?? "", { shouldValidate: true });
+    //   setValue("originalFilename", result.originalFilename ?? file.name, {
+    //     shouldDirty: true,
+    //   });
+    //   setValue("mimeType", result.mimeType ?? file.type ?? "", {
+    //     shouldDirty: true,
+    //   });
+    //   setValue("fileSizeBytes", result.fileSizeBytes ?? file.size, {
+    //     shouldDirty: true,
+    //   });
+    //   setValue("pageCount", result.pageCount, { shouldDirty: true });
+    //   setValue("durationSeconds", result.durationSeconds, {
+    //     shouldDirty: true,
+    //   });
+    //   setValue("thumbnailUrl", result.thumbnailUrl ?? "", {
+    //     shouldValidate: true,
+    //   });
 
-      setUploadMessage("Archivo procesado correctamente.");
-      await trigger(getStepFields(2, selectedFormat));
-    } catch (error) {
-      setUploadError(
-        error instanceof Error
-          ? error.message
-          : "No se pudo procesar el archivo.",
-      );
-    } finally {
-      setIsUploading(false);
-    }
+    //   setUploadMessage("Archivo procesado correctamente.");
+    //   await trigger(getStepFields(2, selectedFormat));
+    // } catch (error) {
+    //   setUploadError(
+    //     error instanceof Error
+    //       ? error.message
+    //       : "No se pudo procesar el archivo.",
+    //   );
+    // } finally {
+    //   setIsUploading(false);
+    // }
   };
 
   const submitForm = async (rawFormData: z.input<typeof addResourceSchema>) => {
@@ -568,7 +633,7 @@ export default function AddResourceForm({
   };
 
   return (
-    <div className="mx-auto w-full max-w-5xl">
+    <div className="mx-auto w-full max-w-5xl mt-5">
       <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_20px_70px_-35px_rgba(15,23,42,0.25)]">
         <div className="border-b border-slate-100 bg-linear-to-r from-slate-50 via-white to-red-50/40 px-6 py-6 sm:px-8">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -735,7 +800,7 @@ export default function AddResourceForm({
                       error={errors.externalUrl?.message}
                     >
                       <div className="relative">
-                        <Link2 className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <Link2 className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 ps-5 -translate-y-1/2 text-slate-400" />
                         <input
                           type="url"
                           placeholder="https://..."
@@ -789,6 +854,9 @@ export default function AddResourceForm({
                       <button
                         type="button"
                         onClick={() => inputFileRef.current?.click()}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDropFinal}
                         className="flex w-full flex-col items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center transition hover:border-slate-400 hover:bg-slate-50"
                       >
                         <UploadCloud className="mb-3 h-8 w-8 text-slate-400" />
