@@ -578,6 +578,7 @@ export async function POST(req: NextRequest) {
       pageCount: payload.pageCount,
       durationSeconds: payload.durationSeconds,
       thumbnailUrl: payload.thumbnailUrl,
+      thumbnailStoragePath: payload.thumbnailStoragePath,
       externalUrl: payload.externalUrl,
 
       /**

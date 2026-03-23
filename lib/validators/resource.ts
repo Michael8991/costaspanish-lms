@@ -114,6 +114,7 @@ export const createResourceSchema = z
     pageCount: z.coerce.number().int().min(1).optional(),
     durationSeconds: z.coerce.number().int().min(1).optional(),
     thumbnailUrl: optionalUrlString(),
+    thumbnailStoragePath: z.string().trim().max(500).optional().or(z.literal("")),
 
     externalUrl: optionalUrlString(),
   })

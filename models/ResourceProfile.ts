@@ -104,6 +104,7 @@ export interface IResource {
   pageCount?: number;
   durationSeconds?: number;
   thumbnailUrl?: string;
+  thumbnailStoragePath?:string;
 
   // Si es recurso externo
   externalUrl?: string;
@@ -240,6 +241,10 @@ const ResourceSchema = new Schema<IResource>(
     },
 
     storagePath: {
+      type: String,
+      trim: true,
+    },
+    thumbnailStoragePath: {
       type: String,
       trim: true,
     },

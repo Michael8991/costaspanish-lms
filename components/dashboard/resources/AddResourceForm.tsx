@@ -765,13 +765,6 @@ export default function AddResourceForm({
                 </div>
 
                 <FieldError error={errors.format?.message} />
-
-                <InfoBox>
-                  <strong>Importante:</strong> en recursos externos se guarda{" "}
-                  <code>externalUrl</code>. En recursos subidos se usan{" "}
-                  <code>fileUrl</code> y/o <code>storagePath</code>. En PDF,
-                  además, se exige <code>thumbnailUrl</code>.
-                </InfoBox>
               </section>
             )}
 
@@ -1116,14 +1109,6 @@ export default function AddResourceForm({
                           )}
                         </div>
                       </div>
-                    )}
-
-                    {selectedFormat === "pdf" && (
-                      <InfoBox>
-                        En PDF se valida que existan <code>fileUrl</code> y{" "}
-                        <code>thumbnailUrl</code>. Eso te deja lista la vista de
-                        biblioteca con miniatura desde la primera página.
-                      </InfoBox>
                     )}
                   </div>
                 )}
@@ -1491,18 +1476,12 @@ export default function AddResourceForm({
                 </p>
               </div>
 
-              <div className="rounded-3xl border border-slate-200 bg-white p-5">
+              {/* <div className="rounded-3xl border border-slate-200 bg-white p-5">
                 <div className="mb-3 text-sm font-semibold text-slate-900">
                   Reglas activas
                 </div>
-                <ul className="space-y-2 text-sm text-slate-600">
-                  <li>• external_link usa externalUrl.</li>
-                  <li>• PDF exige fileUrl + thumbnailUrl.</li>
-                  <li>• pageCount solo aplica a PDF.</li>
-                  <li>• durationSeconds solo aplica a audio/video.</li>
-                  <li>• El backend seguirá validando igualmente.</li>
-                </ul>
-              </div>
+                
+              </div> */}
 
               <div className="rounded-3xl border border-slate-200 bg-white p-5">
                 <div className="mb-3 text-sm font-semibold text-slate-900">

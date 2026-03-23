@@ -20,6 +20,7 @@ export default function TeacherTodaySchedule() {
       const res = await fetch("/api/integrations/google/events", {
         credentials: "include",
       });
+
       const data = await res.json();
 
       if (!res.ok || !data.connected) {
