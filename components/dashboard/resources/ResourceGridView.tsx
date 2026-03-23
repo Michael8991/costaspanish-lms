@@ -24,6 +24,12 @@ import { ResourceListItemDTO } from "@/lib/dto/resource.dto";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
+import CustomModal from "@/components/ui/CustomModal";
+import ArchiveResourceForm, {
+  ArchiveResourceFormData,
+} from "./ArchiveResourceForm";
+import { toast } from "sonner";
+import { CircleAlert } from "lucide-react";
 
 type ResourceFormat = "pdf" | "image" | "audio" | "video" | "external_link";
 type ResourceVisibility = "private" | "shared";
@@ -267,30 +273,33 @@ function ResourcePreview({ resource }: { resource: ResourceListItemDTO }) {
   );
 }
 
+type ResourceMenuAction = "ARCHIVE" | "ADD_TO_CLASS";
+
 type QuickOptionsMenu = {
   label: string;
-  href: (id: string) => string;
+  href?: (id: string) => string;
+  action?: ResourceMenuAction;
   icon: LucideIcon;
 };
 const quickOptionsMenu: QuickOptionsMenu[] = [
   {
-    label: "Ver detalles",
+    label: "Detalles del material",
     href: (id) => `/dashboard/resources/${id}`,
     icon: File,
   },
   {
-    label: "Editar",
+    label: "Editar material",
     href: (id) => `/dashboard/resources/edit/${id}/`,
     icon: SquarePen,
   },
   {
     label: "Archivar",
-    href: (id) => `/dashboard/students/lessons/newLesson`,
+    action: "ARCHIVE",
     icon: Archive,
   },
   {
     label: "Agregar a una clase",
-    href: (id) => `/dashboard/students/${id}/editStudent`,
+    action: "ADD_TO_CLASS",
     icon: FileInput,
   },
 ];
@@ -303,6 +312,19 @@ export default function ResourcesGridView({
     `/${locale}${path.startsWith("/") ? path : `/${path}`}`;
 
   const [isOpenQO, setIsOpenQO] = useState<string | null>(null);
+  const [archivingResource, setArchivingResource] = useState<string | null>(
+    null,
+  );
+
+  const [resourceToArchive, setResourceToArchive] = useState<string | null>(
+    null,
+  );
+  const [resourceToArchiveName, setResourceToArchiveName] = useState<
+    string | null
+  >(null);
+  const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
+  const [isSubmittingArchiveResource, setIsSubmittingArchiveResource] =
+    useState(false);
 
   const [menuPosition, setMenuPosition] = useState<{
     top: number;
@@ -310,10 +332,11 @@ export default function ResourcesGridView({
   } | null>(null);
 
   const toggleQuickOptionsMenu = (
-    studentId: string,
+    resourceId: string,
     event: React.MouseEvent<HTMLButtonElement>,
+    resourceTitle: string,
   ) => {
-    if (isOpenQO === studentId) {
+    if (isOpenQO === resourceId) {
       setIsOpenQO(null);
       setMenuPosition(null);
     } else {
@@ -327,7 +350,9 @@ export default function ResourcesGridView({
           spaceBelow > menuHeight ? rect.bottom + 4 : rect.top - menuHeight - 4,
         left: rect.right - menuWidth,
       });
-      setIsOpenQO(studentId);
+      setIsOpenQO(resourceId);
+      setResourceToArchive(resourceId);
+      setResourceToArchiveName(resourceTitle);
     }
   };
 
@@ -357,6 +382,43 @@ export default function ResourcesGridView({
     );
   }
 
+  const handleActionClick = (
+    action: ResourceMenuAction,
+    resourceId: string | null,
+  ) => {
+    if (action === "ARCHIVE") {
+      setArchivingResource(resourceId);
+      setIsArchiveModalOpen(true);
+      setMenuPosition(null);
+    } else if (action === "ADD_TO_CLASS") {
+      // setAddingToClassResource(resourceId); //TODO: Abre el modal de clases podemos ahcer el modal pero faltaria las conexiones reales para cuando esten las lessons
+    }
+  };
+
+  const handleArchiveResource = async (
+    resourceId: string | null,
+    formData: ArchiveResourceFormData,
+  ) => {
+    setIsSubmittingArchiveResource(true);
+    try {
+      const res = await fetch(`/api/resources/${resourceId}`, {
+        method: "DELETE",
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData || "Error al archivar el recurso.");
+      }
+      toast.success("Recurso archivado con exito.");
+      window.location.reload();
+    } catch (error) {
+      if (error instanceof Error) toast.error(error.message);
+      else toast.error("Ocurrió un error inesperado al archivar el recurso.");
+    } finally {
+      setIsSubmittingArchiveResource(false);
+    }
+  };
+
   return (
     <>
       <motion.div
@@ -366,6 +428,7 @@ export default function ResourcesGridView({
         className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3 p-5"
       >
         {resources.map((resource) => {
+          const isArchived = resource.status === "archived";
           const {
             icon: FormatIcon,
             color: formatColor,
@@ -388,7 +451,8 @@ export default function ResourcesGridView({
             <motion.article
               key={resource.id}
               variants={itemVariants}
-              className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/70"
+              // TODO: Editar para que al archivar se haga mas opaco y los botones no sean de Vertical dots sino un boton para reactivar
+              className={`${isArchived ? "bg-gray-50/50 opacity-60 grayscale-30" : "bg-white"}  group overflow-hidden rounded-2xl border border-slate-200 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/70`}
             >
               <ResourcePreview resource={resource} />
 
@@ -405,7 +469,9 @@ export default function ResourcesGridView({
                     <button
                       type="button"
                       title="Open quick actions"
-                      onClick={(e) => toggleQuickOptionsMenu(resource.id, e)}
+                      onClick={(e) =>
+                        toggleQuickOptionsMenu(resource.id, e, resource.title)
+                      }
                       className="cursor-pointer shrink-0 rounded-xl p-2 text-slate-400 transition-colors hover:bg-rose-50 hover:text-[#9e2727]"
                     >
                       <MoreVertical size={18} />
@@ -505,6 +571,15 @@ export default function ResourcesGridView({
                       : "—"}
                   </span>
                 </div>
+                {isArchived ? (
+                  <div className="w-full flex items-center justify-center">
+                    <p className="text-sm text-red-500 flex items-center gap-2">
+                      <CircleAlert size={14} /> Este recurso se eliminará pronto
+                    </p>
+                  </div>
+                ) : (
+                  ""
+                )}
               </div>
             </motion.article>
           );
@@ -514,29 +589,61 @@ export default function ResourcesGridView({
         menuPosition &&
         createPortal(
           <div
-            className="menu-dropdown fixed z-[9999] py-3 px-2 min-w-[220px] flex flex-col rounded-xl bg-[#9e2727] gap-1 shadow-2xl"
+            className="menu-dropdown fixed z-9999 py-3 px-2 min-w-55 flex flex-col rounded-xl bg-[#9e2727] gap-1 shadow-2xl"
             style={{ top: menuPosition.top, left: menuPosition.left }}
           >
-            {quickOptionsMenu.map((object, index) => {
-              const Icon = object.icon;
-              return (
-                <Link
-                  key={index}
-                  onClick={() => {
-                    setIsOpenQO(null);
-                    setMenuPosition(null);
-                  }}
-                  href={withLocale(object.href(isOpenQO))}
-                  className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-white transition-all hover:bg-white/10"
-                >
-                  <Icon size={16} />
-                  {object.label}
-                </Link>
-              );
+            {quickOptionsMenu.map((option, index) => {
+              const Icon = option.icon;
+
+              if (option.href) {
+                return (
+                  <Link
+                    key={index}
+                    href={withLocale(option.href(isOpenQO))}
+                    className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-white transition-all hover:bg-white/10"
+                  >
+                    <Icon size={16} />
+                    <span>{option.label}</span>
+                  </Link>
+                );
+              }
+
+              if (option.action) {
+                return (
+                  <button
+                    key={index}
+                    onClick={() =>
+                      handleActionClick(option.action!, resourceToArchive)
+                    }
+                    className="cursor-pointer flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-white transition-all hover:bg-white/10"
+                  >
+                    <Icon size={16} />
+                    <span>{option.label}</span>
+                  </button>
+                );
+              }
+
+              return null;
             })}
           </div>,
+
           document.body,
         )}
+      <CustomModal
+        isOpen={isArchiveModalOpen}
+        onClose={() => setIsArchiveModalOpen(false)}
+        title="Archivar material"
+      >
+        <div className="p-4">
+          <ArchiveResourceForm
+            resource={resourceToArchive}
+            resourceName={resourceToArchiveName}
+            onSubmitForm={handleArchiveResource}
+            isSubmitting={isSubmittingArchiveResource}
+            onClose={() => setIsArchiveModalOpen(false)}
+          />
+        </div>
+      </CustomModal>
     </>
   );
 }

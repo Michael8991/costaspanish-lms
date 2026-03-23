@@ -24,9 +24,12 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 
+type ResourceMenuAction = "ARCHIVE" | "ADD_TO_CLASS";
+
 type QuickOptionsMenu = {
   label: string;
-  href: (id: string) => string;
+  href?: (id: string) => string;
+  action?: ResourceMenuAction;
   icon: LucideIcon;
 };
 const quickOptionsMenu: QuickOptionsMenu[] = [
@@ -42,12 +45,12 @@ const quickOptionsMenu: QuickOptionsMenu[] = [
   },
   {
     label: "Archivar",
-    href: (id) => `/dashboard/students/lessons/newLesson`,
+    action: "ARCHIVE",
     icon: Archive,
   },
   {
     label: "Agregar a una clase",
-    href: (id) => `/dashboard/students/${id}/editStudent`,
+    action: "ADD_TO_CLASS",
     icon: FileInput,
   },
 ];
@@ -213,6 +216,9 @@ export default function ResourceTableView({
     `/${locale}${path.startsWith("/") ? path : `/${path}`}`;
 
   const [isOpenQO, setIsOpenQO] = useState<string | null>(null);
+  const [archivingResource, setArchivingResource] = useState<string | null>(
+    null,
+  );
 
   const [menuPosition, setMenuPosition] = useState<{
     top: number;
@@ -220,10 +226,10 @@ export default function ResourceTableView({
   } | null>(null);
 
   const toggleQuickOptionsMenu = (
-    studentId: string,
+    resourceId: string,
     event: React.MouseEvent<HTMLButtonElement>,
   ) => {
-    if (isOpenQO === studentId) {
+    if (isOpenQO === resourceId) {
       setIsOpenQO(null);
       setMenuPosition(null);
     } else {
@@ -237,7 +243,7 @@ export default function ResourceTableView({
           spaceBelow > menuHeight ? rect.bottom + 4 : rect.top - menuHeight - 4,
         left: rect.right - menuWidth,
       });
-      setIsOpenQO(studentId);
+      setIsOpenQO(resourceId);
     }
   };
 
@@ -300,6 +306,17 @@ export default function ResourceTableView({
       </div>
     );
   }
+
+  const handleActionClick = (
+    action: ResourceMenuAction,
+    resourceId: string,
+  ) => {
+    if (action === "ARCHIVE") {
+      setArchivingResource(resourceId);
+    } else if (action === "ADD_TO_CLASS") {
+      // setAddingToClassResource(resourceId); //TODO: Abre el modal de clases podemos ahcer el modal pero faltaria las conexiones reales para cuando esten las lessons
+    }
+  };
 
   return (
     <>
@@ -453,25 +470,39 @@ export default function ResourceTableView({
         menuPosition &&
         createPortal(
           <div
-            className="menu-dropdown fixed z-[9999] py-3 px-2 min-w-[220px] flex flex-col rounded-xl bg-[#9e2727] gap-1 shadow-2xl"
+            className="menu-dropdown fixed z-9999 py-3 px-2 min-w-55 flex flex-col rounded-xl bg-[#9e2727] gap-1 shadow-2xl"
             style={{ top: menuPosition.top, left: menuPosition.left }}
           >
-            {quickOptionsMenu.map((object, index) => {
-              const Icon = object.icon;
-              return (
-                <Link
-                  key={index}
-                  onClick={() => {
-                    setIsOpenQO(null);
-                    setMenuPosition(null);
-                  }}
-                  href={withLocale(object.href(isOpenQO))}
-                  className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-white transition-all hover:bg-white/10"
-                >
-                  <Icon size={16} />
-                  {object.label}
-                </Link>
-              );
+            {quickOptionsMenu.map((option, index) => {
+              const Icon = option.icon;
+
+              if (option.href) {
+                return (
+                  <Link
+                    key={index}
+                    href={withLocale(option.href(isOpenQO))}
+                    className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-white transition-all hover:bg-white/10"
+                  >
+                    <Icon size={16} />
+                    <span>{option.label}</span>
+                  </Link>
+                );
+              }
+
+              if (option.action) {
+                return (
+                  <button
+                    key={index}
+                    onClick={() => handleActionClick(option.action!, isOpenQO)}
+                    className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-white transition-all hover:bg-white/10"
+                  >
+                    <Icon size={16} />
+                    <span>{option.label}</span>
+                  </button>
+                );
+              }
+
+              return null;
             })}
           </div>,
           document.body,
