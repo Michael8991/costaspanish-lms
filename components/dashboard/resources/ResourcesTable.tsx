@@ -1,11 +1,16 @@
 "use client";
 
 import {
+  Archive,
   ChevronDown,
+  File,
+  FileInput,
   Filter,
   LayoutDashboard,
+  LucideIcon,
   Plus,
   Search,
+  SquarePen,
   TextAlignJustify,
 } from "lucide-react";
 import Link from "next/link";
@@ -29,6 +34,7 @@ import {
   RESOURCE_STATUS,
   SKILL_FOCUS,
 } from "@/lib/constants/resource.constants";
+import Pagination from "@/components/ui/Pagination";
 
 const SORT_OPTIONS = [
   { value: "", label: "Más recientes" },
@@ -597,10 +603,21 @@ export default function ResourcesTable({ locale }: { locale: string }) {
         <div className="p-10 text-center text-slate-500">
           No se han encontrado recursos con los filtros actuales.
         </div>
-      ) : viewMode === "grid" ? (
-        <ResourcesGridView resources={items} />
       ) : (
-        <ResourceTableView resources={items} />
+        <>
+          {viewMode === "grid" ? (
+            <ResourcesGridView resources={items} locale={locale} />
+          ) : (
+            <ResourceTableView resources={items} locale={locale} />
+          )}
+
+          <div className="border-t border-slate-200 bg-slate-50">
+            <Pagination
+              totalItems={data?.totalItems || 0}
+              itemsPerPage={10} // Pon el número de elementos que devuelve tu API por defecto
+            />
+          </div>
+        </>
       )}
     </div>
   );

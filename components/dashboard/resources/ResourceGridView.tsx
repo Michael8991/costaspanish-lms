@@ -1,15 +1,19 @@
 "use client";
 
 import {
+  Archive,
   Clock3,
   Eye,
   EyeOff,
+  File,
+  FileInput,
   FileQuestion,
   FileText,
   Headphones,
   ImageIcon,
   Link as LucideLink,
   MoreVertical,
+  SquarePen,
   Video,
   type LucideIcon,
 } from "lucide-react";
@@ -17,12 +21,16 @@ import { motion, type Variants } from "framer-motion";
 import Image from "next/image";
 
 import { ResourceListItemDTO } from "@/lib/dto/resource.dto";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { createPortal } from "react-dom";
 
 type ResourceFormat = "pdf" | "image" | "audio" | "video" | "external_link";
 type ResourceVisibility = "private" | "shared";
 
 interface ResourcesGridViewProps {
   resources: ResourceListItemDTO[];
+  locale: string;
 }
 
 const toDisplayLabel = (value: string) => {
@@ -259,9 +267,88 @@ function ResourcePreview({ resource }: { resource: ResourceListItemDTO }) {
   );
 }
 
+type QuickOptionsMenu = {
+  label: string;
+  href: (id: string) => string;
+  icon: LucideIcon;
+};
+const quickOptionsMenu: QuickOptionsMenu[] = [
+  {
+    label: "Ver detalles",
+    href: (id) => `/dashboard/resources/${id}`,
+    icon: File,
+  },
+  {
+    label: "Editar",
+    href: (id) => `/dashboard/resources/edit/${id}/`,
+    icon: SquarePen,
+  },
+  {
+    label: "Archivar",
+    href: (id) => `/dashboard/students/lessons/newLesson`,
+    icon: Archive,
+  },
+  {
+    label: "Agregar a una clase",
+    href: (id) => `/dashboard/students/${id}/editStudent`,
+    icon: FileInput,
+  },
+];
+
 export default function ResourcesGridView({
   resources,
+  locale,
 }: ResourcesGridViewProps) {
+  const withLocale = (path: string) =>
+    `/${locale}${path.startsWith("/") ? path : `/${path}`}`;
+
+  const [isOpenQO, setIsOpenQO] = useState<string | null>(null);
+
+  const [menuPosition, setMenuPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
+
+  const toggleQuickOptionsMenu = (
+    studentId: string,
+    event: React.MouseEvent<HTMLButtonElement>,
+  ) => {
+    if (isOpenQO === studentId) {
+      setIsOpenQO(null);
+      setMenuPosition(null);
+    } else {
+      const rect = event.currentTarget.getBoundingClientRect();
+      const menuHeight = 260;
+      const menuWidth = 220;
+      const spaceBelow = window.innerHeight - rect.bottom;
+
+      setMenuPosition({
+        top:
+          spaceBelow > menuHeight ? rect.bottom + 4 : rect.top - menuHeight - 4,
+        left: rect.right - menuWidth,
+      });
+      setIsOpenQO(studentId);
+    }
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (
+        !target.closest(".menu-button") &&
+        !target.closest(".menu-dropdown")
+      ) {
+        setIsOpenQO(null);
+        setMenuPosition(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   if (!resources || resources.length === 0) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
@@ -271,154 +358,185 @@ export default function ResourcesGridView({
   }
 
   return (
-    <motion.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="show"
-      className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3 p-5"
-    >
-      {resources.map((resource) => {
-        const {
-          icon: FormatIcon,
-          color: formatColor,
-          label: formatLabel,
-        } = getFileTypeBadge(resource.asset.format);
+    <>
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3 p-5"
+      >
+        {resources.map((resource) => {
+          const {
+            icon: FormatIcon,
+            color: formatColor,
+            label: formatLabel,
+          } = getFileTypeBadge(resource.asset.format);
 
-        const {
-          icon: VisibilityIcon,
-          label: visibilityLabel,
-          className: visibilityClassName,
-        } = getVisibilityMeta(resource.visibility);
+          const {
+            icon: VisibilityIcon,
+            label: visibilityLabel,
+            className: visibilityClassName,
+          } = getVisibilityMeta(resource.visibility);
 
-        const mediaDuration =
-          resource.asset.format === "audio" || resource.asset.format === "video"
-            ? formatDuration(resource.asset.durationSeconds)
-            : null;
+          const mediaDuration =
+            resource.asset.format === "audio" ||
+            resource.asset.format === "video"
+              ? formatDuration(resource.asset.durationSeconds)
+              : null;
 
-        return (
-          <motion.article
-            key={resource.id}
-            variants={itemVariants}
-            className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/70"
-          >
-            <ResourcePreview resource={resource} />
+          return (
+            <motion.article
+              key={resource.id}
+              variants={itemVariants}
+              className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/70"
+            >
+              <ResourcePreview resource={resource} />
 
-            <div className="space-y-4 p-4 sm:p-5">
-              <div className="space-y-2">
-                <div className="flex items-start justify-between gap-3">
-                  <h3
-                    title="Resource title"
-                    className="line-clamp-2 text-[15px] font-semibold leading-6 text-slate-900"
-                  >
-                    {resource.title}
-                  </h3>
-
-                  <button
-                    type="button"
-                    title="Open quick actions"
-                    className="shrink-0 rounded-xl p-2 text-slate-400 transition-colors hover:bg-rose-50 hover:text-[#9e2727]"
-                  >
-                    <MoreVertical size={18} />
-                  </button>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    title="File format"
-                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${formatColor}`}
-                  >
-                    <FormatIcon size={12} />
-                    {formatLabel}
-                  </span>
-
-                  {mediaDuration && (
-                    <span
-                      title="Media duration"
-                      className="inline-flex items-center gap-1 rounded-full border border-slate-200/80 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700"
+              <div className="space-y-4 p-4 sm:p-5">
+                <div className="space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <h3
+                      title="Resource title"
+                      className="line-clamp-2 text-[15px] font-semibold leading-6 text-slate-900"
                     >
-                      <Clock3 size={12} />
-                      {mediaDuration}
+                      {resource.title}
+                    </h3>
+
+                    <button
+                      type="button"
+                      title="Open quick actions"
+                      onClick={(e) => toggleQuickOptionsMenu(resource.id, e)}
+                      className="cursor-pointer shrink-0 rounded-xl p-2 text-slate-400 transition-colors hover:bg-rose-50 hover:text-[#9e2727]"
+                    >
+                      <MoreVertical size={18} />
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      title="File format"
+                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${formatColor}`}
+                    >
+                      <FormatIcon size={12} />
+                      {formatLabel}
                     </span>
-                  )}
 
-                  <span
-                    title="Pedagogical type"
-                    className="inline-flex items-center rounded-full border border-slate-200/80 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700"
-                  >
-                    {getPedagogicalTypeLabel(resource.pedagogicalType)}
-                  </span>
-
-                  <span
-                    title="Visibility"
-                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${visibilityClassName}`}
-                  >
-                    <VisibilityIcon size={12} />
-                    {visibilityLabel}
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                    Levels
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {(resource.levels ?? []).map((level, index) => (
+                    {mediaDuration && (
                       <span
-                        key={`${resource.id}-level-${index}`}
-                        title="CEFR level"
-                        className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold ${getLevelBadge(
-                          level,
-                        )}`}
+                        title="Media duration"
+                        className="inline-flex items-center gap-1 rounded-full border border-slate-200/80 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700"
                       >
-                        {level}
+                        <Clock3 size={12} />
+                        {mediaDuration}
                       </span>
-                    ))}
+                    )}
+
+                    <span
+                      title="Pedagogical type"
+                      className="inline-flex items-center rounded-full border border-slate-200/80 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700"
+                    >
+                      {getPedagogicalTypeLabel(resource.pedagogicalType)}
+                    </span>
+
+                    <span
+                      title="Visibility"
+                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${visibilityClassName}`}
+                    >
+                      <VisibilityIcon size={12} />
+                      {visibilityLabel}
+                    </span>
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                    Language Skills
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {(resource.skills ?? []).map((skill, index) => (
-                      <span
-                        key={`${resource.id}-skill-${index}`}
-                        title="Language skill"
-                        className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium ${getSkillBadge()}`}
-                      >
-                        {getSkillLabel(skill)}
-                      </span>
-                    ))}
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                      Levels
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {(resource.levels ?? []).map((level, index) => (
+                        <span
+                          key={`${resource.id}-level-${index}`}
+                          title="CEFR level"
+                          className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold ${getLevelBadge(
+                            level,
+                          )}`}
+                        >
+                          {level}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                      Language Skills
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {(resource.skills ?? []).map((skill, index) => (
+                        <span
+                          key={`${resource.id}-skill-${index}`}
+                          title="Language skill"
+                          className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium ${getSkillBadge()}`}
+                        >
+                          {getSkillLabel(skill)}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
-                <span
-                  title="Publication status"
-                  className={`inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-medium ${getStatusBadge(
-                    resource.status,
-                  )}`}
-                >
-                  {toDisplayLabel(resource.status)}
-                </span>
+                <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                  <span
+                    title="Publication status"
+                    className={`inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-medium ${getStatusBadge(
+                      resource.status,
+                    )}`}
+                  >
+                    {toDisplayLabel(resource.status)}
+                  </span>
 
-                <span
-                  title="Estimated activity duration"
-                  className="text-xs font-medium text-slate-500"
-                >
-                  {resource.estimatedDurationMinutes
-                    ? `${resource.estimatedDurationMinutes} min`
-                    : "—"}
-                </span>
+                  <span
+                    title="Estimated activity duration"
+                    className="text-xs font-medium text-slate-500"
+                  >
+                    {resource.estimatedDurationMinutes
+                      ? `${resource.estimatedDurationMinutes} min`
+                      : "—"}
+                  </span>
+                </div>
               </div>
-            </div>
-          </motion.article>
-        );
-      })}
-    </motion.div>
+            </motion.article>
+          );
+        })}
+      </motion.div>
+      {isOpenQO &&
+        menuPosition &&
+        createPortal(
+          <div
+            className="menu-dropdown fixed z-[9999] py-3 px-2 min-w-[220px] flex flex-col rounded-xl bg-[#9e2727] gap-1 shadow-2xl"
+            style={{ top: menuPosition.top, left: menuPosition.left }}
+          >
+            {quickOptionsMenu.map((object, index) => {
+              const Icon = object.icon;
+              return (
+                <Link
+                  key={index}
+                  onClick={() => {
+                    setIsOpenQO(null);
+                    setMenuPosition(null);
+                  }}
+                  href={withLocale(object.href(isOpenQO))}
+                  className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-white transition-all hover:bg-white/10"
+                >
+                  <Icon size={16} />
+                  {object.label}
+                </Link>
+              );
+            })}
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }

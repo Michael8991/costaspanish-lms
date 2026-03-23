@@ -12,13 +12,49 @@ import {
   Link as LucideLink,
   Clock3,
   MoreVertical,
+  SquarePen,
+  Archive,
+  FileInput,
+  File,
 } from "lucide-react";
 import { motion, type Variants } from "framer-motion";
 
 import { ResourceListItemDTO } from "../../../lib/dto/resource.dto";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { createPortal } from "react-dom";
+
+type QuickOptionsMenu = {
+  label: string;
+  href: (id: string) => string;
+  icon: LucideIcon;
+};
+const quickOptionsMenu: QuickOptionsMenu[] = [
+  {
+    label: "Detalles del material",
+    href: (id) => `/dashboard/resources/${id}`,
+    icon: File,
+  },
+  {
+    label: "Editar material",
+    href: (id) => `/dashboard/resources/edit/${id}/`,
+    icon: SquarePen,
+  },
+  {
+    label: "Archivar",
+    href: (id) => `/dashboard/students/lessons/newLesson`,
+    icon: Archive,
+  },
+  {
+    label: "Agregar a una clase",
+    href: (id) => `/dashboard/students/${id}/editStudent`,
+    icon: FileInput,
+  },
+];
 
 interface ResourcesRowProps {
   resources: ResourceListItemDTO[];
+  locale: string;
 }
 
 export const listContainerVariants: Variants = {
@@ -169,7 +205,60 @@ const getVisibilityMeta = (visibility: ResourceVisibility | string) => {
   };
 };
 
-export default function ResourceTableView({ resources }: ResourcesRowProps) {
+export default function ResourceTableView({
+  resources,
+  locale,
+}: ResourcesRowProps) {
+  const withLocale = (path: string) =>
+    `/${locale}${path.startsWith("/") ? path : `/${path}`}`;
+
+  const [isOpenQO, setIsOpenQO] = useState<string | null>(null);
+
+  const [menuPosition, setMenuPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
+
+  const toggleQuickOptionsMenu = (
+    studentId: string,
+    event: React.MouseEvent<HTMLButtonElement>,
+  ) => {
+    if (isOpenQO === studentId) {
+      setIsOpenQO(null);
+      setMenuPosition(null);
+    } else {
+      const rect = event.currentTarget.getBoundingClientRect();
+      const menuHeight = 260;
+      const menuWidth = 220;
+      const spaceBelow = window.innerHeight - rect.bottom;
+
+      setMenuPosition({
+        top:
+          spaceBelow > menuHeight ? rect.bottom + 4 : rect.top - menuHeight - 4,
+        left: rect.right - menuWidth,
+      });
+      setIsOpenQO(studentId);
+    }
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (
+        !target.closest(".menu-button") &&
+        !target.closest(".menu-dropdown")
+      ) {
+        setIsOpenQO(null);
+        setMenuPosition(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   const getStatusBadge = (rawStatus: string) => {
     const status = (rawStatus || "").trim().toLowerCase();
 
@@ -213,150 +302,180 @@ export default function ResourceTableView({ resources }: ResourcesRowProps) {
   }
 
   return (
-    <motion.div
-      variants={listContainerVariants}
-      initial="hidden"
-      animate="show"
-      className="overflow-x-auto"
-    >
-      <table className="w-full border-collapse text-left">
-        <thead>
-          <tr className="border-b border-slate-200 bg-slate-50/50 text-[11px] uppercase tracking-[0.12em] text-slate-500">
-            <th className="px-6 py-4 font-medium">Title</th>
-            <th className="px-6 py-4 font-medium">Level</th>
-            <th className="px-6 py-4 font-medium">Language Skills</th>
-            <th className="px-6 py-4 text-center font-medium">Status</th>
-            <th className="px-6 py-4 text-right font-medium">Quick Menu</th>
-          </tr>
-        </thead>
+    <>
+      <motion.div
+        variants={listContainerVariants}
+        initial="hidden"
+        animate="show"
+        className="overflow-x-auto"
+      >
+        <table className="w-full border-collapse text-left">
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-50/50 text-[11px] uppercase tracking-[0.12em] text-slate-500">
+              <th className="px-6 py-4 font-medium">Title</th>
+              <th className="px-6 py-4 font-medium">Level</th>
+              <th className="px-6 py-4 font-medium">Language Skills</th>
+              <th className="px-6 py-4 text-center font-medium">Status</th>
+              <th className="px-6 py-4 text-right font-medium">Quick Menu</th>
+            </tr>
+          </thead>
 
-        <tbody className="divide-y divide-slate-200">
-          {resources.map((resource) => {
-            const {
-              icon: FormatIcon,
-              color: formatColor,
-              label: formatLabel,
-            } = getFileTypeBadge(resource.asset.format);
+          <tbody className="divide-y divide-slate-200">
+            {resources.map((resource) => {
+              const {
+                icon: FormatIcon,
+                color: formatColor,
+                label: formatLabel,
+              } = getFileTypeBadge(resource.asset.format);
 
-            const {
-              icon: VisibilityIcon,
-              label: visibilityLabel,
-              className: visibilityClassName,
-            } = getVisibilityMeta(resource.visibility);
+              const {
+                icon: VisibilityIcon,
+                label: visibilityLabel,
+                className: visibilityClassName,
+              } = getVisibilityMeta(resource.visibility);
 
-            const mediaDuration =
-              resource.asset.format === "audio" ||
-              resource.asset.format === "video"
-                ? formatDuration(resource.asset.durationSeconds)
-                : null;
+              const mediaDuration =
+                resource.asset.format === "audio" ||
+                resource.asset.format === "video"
+                  ? formatDuration(resource.asset.durationSeconds)
+                  : null;
 
-            return (
-              <motion.tr
-                key={resource.id}
-                variants={listRowVariants}
-                className="group transition-colors hover:bg-slate-50/70"
-              >
-                <td className="min-w-90 px-6 py-4">
-                  <div className="flex flex-col gap-2">
-                    <p
-                      title="Resource title"
-                      className="text-[15px] font-semibold leading-6 text-slate-900"
-                    >
-                      {resource.title}
-                    </p>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        title="File format"
-                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${formatColor}`}
+              return (
+                <motion.tr
+                  key={resource.id}
+                  variants={listRowVariants}
+                  className="group transition-colors hover:bg-slate-50/70"
+                >
+                  <td className="min-w-90 px-6 py-4">
+                    <div className="flex flex-col gap-2">
+                      <p
+                        title="Resource title"
+                        className="text-[15px] font-semibold leading-6 text-slate-900"
                       >
-                        <FormatIcon size={13} />
-                        {formatLabel}
-                      </span>
+                        {resource.title}
+                      </p>
 
-                      {mediaDuration && (
+                      <div className="flex flex-wrap items-center gap-2">
                         <span
-                          title="Media duration"
-                          className="inline-flex items-center gap-1 rounded-full border border-slate-200/80 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700"
+                          title="File format"
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${formatColor}`}
                         >
-                          <Clock3 size={13} />
-                          {mediaDuration}
+                          <FormatIcon size={13} />
+                          {formatLabel}
                         </span>
-                      )}
 
-                      <span
-                        title="Pedagogical type"
-                        className="inline-flex items-center rounded-full border border-slate-200/80 bg-white px-2.5 py-1 text-xs font-medium text-slate-700"
-                      >
-                        {getPedagogicalTypeLabel(resource.pedagogicalType)}
-                      </span>
+                        {mediaDuration && (
+                          <span
+                            title="Media duration"
+                            className="inline-flex items-center gap-1 rounded-full border border-slate-200/80 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700"
+                          >
+                            <Clock3 size={13} />
+                            {mediaDuration}
+                          </span>
+                        )}
 
-                      <span
-                        title="Visibility"
-                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${visibilityClassName}`}
-                      >
-                        <VisibilityIcon size={13} />
-                        {visibilityLabel}
-                      </span>
+                        <span
+                          title="Pedagogical type"
+                          className="inline-flex items-center rounded-full border border-slate-200/80 bg-white px-2.5 py-1 text-xs font-medium text-slate-700"
+                        >
+                          {getPedagogicalTypeLabel(resource.pedagogicalType)}
+                        </span>
+
+                        <span
+                          title="Visibility"
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${visibilityClassName}`}
+                        >
+                          <VisibilityIcon size={13} />
+                          {visibilityLabel}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                </td>
+                  </td>
 
-                <td className="px-6 py-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {(resource.levels ?? []).map((level, index) => (
-                      <span
-                        key={`${resource.id}-level-${index}`}
-                        title="CEFR level"
-                        className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${getLevelBadge(
-                          level,
-                        )}`}
-                      >
-                        {level}
-                      </span>
-                    ))}
-                  </div>
-                </td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {(resource.levels ?? []).map((level, index) => (
+                        <span
+                          key={`${resource.id}-level-${index}`}
+                          title="CEFR level"
+                          className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${getLevelBadge(
+                            level,
+                          )}`}
+                        >
+                          {level}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
 
-                <td className="px-6 py-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {(resource.skills ?? []).map((skill, index) => (
-                      <span
-                        key={`${resource.id}-skill-${index}`}
-                        title="Language skill"
-                        className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${getSkillBadge()}`}
-                      >
-                        {getSkillLabel(skill)}
-                      </span>
-                    ))}
-                  </div>
-                </td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {(resource.skills ?? []).map((skill, index) => (
+                        <span
+                          key={`${resource.id}-skill-${index}`}
+                          title="Language skill"
+                          className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${getSkillBadge()}`}
+                        >
+                          {getSkillLabel(skill)}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
 
-                <td className="px-6 py-4 text-center">
-                  <span
-                    title="Publication status"
-                    className={`inline-flex items-center justify-center rounded-full px-3 py-1 text-sm font-medium ${getStatusBadge(
-                      resource.status,
-                    )}`}
-                  >
-                    {toDisplayLabel(resource.status)}
-                  </span>
-                </td>
+                  <td className="px-6 py-4 text-center">
+                    <span
+                      title="Publication status"
+                      className={`inline-flex items-center justify-center rounded-full px-3 py-1 text-sm font-medium ${getStatusBadge(
+                        resource.status,
+                      )}`}
+                    >
+                      {toDisplayLabel(resource.status)}
+                    </span>
+                  </td>
 
-                <td className="px-6 py-4 text-right">
-                  <button
-                    type="button"
-                    title="Open quick actions"
-                    className="menu-button rounded-xl p-2 text-slate-400 transition-colors hover:cursor-pointer hover:bg-rose-50 hover:text-[#9e2727]"
-                  >
-                    <MoreVertical size={20} />
-                  </button>
-                </td>
-              </motion.tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </motion.div>
+                  <td className="px-6 py-4 text-right">
+                    <button
+                      type="button"
+                      title="Open quick actions"
+                      onClick={(e) => toggleQuickOptionsMenu(resource.id, e)}
+                      className="cursor-pointer menu-button rounded-xl p-2 text-slate-400 transition-colors hover:cursor-pointer hover:bg-rose-50 hover:text-[#9e2727]"
+                    >
+                      <MoreVertical size={20} />
+                    </button>
+                  </td>
+                </motion.tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </motion.div>
+      {isOpenQO &&
+        menuPosition &&
+        createPortal(
+          <div
+            className="menu-dropdown fixed z-[9999] py-3 px-2 min-w-[220px] flex flex-col rounded-xl bg-[#9e2727] gap-1 shadow-2xl"
+            style={{ top: menuPosition.top, left: menuPosition.left }}
+          >
+            {quickOptionsMenu.map((object, index) => {
+              const Icon = object.icon;
+              return (
+                <Link
+                  key={index}
+                  onClick={() => {
+                    setIsOpenQO(null);
+                    setMenuPosition(null);
+                  }}
+                  href={withLocale(object.href(isOpenQO))}
+                  className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-white transition-all hover:bg-white/10"
+                >
+                  <Icon size={16} />
+                  {object.label}
+                </Link>
+              );
+            })}
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
