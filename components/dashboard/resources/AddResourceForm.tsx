@@ -47,6 +47,7 @@ type UploadedResourceMeta = {
   pageCount?: number;
   durationSeconds?: number;
   thumbnailUrl?: string;
+  thumbnailStoragePath?: string;
   fileSizeBytes?: number;
 };
 
@@ -82,6 +83,7 @@ export type AddResourcePayload = {
   pageCount?: number;
   durationSeconds?: number;
   thumbnailUrl?: string;
+  thumbnailStoragePath?: string;
 
   externalUrl?: string;
 };
@@ -135,6 +137,12 @@ const addResourceSchema = z
     pageCount: z.number().min(1).optional(),
     durationSeconds: z.number().min(1).optional(),
     thumbnailUrl: z.string().trim().max(1200).optional().or(z.literal("")),
+    thumbnailStoragePath: z
+      .string()
+      .trim()
+      .max(500)
+      .optional()
+      .or(z.literal("")),
 
     externalUrl: z.string().trim().max(1200).optional().or(z.literal("")),
   })
@@ -396,6 +404,7 @@ export default function AddResourceForm({
       originalFilename: "",
       mimeType: "",
       thumbnailUrl: "",
+      thumbnailStoragePath: "",
       externalUrl: "",
       ...initialValues,
     },
@@ -472,6 +481,9 @@ export default function AddResourceForm({
       setValue("thumbnailUrl", result.thumbnailUrl ?? "", {
         shouldValidate: true,
       });
+      setValue("thumbnailStoragePath", result.thumbnailStoragePath ?? "", {
+        shouldValidate: true,
+      });
 
       if (result.pageCount) setValue("pageCount", result.pageCount);
       if (result.durationSeconds)
@@ -539,6 +551,7 @@ export default function AddResourceForm({
     resetField("pageCount");
     resetField("durationSeconds");
     resetField("thumbnailUrl");
+    resetField("thumbnailStoragePath");
   };
 
   const handlePickFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -626,6 +639,7 @@ export default function AddResourceForm({
       pageCount: formData.pageCount,
       durationSeconds: formData.durationSeconds,
       thumbnailUrl: formData.thumbnailUrl || undefined,
+      thumbnailStoragePath: formData.thumbnailStoragePath || undefined,
       externalUrl: formData.externalUrl || undefined,
     };
 
@@ -931,6 +945,14 @@ export default function AddResourceForm({
                                   }
                                 />
                                 <MetaRow
+                                  label="thumbnailStoragePath"
+                                  value={
+                                    values.thumbnailStoragePath
+                                      ? "Disponible"
+                                      : "Pendiente"
+                                  }
+                                />
+                                <MetaRow
                                   label="Páginas"
                                   value={
                                     typeof values.pageCount === "number"
@@ -1065,6 +1087,20 @@ export default function AddResourceForm({
                                   {...register("thumbnailUrl")}
                                   className={inputClass(
                                     Boolean(errors.thumbnailUrl),
+                                  )}
+                                />
+                              </FormField>
+                              <FormField
+                                label="thumbnailStoragePath"
+                                hint="Obligatorio para la miniatura del PDF en biblioteca."
+                                error={errors.thumbnailStoragePath?.message}
+                              >
+                                <input
+                                  type="url"
+                                  placeholder="https://..."
+                                  {...register("thumbnailStoragePath")}
+                                  className={inputClass(
+                                    Boolean(errors.thumbnailStoragePath),
                                   )}
                                 />
                               </FormField>
@@ -1391,6 +1427,10 @@ export default function AddResourceForm({
                       label="thumbnailUrl"
                       value={values.thumbnailUrl ? "Sí" : "No"}
                     />
+                    <ReviewRow
+                      label="thumbnailStoragePath"
+                      value={values.thumbnailStoragePath ? "Sí" : "No"}
+                    />
                   </div>
 
                   <div className="mt-5 space-y-4">
@@ -1526,7 +1566,12 @@ function getStepFields(step: Step, format?: FormatType) {
         return ["externalUrl"] as const;
       }
       if (format === "pdf") {
-        return ["fileUrl", "storagePath", "thumbnailUrl"] as const;
+        return [
+          "fileUrl",
+          "storagePath",
+          "thumbnailUrl",
+          "thumbnailStoragePath",
+        ] as const;
       }
       return ["fileUrl", "storagePath"] as const;
 

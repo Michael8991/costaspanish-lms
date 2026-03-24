@@ -1,16 +1,11 @@
 "use client";
 
 import {
-  Archive,
   ChevronDown,
-  File,
-  FileInput,
   Filter,
   LayoutDashboard,
-  LucideIcon,
   Plus,
   Search,
-  SquarePen,
   TextAlignJustify,
 } from "lucide-react";
 import Link from "next/link";

@@ -529,6 +529,7 @@ export default function ResourcesGridView({
       console.error(error);
     } finally {
       setIsDelettingResource(false);
+      setIsDeleteResourceModalOpen(false);
     }
   };
 

@@ -289,6 +289,7 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
     // 3. Vaciamos las referencias de la miniatura
     resource.thumbnailUrl = "";
     resource.thumbnailStoragePath = "";
+    resource.storagePath = "";
 
     // Guardamos en MongoDB
     await resource.save();

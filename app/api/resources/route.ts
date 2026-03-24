@@ -386,6 +386,8 @@ export async function GET(req: NextRequest) {
       ownerTeacherId: 1,
       createdAt: 1,
       updatedAt: 1,
+      storagePath: 1,
+      thumbnailStoragePath: 1,
     } as const;
 
     /**
