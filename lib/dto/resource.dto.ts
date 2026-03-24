@@ -30,6 +30,8 @@ export type ResourceListSource = Pick<
   | "ownerTeacherId"
   | "createdAt"
   | "updatedAt"
+  | "storagePath"
+  | "thumbnailStoragePath"
 > & {
   _id: Types.ObjectId;
 };
@@ -102,6 +104,8 @@ export interface ResourceListItemDTO {
     mimeType?: string;
     pageCount?: number;
     durationSeconds?: number;
+    thumbnailStoragePath?: string;
+    storagePath?: string;
   };
 
   owner: {
@@ -173,6 +177,8 @@ export function toResourceListItemDTO(
       mimeType: resource.mimeType,
       pageCount: resource.pageCount,
       durationSeconds: resource.durationSeconds,
+      thumbnailStoragePath: resource.thumbnailStoragePath,
+      storagePath: resource.storagePath,
     },
 
     owner: {

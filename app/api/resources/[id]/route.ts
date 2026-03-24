@@ -278,10 +278,19 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Soft delete: mejor que hard delete para no romper histórico
-    resource.status = "archived";
+   // 1. Cambiamos el estado para que desaparezca de las búsquedas
+    resource.status = "deleted";
     resource.visibility = "private";
 
+    // 2. Vaciamos las referencias del archivo principal
+    resource.fileUrl = "";
+    resource.fileSizeBytes = 0;
+    
+    // 3. Vaciamos las referencias de la miniatura
+    resource.thumbnailUrl = "";
+    resource.thumbnailStoragePath = "";
+
+    // Guardamos en MongoDB
     await resource.save();
 
     return NextResponse.json(

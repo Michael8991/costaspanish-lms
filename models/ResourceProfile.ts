@@ -7,7 +7,7 @@ import mongoose, { Schema, model, models, Types } from "mongoose";
 export const CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
 export type CEFRLevel = (typeof CEFR_LEVELS)[number];
 
-export const RESOURCE_STATUS = ["draft", "published", "archived"] as const;
+export const RESOURCE_STATUS = ["draft", "published", "archived","deleted"] as const;
 export type ResourceStatus = (typeof RESOURCE_STATUS)[number];
 
 export const RESOURCE_VISIBILITY = ["private", "shared"] as const;

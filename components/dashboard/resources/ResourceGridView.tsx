@@ -1,7 +1,9 @@
+// TODO: Se puede agregar dentro de las quickoptions el cambio de estado al normal y tmb un boton para eliminar definitivamente de la base de datos de firebase para que no ocupe lugar?
 "use client";
 
 import {
   Archive,
+  ArchiveRestore,
   Clock3,
   Eye,
   EyeOff,
@@ -14,13 +16,14 @@ import {
   Link as LucideLink,
   MoreVertical,
   SquarePen,
+  Trash2,
   Video,
   type LucideIcon,
 } from "lucide-react";
 import { motion, type Variants } from "framer-motion";
 import Image from "next/image";
 
-import { ResourceListItemDTO } from "@/lib/dto/resource.dto";
+import { ResourceDetailDTO, ResourceListItemDTO } from "@/lib/dto/resource.dto";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
@@ -30,9 +33,16 @@ import ArchiveResourceForm, {
 } from "./ArchiveResourceForm";
 import { toast } from "sonner";
 import { CircleAlert } from "lucide-react";
-
-type ResourceFormat = "pdf" | "image" | "audio" | "video" | "external_link";
-type ResourceVisibility = "private" | "shared";
+import { MOCK_UPCOMING_CLASSES } from "@/lib/mocks/lessons.mock"; //!Mock de clases
+import AddResourceToLessonForm from "./AddResourceToLessonForm";
+import {
+  FormatType,
+  ResourceVisibility,
+} from "@/lib/constants/resource.constants";
+import { deleteObject, ref } from "firebase/storage";
+import { storage } from "@/lib/firebase";
+import { mutate } from "swr";
+import DeleteResourceForm from "./DeleteResourceForm";
 
 interface ResourcesGridViewProps {
   resources: ResourceListItemDTO[];
@@ -64,7 +74,7 @@ const formatDuration = (seconds?: number) => {
   return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 };
 
-const getFileTypeBadge = (format: ResourceFormat | string) => {
+const getFileTypeBadge = (format: FormatType | string) => {
   const formatConfig: Record<
     string,
     { icon: LucideIcon; color: string; label: string }
@@ -136,7 +146,6 @@ const getSkillLabel = (skill: string) => {
     grammar: "Grammar",
     vocabulary: "Vocabulary",
     pronunciation: "Pronunciation",
-    culture: "Culture",
   };
 
   return skillMap[skill] || toDisplayLabel(skill);
@@ -325,6 +334,14 @@ export default function ResourcesGridView({
   const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
   const [isSubmittingArchiveResource, setIsSubmittingArchiveResource] =
     useState(false);
+  const [isAddResourceModalOpen, setIsAddResourceModalOpen] = useState(false);
+  const [isSubmittingAddResource, setIsSubmittingAddResource] = useState(false);
+  const [isDeleteResourceModalOpen, setIsDeleteResourceModalOpen] =
+    useState(false);
+  const [isDelettingResource, setIsDelettingResource] = useState(false);
+
+  const [isSubmittingReactivateResource, setIsSubmittingReactivateResource] =
+    useState(false);
 
   const [menuPosition, setMenuPosition] = useState<{
     top: number;
@@ -391,8 +408,17 @@ export default function ResourcesGridView({
       setIsArchiveModalOpen(true);
       setMenuPosition(null);
     } else if (action === "ADD_TO_CLASS") {
-      // setAddingToClassResource(resourceId); //TODO: Abre el modal de clases podemos ahcer el modal pero faltaria las conexiones reales para cuando esten las lessons
+      setArchivingResource(resourceId);
+      setIsAddResourceModalOpen(true);
+      setMenuPosition(null);
     }
+  };
+
+  const handleAddResource = async (
+    resourceId: string | null,
+    lessonId: string,
+  ) => {
+    console.log("Hola!"); //!Subida
   };
 
   const handleArchiveResource = async (
@@ -402,7 +428,12 @@ export default function ResourcesGridView({
     setIsSubmittingArchiveResource(true);
     try {
       const res = await fetch(`/api/resources/${resourceId}`, {
-        method: "DELETE",
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "archived",
+          visibility: "private",
+        }),
         cache: "no-store",
       });
       if (!res.ok) {
@@ -410,12 +441,94 @@ export default function ResourcesGridView({
         throw new Error(errorData || "Error al archivar el recurso.");
       }
       toast.success("Recurso archivado con exito.");
-      window.location.reload();
+      mutate("/api/resources");
     } catch (error) {
       if (error instanceof Error) toast.error(error.message);
       else toast.error("Ocurrió un error inesperado al archivar el recurso.");
     } finally {
       setIsSubmittingArchiveResource(false);
+      setIsArchiveModalOpen(false);
+    }
+  };
+
+  const handleReactivateResource = async (resourceId: string | null) => {
+    setIsSubmittingReactivateResource(true);
+    try {
+      const res = await fetch(`/api/resources/${resourceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "draft",
+          visibility: "private",
+        }),
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || "Error al reactivar el recurso.");
+      }
+      toast.success("Recurso reactivado con éxito.");
+      mutate("/api/resources");
+    } catch (error) {
+      if (error instanceof Error) {
+        toast.error(error.message || "Ocurrió un error inesperado.");
+      } else {
+        toast.error("Error al reactivar el recurso.");
+      }
+    } finally {
+      setIsSubmittingReactivateResource(false);
+    }
+  };
+
+  const handlePermanentDelete = async (resourceId: string | null) => {
+    if (!resourceId) return;
+
+    const resource = resources.find((r) => r.id === resourceId);
+
+    if (!resource) {
+      toast.error("No se encontró el recurso en la memoria.");
+      return;
+    }
+    setIsDelettingResource(true);
+    try {
+      if (resource.asset.storagePath) {
+        const fileRef = ref(storage, resource.asset.storagePath);
+        await deleteObject(fileRef).catch((err) =>
+          console.warn("El archivo ya no existía en Firebase o falló:", err),
+        );
+      }
+
+      if (resource.asset.thumbnailStoragePath) {
+        const thumbRef = ref(storage, resource.asset.thumbnailStoragePath);
+        await deleteObject(thumbRef).catch((err) =>
+          console.warn("La miniatura ya no existía en Firebase o falló:", err),
+        );
+      }
+
+      const res = await fetch(`/api/resources/${resource.id}`, {
+        method: "DELETE",
+        cache: "no-store",
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+
+        console.error("ERROR:", errorData);
+
+        toast.error(
+          `Error BD: ${JSON.stringify(errorData.error || errorData)}`,
+        );
+
+        throw new Error("Abortando operación por error del servidor");
+      }
+
+      toast.success("Recurso y archivos eliminados definitivamente.");
+      mutate("/api/resources");
+    } catch (error) {
+      toast.error("Ocurrió un error al eliminar el recurso.");
+      console.error(error);
+    } finally {
+      setIsDelettingResource(false);
     }
   };
 
@@ -451,8 +564,11 @@ export default function ResourcesGridView({
             <motion.article
               key={resource.id}
               variants={itemVariants}
-              // TODO: Editar para que al archivar se haga mas opaco y los botones no sean de Vertical dots sino un boton para reactivar
-              className={`${isArchived ? "bg-gray-50/50 opacity-60 grayscale-30" : "bg-white"}  group overflow-hidden rounded-2xl border border-slate-200 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/70`}
+              className={`group overflow-hidden rounded-2xl border shadow-sm transition-all duration-200 ${
+                isArchived
+                  ? "bg-slate-50/80 opacity-70 grayscale-20 border-slate-200"
+                  : "bg-white border-slate-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/70"
+              }`}
             >
               <ResourcePreview resource={resource} />
 
@@ -465,17 +581,20 @@ export default function ResourcesGridView({
                     >
                       {resource.title}
                     </h3>
-
-                    <button
-                      type="button"
-                      title="Open quick actions"
-                      onClick={(e) =>
-                        toggleQuickOptionsMenu(resource.id, e, resource.title)
-                      }
-                      className="cursor-pointer shrink-0 rounded-xl p-2 text-slate-400 transition-colors hover:bg-rose-50 hover:text-[#9e2727]"
-                    >
-                      <MoreVertical size={18} />
-                    </button>
+                    {!isArchived ? (
+                      <button
+                        type="button"
+                        title="Open quick actions"
+                        onClick={(e) =>
+                          toggleQuickOptionsMenu(resource.id, e, resource.title)
+                        }
+                        className="cursor-pointer shrink-0 rounded-xl p-2 text-slate-400 transition-colors hover:bg-rose-50 hover:text-[#9e2727]"
+                      >
+                        <MoreVertical size={18} />
+                      </button>
+                    ) : (
+                      ""
+                    )}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
@@ -571,14 +690,39 @@ export default function ResourcesGridView({
                       : "—"}
                   </span>
                 </div>
-                {isArchived ? (
-                  <div className="w-full flex items-center justify-center">
-                    <p className="text-sm text-red-500 flex items-center gap-2">
-                      <CircleAlert size={14} /> Este recurso se eliminará pronto
+                {isArchived && (
+                  <div className="flex flex-col gap-2 border-t border-slate-100 pt-3">
+                    <p className="text-xs text-red-500 flex items-center gap-1.5">
+                      <CircleAlert size={12} />
+                      Este recurso se eliminará pronto
                     </p>
+                    <div className="flex gap-2">
+                      {/* Reactivar — recupera si el archivo aún existe en storage */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleReactivateResource(resource.id);
+                        }}
+                        className="cursor-pointer flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 transition-all hover:bg-emerald-100"
+                      >
+                        <ArchiveRestore size={12} />
+                        Reactivar
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setResourceToArchive(resource.id);
+                          setResourceToArchiveName(resource.title);
+                          setIsDeleteResourceModalOpen(true);
+                        }}
+                        className="cursor-pointer flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 transition-all hover:bg-red-100"
+                      >
+                        <Trash2 size={12} />
+                        Eliminar
+                      </button>
+                    </div>
                   </div>
-                ) : (
-                  ""
                 )}
               </div>
             </motion.article>
@@ -641,6 +785,38 @@ export default function ResourcesGridView({
             onSubmitForm={handleArchiveResource}
             isSubmitting={isSubmittingArchiveResource}
             onClose={() => setIsArchiveModalOpen(false)}
+          />
+        </div>
+      </CustomModal>
+      <CustomModal
+        isOpen={isAddResourceModalOpen}
+        onClose={() => setIsAddResourceModalOpen(false)}
+        title="Proximas clases"
+        maxWidth="5xl"
+      >
+        <div className="p-4">
+          <AddResourceToLessonForm
+            resource={resourceToArchive}
+            resourceName={resourceToArchiveName}
+            lessons={MOCK_UPCOMING_CLASSES}
+            onSubmitForm={handleAddResource}
+            isSubmitting={isSubmittingAddResource}
+            onClose={() => setIsAddResourceModalOpen(false)}
+          />
+        </div>
+      </CustomModal>
+      <CustomModal
+        isOpen={isDeleteResourceModalOpen}
+        onClose={() => setIsDeleteResourceModalOpen(false)}
+        title="Eliminar recurso"
+      >
+        <div className="p-4">
+          <DeleteResourceForm
+            resource={resourceToArchive}
+            resourceName={resourceToArchiveName}
+            onSubmitForm={handlePermanentDelete}
+            isSubmitting={isDelettingResource}
+            onClose={() => setIsDeleteResourceModalOpen(false)}
           />
         </div>
       </CustomModal>

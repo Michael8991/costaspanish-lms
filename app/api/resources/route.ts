@@ -298,6 +298,8 @@ export async function GET(req: NextRequest) {
         if (visibility) {
           finalQuery.visibility = visibility;
         }
+
+       
       } else if (ownership === "shared") {
         /**
          * `shared`:
@@ -338,6 +340,11 @@ export async function GET(req: NextRequest) {
       }
     }
 
+     if (!finalQuery.status) {
+      (finalQuery).status = { 
+        $in: ["draft", "published", "archived"] 
+      };
+    }
     /**
      * Cálculo de offset para paginación clásica por página y tamaño de página.
      */

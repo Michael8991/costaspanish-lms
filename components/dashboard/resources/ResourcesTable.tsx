@@ -177,8 +177,8 @@ export default function ResourcesTable({ locale }: { locale: string }) {
     fetcher,
     {
       keepPreviousData: true,
-      revalidateOnFocus: false,
-      dedupingInterval: 10_000,
+      revalidateOnFocus: true,
+      dedupingInterval: 2000,
     },
   );
 
