@@ -25,6 +25,7 @@ export type ResourceListSource = Pick<
   | "pageCount"
   | "durationSeconds"
   | "thumbnailUrl"
+  | "fileUrl"
   | "externalUrl"
   | "timesUsed"
   | "ownerTeacherId"
@@ -171,7 +172,7 @@ export function toResourceListItemDTO(
 
     asset: {
       format: resource.format,
-      thumbnailUrl: resource.thumbnailUrl,
+      thumbnailUrl: resource.format === "image" ? resource.fileUrl : resource.thumbnailUrl,
       externalUrl: resource.externalUrl,
       originalFilename: resource.originalFilename,
       mimeType: resource.mimeType,

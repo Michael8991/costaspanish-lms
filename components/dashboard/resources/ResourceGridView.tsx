@@ -23,7 +23,7 @@ import {
 import { motion, type Variants } from "framer-motion";
 import Image from "next/image";
 
-import { ResourceDetailDTO, ResourceListItemDTO } from "@/lib/dto/resource.dto";
+import { ResourceListItemDTO } from "@/lib/dto/resource.dto";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
@@ -414,7 +414,7 @@ export default function ResourcesGridView({
     }
   };
 
-  const handleAddResource = async (
+  const handleAddResourceToLesson = async (
     resourceId: string | null,
     lessonId: string,
   ) => {
@@ -800,7 +800,7 @@ export default function ResourcesGridView({
             resource={resourceToArchive}
             resourceName={resourceToArchiveName}
             lessons={MOCK_UPCOMING_CLASSES}
-            onSubmitForm={handleAddResource}
+            onSubmitForm={handleAddResourceToLesson}
             isSubmitting={isSubmittingAddResource}
             onClose={() => setIsAddResourceModalOpen(false)}
           />

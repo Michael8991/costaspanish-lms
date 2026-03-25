@@ -173,11 +173,11 @@ export default function HeaderResource({ resource, locale }: ResourceProps) {
             <div className="flex w-full items-center">
               <button
                 onClick={() => setIsDescriptionOpen((v) => !v)}
-                className="cursor-pointer flex items-center gap-1 text-md font-medium text-slate-400 hover:text-slate-600 transition-colors w-full justify-between px-5 py-1"
+                className="cursor-pointer flex items-center gap-1 text-md font-medium text-slate-600 hover:text-slate-700 transition-colors w-full justify-between px-5 py-1"
               >
                 {isDescriptionOpen ? "Ocultar descripción" : "Ver descripción"}
                 <ChevronDown
-                  size={13}
+                  size={20}
                   className={`transition-transform duration-200 ${isDescriptionOpen ? "rotate-180" : ""}`}
                 />
               </button>

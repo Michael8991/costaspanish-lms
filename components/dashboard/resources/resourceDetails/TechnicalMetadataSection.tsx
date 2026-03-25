@@ -107,6 +107,9 @@ export const TechnicalMetadataSection = ({
           label="File size"
           value={formatBytes(resource.storage.fileSizeBytes)}
         />
+        {/* //TODO: agregar diferencias entre formatos para ver duracion paginas etc */}
+        {/* {resource.format === "pdf" ? (
+        ) : () } */}
         <MetaRow label="Pages" value={resource.asset.pageCount ?? "—"} />
       </SectionCard>
     </>
