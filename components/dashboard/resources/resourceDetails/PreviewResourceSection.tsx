@@ -1,0 +1,218 @@
+import { ResourceDetailDTO } from "@/lib/dto/resource.dto";
+import {
+  Copy,
+  Eye,
+  FileText,
+  Globe,
+  Headphones,
+  ImageIcon,
+  Layers3,
+  Video,
+} from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+
+interface previewResourceProps {
+  resource: ResourceDetailDTO;
+  locale: string;
+}
+
+const formatDuration = (seconds?: number) => {
+  if (!seconds || seconds <= 0) return "—";
+
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainingSeconds = seconds % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+
+  if (minutes > 0) {
+    return `${minutes}m ${remainingSeconds}s`;
+  }
+
+  return `${remainingSeconds}s`;
+};
+
+function ResourcePreview({ resource }: { resource: ResourceDetailDTO }) {
+  const openHref =
+    resource.asset.format === "external_link"
+      ? resource.asset.externalUrl
+      : resource.storage.fileUrl;
+
+  if (resource.asset.format === "external_link") {
+    let host = "";
+    try {
+      host = resource.asset.externalUrl
+        ? new URL(resource.asset.externalUrl).hostname
+        : "";
+    } catch {
+      host = "";
+    }
+
+    return (
+      <>
+        <div className="overflow-hidden rounded-lg border border-orange-200 bg-linear-to-br from-orange-50 to-white p-3">
+          <div className="flex flex-col items-start gap-4">
+            <div className="flex items-start gap-2">
+              <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-orange-200">
+                <Globe className="h-8 w-8 text-orange-600" />
+              </div>
+              <div>
+                <p className="mb-1 text-md font-medium text-orange-700">
+                  External resource
+                </p>
+                <h3 className="text-sm font-light text-slate-900">
+                  {host ? (
+                    <p className="mt-2 text-xs uppercase tracking-wide text-slate-400">
+                      {host}
+                    </p>
+                  ) : null}
+                </h3>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 w-full justify-center mt-4">
+          {openHref ? (
+            <Link
+              href={openHref}
+              target="_blank"
+              rel="noreferrer"
+              className="hover:bg-blue-100 hover:text-blue-500 hover:border-blue-400 inline-flex border border-gray-100 items-center justify-center gap-2 rounded-lg px-4 py-2 text-xs font-light shadow-md text-gray-700 transition"
+            >
+              <Eye className="h-4 w-4" />
+              Abrir link
+            </Link>
+          ) : null}
+          <button className="hover:bg-green-100  hover:text-green-700 hover:border-green-400 cursor-pointer inline-flex border border-gray-100 items-center justify-center gap-2 rounded-lg  px-4 py-2 text-xs font-light shadow-md text-gray-700 transition">
+            <Copy className="h-4 w-4" />
+            Copiar link
+          </button>
+          {/* {resource.asset.externalUrl || "No external URL available"} */}
+        </div>
+      </>
+    );
+  }
+
+  if (resource.asset.format === "pdf" || resource.asset.format === "image") {
+    return (
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <div className="relative aspect-video w-full  h-80">
+          {resource.asset.thumbnailUrl ? (
+            <img
+              src={resource.asset.thumbnailUrl}
+              alt={resource.title}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center">
+              {resource.asset.format === "pdf" ? (
+                <FileText className="h-16 w-16 text-slate-300" />
+              ) : (
+                <>
+                  <div className="relative w-full h-70  overflow-hidden bg-white flex items-center justify-center p-4">
+                    <Image
+                      src={resource.storage.fileUrl!}
+                      alt={resource.title}
+                      fill={true}
+                      className="max-w-full max-h-full rounded-lg object-contain shadow-md"
+                      priority
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="flex flex-col border-t border-slate-100 p-5 md:flex-row md:items-center justify-center">
+          <div>
+            {resource.storage.fileUrl ? (
+              <Link
+                href={resource.storage.fileUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="group mb-4 flex items-center justify-center cursor-pointer gap-1.5 px-3 py-1.5 border rounded-md text-sm font-medium shadow-sm transition-all duration-200 bg-white border-gray-200 text-gray-600 hover:border-green-300 hover:text-green-700 hover:bg-green-50"
+              >
+                <Eye className="h-4 w-4" />
+                {resource.asset.format === "pdf" ? "Open PDF" : "Open image"}
+              </Link>
+            ) : null}
+            <p className="text-sm font-medium text-slate-700">
+              {resource.asset.originalFilename || "Untitled file"}
+            </p>
+            <p className="text-sm text-slate-500">
+              {resource.asset.format === "pdf"
+                ? `${resource.asset.pageCount ?? "—"} pages`
+                : resource.asset.mimeType || "Image file"}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (resource.asset.format === "audio" || resource.asset.format === "video") {
+    const MediaIcon = resource.asset.format === "audio" ? Headphones : Video;
+
+    return (
+      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-linear-to-br from-slate-50 to-white p-8">
+        <div className="flex flex-col items-start gap-6 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-start gap-4">
+            <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+              <MediaIcon className="h-8 w-8 text-slate-700" />
+            </div>
+            <div>
+              <p className="mb-1 text-sm font-medium text-slate-500">
+                {resource.asset.format === "audio"
+                  ? "Audio track"
+                  : "Video clip"}
+              </p>
+              <h3 className="text-xl font-semibold text-slate-900">
+                {resource.title}
+              </h3>
+              <p className="mt-2 text-sm text-slate-600">
+                Duration: {formatDuration(resource.asset.durationSeconds)}
+              </p>
+            </div>
+          </div>
+
+          {resource.storage.fileUrl ? (
+            <Link
+              href={resource.storage.fileUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+            >
+              <Eye className="h-4 w-4" />
+              Open {resource.asset.format}
+            </Link>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-8 text-sm text-slate-500">
+      Preview not available for this resource.
+    </div>
+  );
+}
+
+export default function PreviewResourceSection({
+  resource,
+}: previewResourceProps) {
+  return (
+    <section className="rounded-lg border border-slate-100 bg-white p-4 shadow-sm md:p-8m">
+      <div className="mb-5 flex items-center gap-2">
+        <div className="rounded-lg bg-slate-100 p-2 shadow-xs">
+          <Layers3 className="h-4 w-4 text-slate-700 " />
+        </div>
+        <h2 className="text-lg font-medium text-slate-900">Vista rápidas</h2>
+      </div>
+      <ResourcePreview resource={resource} />
+    </section>
+  );
+}
