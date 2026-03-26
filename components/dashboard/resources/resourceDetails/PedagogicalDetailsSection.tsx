@@ -56,7 +56,7 @@ export const PedagogicalDetailsSection = ({
   resource,
 }: pedagogicalDetailsProps) => {
   return (
-    <section className="col-span-3 border border-slate-100 bg-white shadow-sm">
+    <section className="col-span-3 border rounded-lg border-slate-100 bg-white shadow-sm">
       {/* Header */}
       <div className="flex items-center gap-2.5 border-b border-slate-100 px-6 py-4">
         <BookOpen className="h-4 w-4 text-slate-400" />

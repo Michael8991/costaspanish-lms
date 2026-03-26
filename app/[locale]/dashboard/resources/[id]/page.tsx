@@ -34,9 +34,7 @@ export default async function ResourcePage({
     { label: "Resources", href: `/${locale}/dashboard/resources` },
     { label: resource.title },
   ];
-  console.log("RAW RESOURCE:", rawResource);
-  console.log("DTO RESOURCE:", resource);
-  console.log(resource.storage.transcriptText);
+
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8 text-slate-800 md:px-8">
       <Breadcrumbs items={breadcrumbItems} locale={locale} />

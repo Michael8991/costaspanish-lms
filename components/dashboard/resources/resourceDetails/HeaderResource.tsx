@@ -1,8 +1,12 @@
 "use client";
 
+import CustomModal from "@/components/ui/CustomModal";
 import { ResourceDetailDTO } from "@/lib/dto/resource.dto";
+import { useResourceActions } from "@/lib/hooks/useResourceActions";
 import {
+  ArchiveRestore,
   ChevronDown,
+  CircleAlert,
   FileInput,
   FileText,
   Headphones,
@@ -14,6 +18,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import ArchiveResourceForm from "../ArchiveResourceForm";
+import DeleteResourceForm from "../DeleteResourceForm";
+import AddResourceToLessonForm from "../AddResourceToLessonForm";
+import { MOCK_UPCOMING_CLASSES } from "@/lib/mocks/lessons.mock";
 
 const getStatusClasses = (status: string) => {
   switch (status) {
@@ -100,6 +108,28 @@ interface ResourceProps {
 }
 
 export default function HeaderResource({ resource, locale }: ResourceProps) {
+  const {
+    resourceToArchive,
+    setResourceToArchive,
+    resourceToArchiveName,
+    setResourceToArchiveName,
+    isArchiveModalOpen,
+    setIsArchiveModalOpen,
+    isDeleteResourceModalOpen,
+    setIsDeleteResourceModalOpen,
+    isSubmittingArchiveResource,
+    isDelettingResource,
+    isSubmittingReactivateResource,
+    handleArchiveResource,
+    handlePermanentDelete,
+    handleReactivateResource,
+    handleAddResourceToLesson,
+    isAddResourceModalOpen,
+    setIsAddResourceModalOpen,
+    isSubmittingAddResource,
+    handleActionClick,
+  } = useResourceActions(resource);
+
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
   const formatMeta = formatMetaMap[resource.asset.format];
   const FormatIcon = formatMeta.icon;
@@ -122,6 +152,12 @@ export default function HeaderResource({ resource, locale }: ResourceProps) {
 
         <div className="px-6 py-5 md:px-8 md:py-6">
           {/* Fila superior: título + botones */}
+          {resource.status === "archived" && (
+            <p className="text-xs text-red-500 flex items-center gap-1.5 mb-2">
+              <CircleAlert size={12} />
+              Este recurso se eliminará pronto
+            </p>
+          )}
           <div className="flex items-start justify-between gap-6">
             {/* Izquierda: título */}
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900 md:text-3xl leading-snug">
@@ -138,11 +174,57 @@ export default function HeaderResource({ resource, locale }: ResourceProps) {
                 Editar recurso
               </Link>
 
-              <button className="group flex items-center justify-center cursor-pointer gap-1.5 px-3 py-1.5 border rounded-md text-sm font-medium shadow-sm transition-all duration-200 bg-white border-gray-200 text-gray-600 hover:border-red-300 hover:text-red-700 hover:bg-red-50">
-                <Trash2 size={14} />
-                Archivar
-              </button>
-              <button className="group flex items-center justify-center cursor-pointer gap-1.5 px-3 py-1.5 border rounded-md text-sm font-medium shadow-sm transition-all duration-200 bg-white border-gray-200 text-gray-600 hover:border-orange-300 hover:text-orange-700 hover:bg-orange-50">
+              {resource.status === "archived" ? (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleReactivateResource(resource.id);
+                    }}
+                    className="group flex items-center justify-center cursor-pointer gap-1.5 px-3 py-1.5 border rounded-md text-sm font-medium shadow-sm transition-all duration-200 bg-white border-gray-200 text-gray-600 hover:border-green-300 hover:text-green-700 hover:bg-green-50"
+                  >
+                    <ArchiveRestore size={12} />
+                    Reactivar
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResourceToArchive(resource.id);
+                      setResourceToArchiveName(resource.title);
+                      setResourceToArchiveName(resource.title);
+                      setIsDeleteResourceModalOpen(true);
+                    }}
+                    className="group flex items-center justify-center cursor-pointer gap-1.5 px-3 py-1.5 border rounded-md text-sm font-medium shadow-sm transition-all duration-200 bg-white border-gray-200 text-gray-600 hover:border-red-300 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <Trash2 size={12} />
+                    Eliminar
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <button
+                    onClick={() => {
+                      setIsArchiveModalOpen(true);
+                      setResourceToArchive(resource.id);
+                      setResourceToArchiveName(resource.title);
+                    }}
+                    className="group flex items-center justify-center cursor-pointer gap-1.5 px-3 py-1.5 border rounded-md text-sm font-medium shadow-sm transition-all duration-200 bg-white border-gray-200 text-gray-600 hover:border-red-300 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <Trash2 size={14} />
+                    Archivar
+                  </button>
+                </>
+              )}
+
+              <button
+                onClick={() => {
+                  setResourceToArchive(resource.id);
+                  setResourceToArchiveName(resource.title);
+                  setIsAddResourceModalOpen(true);
+                }}
+                className="group flex items-center justify-center cursor-pointer gap-1.5 px-3 py-1.5 border rounded-md text-sm font-medium shadow-sm transition-all duration-200 bg-white border-gray-200 text-gray-600 hover:border-orange-300 hover:text-orange-700 hover:bg-orange-50"
+              >
                 <FileInput size={14} />
                 Agregar a una clase
               </button>
@@ -201,6 +283,53 @@ export default function HeaderResource({ resource, locale }: ResourceProps) {
           <p className="mt-2 text-sm text-slate-400 italic">Sin descripción.</p>
         )}
       </section>
+      <CustomModal
+        isOpen={isArchiveModalOpen}
+        onClose={() => setIsArchiveModalOpen(false)}
+        title="Archivar material"
+      >
+        <div className="p-4">
+          <ArchiveResourceForm
+            resource={resourceToArchive}
+            resourceName={resourceToArchiveName}
+            onSubmitForm={handleArchiveResource}
+            isSubmitting={isSubmittingArchiveResource}
+            onClose={() => setIsArchiveModalOpen(false)}
+          />
+        </div>
+      </CustomModal>
+      <CustomModal
+        isOpen={isDeleteResourceModalOpen}
+        onClose={() => setIsDeleteResourceModalOpen(false)}
+        title="Eliminar recurso"
+      >
+        <div className="p-4">
+          <DeleteResourceForm
+            resource={resourceToArchive}
+            resourceName={resourceToArchiveName}
+            onSubmitForm={handlePermanentDelete}
+            isSubmitting={isDelettingResource}
+            onClose={() => setIsDeleteResourceModalOpen(false)}
+          />
+        </div>
+      </CustomModal>
+      <CustomModal
+        isOpen={isAddResourceModalOpen}
+        onClose={() => setIsAddResourceModalOpen(false)}
+        title="Proximas clases"
+        maxWidth="5xl"
+      >
+        <div className="p-4">
+          <AddResourceToLessonForm
+            resource={resourceToArchive}
+            resourceName={resourceToArchiveName}
+            lessons={MOCK_UPCOMING_CLASSES}
+            onSubmitForm={handleAddResourceToLesson}
+            isSubmitting={isSubmittingAddResource}
+            onClose={() => setIsAddResourceModalOpen(false)}
+          />
+        </div>
+      </CustomModal>
     </div>
   );
 }

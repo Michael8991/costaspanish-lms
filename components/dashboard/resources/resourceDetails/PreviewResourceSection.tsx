@@ -84,6 +84,18 @@ function CopyLinkButton({ url }: CopyLinkButtonProps) {
   );
 }
 
+export function truncateUrl(url: string, maxLength: number = 50): string {
+  if (!url || url.length <= maxLength) return url;
+
+  const charsToShow = maxLength - 3; // Restamos los puntos suspensivos
+  const frontChars = Math.ceil(charsToShow / 2);
+  const backChars = Math.floor(charsToShow / 2);
+
+  return (
+    url.substring(0, frontChars) + "..." + url.substring(url.length - backChars)
+  );
+}
+
 function ResourcePreview({ resource }: { resource: ResourceDetailDTO }) {
   const openHref =
     resource.asset.format === "external_link"

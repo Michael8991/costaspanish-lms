@@ -278,29 +278,34 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-   // 1. Cambiamos el estado para que desaparezca de las búsquedas
-    resource.status = "deleted";
-    resource.visibility = "private";
+ 
 
-    // 2. Vaciamos las referencias del archivo principal
-    resource.fileUrl = "";
-    resource.fileSizeBytes = 0;
+    const updatedResource = await Resource.findByIdAndUpdate(
+      resource._id,
+      {
+        $set: { 
+          status: "deleted", 
+          visibility: "private" 
+        },
+        $unset: {
+         fileUrl: 1,                 
+          fileSizeBytes: 1,           
+          thumbnailUrl: 1,            
+          thumbnailStoragePath: 1,    
+          storagePath: 1              
+        }
+      },
+      { new: true } 
+    );
     
-    // 3. Vaciamos las referencias de la miniatura
-    resource.thumbnailUrl = "";
-    resource.thumbnailStoragePath = "";
-    resource.storagePath = "";
-
-    // Guardamos en MongoDB
-    await resource.save();
-
     return NextResponse.json(
       {
         success: true,
-        item: toResourceDetailDTO(resource.toObject(), getCurrentUserId(user)),
+        item: toResourceDetailDTO(updatedResource.toObject(), getCurrentUserId(user)),
       },
       { status: 200 }
     );
+  
   } catch (error) {
     if (error instanceof mongoose.Error.ValidationError) {
       return NextResponse.json(
