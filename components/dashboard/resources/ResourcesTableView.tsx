@@ -58,7 +58,7 @@ const quickOptionsMenu: QuickOptionsMenu[] = [
   },
   {
     label: "Editar material",
-    href: (id) => `/dashboard/resources/edit/${id}/`,
+    href: (id) => `/dashboard/resources/${id}/edit`,
     icon: SquarePen,
   },
   { label: "Archivar", action: "ARCHIVE", icon: Archive },
