@@ -104,7 +104,8 @@ export interface IResource {
   pageCount?: number;
   durationSeconds?: number;
   thumbnailUrl?: string;
-  thumbnailStoragePath?:string;
+  thumbnailStoragePath?: string;
+  transcriptText?: string; 
 
   // Si es recurso externo
   externalUrl?: string;
@@ -179,6 +180,11 @@ const ResourceSchema = new Schema<IResource>(
       enum: PEDAGOGICAL_TYPES,
       required: true,
       index: true,
+    },
+    transcriptText: {
+      type: String,
+      trim: true,
+      default: ""
     },
     levels: {
       type: [{ type: String, enum: CEFR_LEVELS }],

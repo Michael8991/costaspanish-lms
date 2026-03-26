@@ -69,6 +69,7 @@ type ResourceDetailSource = Pick<
   | "ownerTeacherId"
   | "createdAt"
   | "updatedAt"
+  | "transcriptText"
 > & {
   _id: Types.ObjectId;
 };
@@ -123,6 +124,7 @@ export interface ResourceDetailDTO extends ResourceListItemDTO {
     storagePath?: string;
     fileUrl?: string;
     fileSizeBytes?: number;
+    transcriptText?: string;
   };
 }
 
@@ -204,6 +206,7 @@ export function toResourceDetailDTO(
       storagePath: resource.storagePath,
       fileUrl: resource.fileUrl,
       fileSizeBytes: resource.fileSizeBytes,
+      transcriptText: resource.transcriptText,
     },
   };
 }

@@ -1,16 +1,18 @@
+"use client";
+
 import { ResourceDetailDTO } from "@/lib/dto/resource.dto";
 import {
+  Check,
   Copy,
   Eye,
   FileText,
   Globe,
   Headphones,
-  ImageIcon,
   Layers3,
   Video,
 } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
+import { useState } from "react";
 
 interface previewResourceProps {
   resource: ResourceDetailDTO;
@@ -34,6 +36,53 @@ const formatDuration = (seconds?: number) => {
 
   return `${remainingSeconds}s`;
 };
+
+interface CopyLinkButtonProps {
+  url: string;
+}
+
+function CopyLinkButton({ url }: CopyLinkButtonProps) {
+  const [isCopied, setIsCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setIsCopied(true);
+      setTimeout(() => {
+        setIsCopied(false);
+      }, 2000);
+    } catch (error) {
+      console.log("Error al copiar en el portapapeles: ", error);
+    }
+  };
+
+  return (
+    <>
+      <button
+        onClick={handleCopy}
+        className={`hover:bg-green-200 cursor-pointer hover:text-green-500 hover:border-green-400 inline-flex border border-gray-100 items-center justify-center gap-2 rounded-lg px-4 py-2 text-xs font-light shadow-md text-gray-700 transition
+        ${
+          isCopied
+            ? "border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
+            : "border-slate-200 bg-white text-slate-700 hover:bg-green-200 hover:text-green-700"
+        }
+      `}
+      >
+        {/* Animación súper suave al cambiar de icono */}
+        {isCopied ? (
+          <Check
+            size={16}
+            className="text-green-600 animate-in zoom-in duration-200"
+          />
+        ) : (
+          <Copy size={16} className="" />
+        )}
+
+        {isCopied ? "¡Copiado!" : "Copiar enlace"}
+      </button>
+    </>
+  );
+}
 
 function ResourcePreview({ resource }: { resource: ResourceDetailDTO }) {
   const openHref =
@@ -76,20 +125,17 @@ function ResourcePreview({ resource }: { resource: ResourceDetailDTO }) {
         </div>
         <div className="flex flex-wrap items-center gap-2 w-full justify-center mt-4">
           {openHref ? (
-            <Link
+            <a
               href={openHref}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="hover:bg-blue-100 hover:text-blue-500 hover:border-blue-400 inline-flex border border-gray-100 items-center justify-center gap-2 rounded-lg px-4 py-2 text-xs font-light shadow-md text-gray-700 transition"
             >
               <Eye className="h-4 w-4" />
               Abrir link
-            </Link>
+            </a>
           ) : null}
-          <button className="hover:bg-green-100  hover:text-green-700 hover:border-green-400 cursor-pointer inline-flex border border-gray-100 items-center justify-center gap-2 rounded-lg  px-4 py-2 text-xs font-light shadow-md text-gray-700 transition">
-            <Copy className="h-4 w-4" />
-            Copiar link
-          </button>
+          <CopyLinkButton url={host} />
           {/* {resource.asset.externalUrl || "No external URL available"} */}
         </div>
       </>
@@ -128,15 +174,15 @@ function ResourcePreview({ resource }: { resource: ResourceDetailDTO }) {
         </div>
         <div className="flex flex-col border-t border-slate-100 p-5 md:flex-row md:items-center justify-center">
           {resource.storage.fileUrl ? (
-            <Link
+            <a
               href={resource.storage.fileUrl}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="group mb-4 flex items-center justify-center cursor-pointer gap-1.5 px-3 py-1.5 border rounded-md text-sm font-medium shadow-sm transition-all duration-200 bg-white border-gray-200 text-gray-600 hover:border-green-300 hover:text-green-700 hover:bg-green-50"
             >
               <Eye className="h-4 w-4" />
               {resource.asset.format === "pdf" ? "Open PDF" : "Open image"}
-            </Link>
+            </a>
           ) : null}
         </div>
       </div>
@@ -169,20 +215,20 @@ function ResourcePreview({ resource }: { resource: ResourceDetailDTO }) {
         </div>
         <div className="flex gap-2 items-center justify-center mt-4">
           {resource.storage.fileUrl ? (
-            <Link
+            <a
               href={resource.storage.fileUrl}
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="text-center hover:bg-blue-100 hover:text-blue-500 hover:border-blue-400 inline-flex border border-gray-100 items-center justify-center gap-2 rounded-lg px-4 py-2 text-xs font-light shadow-md text-gray-700 transition"
             >
               <Eye className="h-4 w-4" />
               Abrir {resource.asset.format}
-            </Link>
+            </a>
           ) : null}
-          <button className="hover:bg-green-100  hover:text-green-700 hover:border-green-400 cursor-pointer inline-flex border border-gray-100 items-center justify-center gap-2 rounded-lg  px-4 py-2 text-xs font-light shadow-md text-gray-700 transition">
+          {/* <button className="hover:bg-green-100  hover:text-green-700 hover:border-green-400 cursor-pointer inline-flex border border-gray-100 items-center justify-center gap-2 rounded-lg  px-4 py-2 text-xs font-light shadow-md text-gray-700 transition">
             <FileText className="h-4 w-4" />
             Ver transcripción
-          </button>
+          </button> */}
         </div>
       </>
     );

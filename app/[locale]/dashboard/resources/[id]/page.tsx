@@ -8,6 +8,7 @@ import HeaderResource from "@/components/dashboard/resources/resourceDetails/Hea
 import PreviewResourceSection from "@/components/dashboard/resources/resourceDetails/PreviewResourceSection";
 import { TechnicalMetadataSection } from "@/components/dashboard/resources/resourceDetails/TechnicalMetadataSection";
 import { PedagogicalDetailsSection } from "@/components/dashboard/resources/resourceDetails/PedagogicalDetailsSection";
+import TranscriptionPreviewSection from "@/components/dashboard/resources/resourceDetails/TranscriptionPreviewSection";
 
 export default async function ResourcePage({
   params,
@@ -33,7 +34,9 @@ export default async function ResourcePage({
     { label: "Resources", href: `/${locale}/dashboard/resources` },
     { label: resource.title },
   ];
-
+  console.log("RAW RESOURCE:", rawResource);
+  console.log("DTO RESOURCE:", resource);
+  console.log(resource.storage.transcriptText);
   return (
     <div className="container mx-auto max-w-7xl px-4 py-8 text-slate-800 md:px-8">
       <Breadcrumbs items={breadcrumbItems} locale={locale} />
@@ -43,8 +46,15 @@ export default async function ResourcePage({
           <PreviewResourceSection resource={resource} locale={locale} />
           <TechnicalMetadataSection resource={resource} locale={locale} />
         </div>
-        <div className="col-span-3 flex flex-col gap-5">
+        <div className="col-span-3 flex flex-col gap-2">
           <HeaderResource resource={resource} locale={locale} />
+          {resource.asset.format === "audio" ? (
+            <TranscriptionPreviewSection
+              transcription={resource.storage.transcriptText}
+            />
+          ) : (
+            ""
+          )}
           <PedagogicalDetailsSection resource={resource} locale={locale} />
         </div>
       </div>

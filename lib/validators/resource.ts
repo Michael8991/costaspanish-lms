@@ -86,8 +86,9 @@ export const createResourceSchema = z
 
     status: z.enum(RESOURCE_STATUS).optional(),
     visibility: z.enum(RESOURCE_VISIBILITY).optional(),
-
+    
     pedagogicalType: z.enum(PEDAGOGICAL_TYPES),
+    transcriptText: z.string().trim().optional().default(""),
 
     levels: levelsArraySchema,
     skills: skillsArraySchema,
@@ -193,6 +194,7 @@ export const updateResourceSchema = z
     visibility: z.enum(RESOURCE_VISIBILITY).optional(),
 
     pedagogicalType: z.enum(PEDAGOGICAL_TYPES).optional(),
+    transcriptText: z.string().trim().optional().default(""),
 
     levels: z
       .array(z.enum(CEFR_LEVELS))

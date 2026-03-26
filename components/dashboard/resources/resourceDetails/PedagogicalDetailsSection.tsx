@@ -8,11 +8,16 @@ interface pedagogicalDetailsProps {
 
 const toDisplayLabel = (value: string) => {
   if (!value) return "";
+
   return value
     .replace(/[_-]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+    .split(" ")
+    .map((word) => {
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(" ");
 };
 
 function TagGroup({

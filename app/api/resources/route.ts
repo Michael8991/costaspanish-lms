@@ -563,6 +563,7 @@ export async function POST(req: NextRequest) {
       visibility: payload.visibility,
 
       pedagogicalType: payload.pedagogicalType,
+      transcriptText: payload.transcriptText,
       levels: payload.levels,
       skills: payload.skills,
       deliveryModes: payload.deliveryModes,

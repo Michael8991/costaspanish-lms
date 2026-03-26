@@ -58,6 +58,7 @@ export type AddResourcePayload = {
   visibility: ResourceVisibility;
 
   pedagogicalType: PedagogicalType;
+  transcriptText?: string;
   levels: CEFRLevel[];
   skills: SkillFocus[];
   deliveryModes: DeliveryModes[];
@@ -108,6 +109,7 @@ const addResourceSchema = z
     pedagogicalType: z.enum(PEDAGOGICAL_TYPES, {
       message: "Selecciona un tipo pedagógico.",
     }),
+    transcriptText: z.string().trim().optional().default(""),
     levels: z.array(z.enum(CEFR_LEVELS)).default([]),
     skills: z.array(z.enum(SKILL_FOCUS)).default([]),
     deliveryModes: z
@@ -396,6 +398,7 @@ export default function AddResourceForm({
       lessonStages: [],
       grammarTopicsInput: "",
       vocabularyTopicsInput: "",
+      transcriptText: "",
       tagsInput: "",
       hasAnswerKey: false,
       requiresTeacherReview: false,
@@ -617,6 +620,7 @@ export default function AddResourceForm({
       status: formData.status,
       visibility: formData.visibility,
       pedagogicalType: formData.pedagogicalType,
+      transcriptText: formData.transcriptText?.trim() || undefined,
       levels: formData.levels,
       skills: formData.skills,
       deliveryModes: formData.deliveryModes,
@@ -643,6 +647,7 @@ export default function AddResourceForm({
       externalUrl: formData.externalUrl || undefined,
     };
 
+    console.log("PAYLOAD FINAL:", payload);
     await onSubmit(payload);
   };
 
@@ -720,6 +725,9 @@ export default function AddResourceForm({
 
         <form
           onSubmit={handleSubmit(submitForm)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && step < 4) e.preventDefault();
+          }}
           className="grid gap-0 lg:grid-cols-[1.4fr_0.8fr]"
         >
           <div className="px-6 py-6 sm:px-8 sm:py-8">
@@ -816,12 +824,6 @@ export default function AddResourceForm({
                         />
                       </div>
                     </FormField>
-
-                    <InfoBox>
-                      Para un enlace externo no deben enviarse{" "}
-                      <code>fileUrl</code>,<code>storagePath</code> ni metadata
-                      de archivo local.
-                    </InfoBox>
                   </div>
                 )}
 
@@ -989,7 +991,21 @@ export default function AddResourceForm({
                         </div>
                       )}
                     </div>
-
+                    {(selectedFormat === "audio" ||
+                      selectedFormat === "video") && (
+                      <FormField
+                        label="Transcripción"
+                        hint="Opcional. Pega el texto completo del audio o vídeo."
+                        error={errors.transcriptText?.message}
+                      >
+                        <textarea
+                          rows={6}
+                          placeholder="Transcribe here the full content of the audio or video..."
+                          {...register("transcriptText")}
+                          className={inputClass(Boolean(errors.transcriptText))}
+                        />
+                      </FormField>
+                    )}
                     {!onUploadFile && (
                       <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5">
                         <div>
@@ -1462,11 +1478,6 @@ export default function AddResourceForm({
                     />
                   </div>
                 </div>
-
-                <InfoBox>
-                  El payload final sale normalizado: arrays sin duplicados, tags
-                  en minúsculas y validación condicional según formato.
-                </InfoBox>
               </section>
             )}
 
@@ -1475,7 +1486,7 @@ export default function AddResourceForm({
                 type="button"
                 onClick={goToPreviousStep}
                 disabled={step === 1}
-                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-40"
+                className="cursor-pointer inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-40"
               >
                 <ChevronLeft className="h-4 w-4" />
                 Atrás
@@ -1485,16 +1496,17 @@ export default function AddResourceForm({
                 <button
                   type="button"
                   onClick={goToNextStep}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
+                  className="cursor-pointer inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
                 >
                   Siguiente
                   <ChevronRight className="h-4 w-4" />
                 </button>
               ) : (
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleSubmit(submitForm)}
                   disabled={isSubmitting || isUploading}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-[#9e2727] px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-[#8d2323] disabled:opacity-60"
+                  className="cursor-pointer inline-flex items-center gap-2 rounded-2xl bg-[#9e2727] px-6 py-2.5 text-sm  text-white transition hover:bg-[#8d2323] disabled:opacity-60"
                 >
                   {(isSubmitting || isUploading) && (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -1642,14 +1654,6 @@ function FormField({
 function FieldError({ error }: { error?: string }) {
   if (!error) return null;
   return <p className="mt-2 text-sm text-red-600">{error}</p>;
-}
-
-function InfoBox({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900">
-      {children}
-    </div>
-  );
 }
 
 function SelectionGroup<T extends string>({
