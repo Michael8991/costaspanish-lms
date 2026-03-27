@@ -5,10 +5,12 @@ import {
   RESOURCE_VISIBILITY,
 } from "@/lib/constants/resource.constants";
 import { ResourceDetailDTO } from "@/lib/dto/resource.dto";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, RotateCcw, Save } from "lucide-react";
 import { FieldErrors, UseFormRegister } from "react-hook-form";
 import { EditFormValues } from "./FormSection";
 import { useRouter } from "next/navigation";
+import { ResourcePreview } from "../../resourceDetails/PreviewResourceSection";
+import CustomModal from "../../../../ui/CustomModal";
 
 interface SidebarInfoProps {
   resource: ResourceDetailDTO;
@@ -81,6 +83,7 @@ export default function SidebarInfo({
           <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
             Archivo
           </p>
+          <ResourcePreview resource={resource} />
           <div className="flex flex-col gap-2">
             <MetaItem
               label="Formato"
@@ -92,9 +95,7 @@ export default function SidebarInfo({
                 value={resource.asset.originalFilename}
               />
             )}
-            {resource.asset.mimeType && (
-              <MetaItem label="MIME" value={resource.asset.mimeType} />
-            )}
+
             {resource.asset.pageCount && (
               <MetaItem
                 label="Páginas"
@@ -108,9 +109,12 @@ export default function SidebarInfo({
               />
             )}
           </div>
-          <p className="text-[11px] text-slate-400">
-            El archivo no se puede cambiar desde aquí.
-          </p>
+          <div className="w-full flex items-center justify-center">
+            <button className="cursor-pointer bg-white hover:bg-blue-100 hover:text-blue-500 hover:border-blue-400 inline-flex border border-gray-100 items-center justify-center gap-2 rounded-lg px-4 py-2 text-xs font-light shadow-md text-gray-700 transition">
+              <RotateCcw size={14} />
+              Actualizar archivo
+            </button>
+          </div>
         </div>
 
         {/* Botones */}
@@ -140,6 +144,21 @@ export default function SidebarInfo({
           Cancelar
         </button>
       </div>
+      <CustomModal
+        isOpen={isArchiveModalOpen}
+        onClose={() => setIsArchiveModalOpen(false)}
+        title="Archivar material"
+      >
+        <div className="p-4">
+          <UpdateResourceFileForm
+            resource={resourceToArchive}
+            resourceName={resourceToArchiveName}
+            onSubmitForm={handleArchiveResource}
+            isSubmitting={isSubmittingArchiveResource}
+            onClose={() => setIsArchiveModalOpen(false)}
+          />
+        </div>
+      </CustomModal>
     </div>
   );
 }

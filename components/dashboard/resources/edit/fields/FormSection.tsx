@@ -97,14 +97,12 @@ export default function FormSection({
   const values = watch();
 
   const toggleField = (field: Path<EditFormValues>, value: string) => {
-    // 1. Obtenemos el valor actual y le aseguramos a TS que es un array de strings
     const current = (watch(field) as string[]) ?? [];
 
     const newValues = current.includes(value)
       ? current.filter((i) => i !== value)
       : [...current, value];
 
-    // 2. Usamos PathValue para mapear el tipo del valor al tipo del campo
     setValue(
       field,
       newValues as PathValue<EditFormValues, Path<EditFormValues>>,

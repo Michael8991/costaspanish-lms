@@ -96,7 +96,7 @@ export function truncateUrl(url: string, maxLength: number = 50): string {
   );
 }
 
-function ResourcePreview({ resource }: { resource: ResourceDetailDTO }) {
+export function ResourcePreview({ resource }: { resource: ResourceDetailDTO }) {
   const openHref =
     resource.asset.format === "external_link"
       ? resource.asset.externalUrl

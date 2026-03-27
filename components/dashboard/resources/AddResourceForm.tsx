@@ -5,10 +5,7 @@ import {
   DeliveryModes,
   FormatType,
   LessonStage,
-  ResourceStatus,
-  ResourceVisibility,
   SkillFocus,
-  PedagogicalType,
   RESOURCE_STATUS,
   RESOURCE_VISIBILITY,
   PEDAGOGICAL_TYPES,
@@ -16,7 +13,6 @@ import {
   SKILL_FOCUS,
   DELIVERY_MODES,
   LESSON_STAGES,
-  FORMAT_TYPES,
 } from "@/lib/constants/resource.constants";
 
 import { z } from "zod";
@@ -25,11 +21,6 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  ExternalLink,
-  FileAudio,
-  FileImage,
-  FileText,
-  Film,
   Link2,
   Loader2,
   Sparkles,
@@ -38,6 +29,20 @@ import {
 import React, { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  cn,
+  formatBytes,
+  getAcceptByFormat,
+  isValidUrl,
+  normalizeLooseStringArray,
+  toDisplayLabel,
+  toggleArrayValue,
+} from "@/lib/utils/form-helpers";
+import { SectionHeader } from "@/components/ui/addResourcesForm/FormSectionWrappers";
+import AddResourceFirstStep from "./addResourceFormComponents/AddResourceFirstStep";
+import { createResourceSchema } from "@/lib/validators/resource";
+import { CreateResourceInput } from "../../../lib/validators/resource";
+import { AddResourcePayload } from "@/lib/utils/resource-mappers";
 
 type UploadedResourceMeta = {
   storagePath?: string;
@@ -51,184 +56,146 @@ type UploadedResourceMeta = {
   fileSizeBytes?: number;
 };
 
-export type AddResourcePayload = {
-  title: string;
-  description: string;
-  status: ResourceStatus;
-  visibility: ResourceVisibility;
-
-  pedagogicalType: PedagogicalType;
-  transcriptText?: string;
-  levels: CEFRLevel[];
-  skills: SkillFocus[];
-  deliveryModes: DeliveryModes[];
-  lessonStage: LessonStage[];
-
-  grammarTopics: string[];
-  vocabularyTopics: string[];
-  tags: string[];
-
-  estimatedDurationMinutes?: number;
-  difficulty?: number;
-
-  hasAnswerKey: boolean;
-  requiresTeacherReview: boolean;
-
-  format: FormatType;
-
-  storagePath?: string;
-  fileUrl?: string;
-  originalFilename?: string;
-  mimeType?: string;
-  fileSizeBytes?: number;
-  pageCount?: number;
-  durationSeconds?: number;
-  thumbnailUrl?: string;
-  thumbnailStoragePath?: string;
-
-  externalUrl?: string;
-};
-
 type Step = 1 | 2 | 3 | 4;
 
-const addResourceSchema = z
-  .object({
-    title: z
-      .string()
-      .trim()
-      .min(3, "El título debe tener al menos 3 caracteres.")
-      .max(180, "Máximo 180 caracteres."),
-    description: z
-      .string()
-      .trim()
-      .max(3000, "Máximo 3000 caracteres.")
-      .default(""),
-    status: z.enum(RESOURCE_STATUS).default("draft"),
-    visibility: z.enum(RESOURCE_VISIBILITY).default("private"),
+// const addResourceSchema = z
+//   .object({
+//     title: z
+//       .string()
+//       .trim()
+//       .min(3, "El título debe tener al menos 3 caracteres.")
+//       .max(180, "Máximo 180 caracteres."),
+//     description: z
+//       .string()
+//       .trim()
+//       .max(3000, "Máximo 3000 caracteres.")
+//       .default(""),
+//     status: z.enum(RESOURCE_STATUS).default("draft"),
+//     visibility: z.enum(RESOURCE_VISIBILITY).default("private"),
 
-    pedagogicalType: z.enum(PEDAGOGICAL_TYPES, {
-      message: "Selecciona un tipo pedagógico.",
-    }),
-    transcriptText: z.string().trim().optional().default(""),
-    levels: z.array(z.enum(CEFR_LEVELS)).default([]),
-    skills: z.array(z.enum(SKILL_FOCUS)).default([]),
-    deliveryModes: z
-      .array(z.enum(DELIVERY_MODES))
-      .default(["classwork", "homework"]),
-    lessonStages: z.array(z.enum(LESSON_STAGES)).default([]),
+//     pedagogicalType: z.enum(PEDAGOGICAL_TYPES, {
+//       message: "Selecciona un tipo pedagógico.",
+//     }),
+//     transcriptText: z.string().trim().optional().default(""),
+//     levels: z.array(z.enum(CEFR_LEVELS)).default([]),
+//     skills: z.array(z.enum(SKILL_FOCUS)).default([]),
+//     deliveryModes: z
+//       .array(z.enum(DELIVERY_MODES))
+//       .default(["classwork", "homework"]),
+//     lessonStages: z.array(z.enum(LESSON_STAGES)).default([]),
 
-    grammarTopicsInput: z.string().max(500).default(""),
-    vocabularyTopicsInput: z.string().max(500).default(""),
-    tagsInput: z.string().max(500).default(""),
+//     grammarTopicsInput: z.string().max(500).default(""),
+//     vocabularyTopicsInput: z.string().max(500).default(""),
+//     tagsInput: z.string().max(500).default(""),
 
-    estimatedDurationMinutes: z.number().min(1).max(180).optional(),
-    difficulty: z.number().min(1).max(5).optional(),
+//     estimatedDurationMinutes: z.number().min(1).max(180).optional(),
+//     difficulty: z.number().min(1).max(5).optional(),
 
-    hasAnswerKey: z.boolean().default(false),
-    requiresTeacherReview: z.boolean().default(false),
+//     hasAnswerKey: z.boolean().default(false),
+//     requiresTeacherReview: z.boolean().default(false),
 
-    format: z.enum(FORMAT_TYPES, {
-      message: "Selecciona un formato.",
-    }),
+//     format: z.enum(FORMAT_TYPES, {
+//       message: "Selecciona un formato.",
+//     }),
 
-    storagePath: z.string().trim().max(500).optional().or(z.literal("")),
-    fileUrl: z.string().trim().max(1200).optional().or(z.literal("")),
-    originalFilename: z.string().trim().max(255).optional().or(z.literal("")),
-    mimeType: z.string().trim().max(120).optional().or(z.literal("")),
-    fileSizeBytes: z.number().min(0).optional(),
-    pageCount: z.number().min(1).optional(),
-    durationSeconds: z.number().min(1).optional(),
-    thumbnailUrl: z.string().trim().max(1200).optional().or(z.literal("")),
-    thumbnailStoragePath: z
-      .string()
-      .trim()
-      .max(500)
-      .optional()
-      .or(z.literal("")),
+//     storagePath: z.string().trim().max(500).optional().or(z.literal("")),
+//     fileUrl: z.string().trim().max(1200).optional().or(z.literal("")),
+//     originalFilename: z.string().trim().max(255).optional().or(z.literal("")),
+//     mimeType: z.string().trim().max(120).optional().or(z.literal("")),
+//     fileSizeBytes: z.number().min(0).optional(),
+//     pageCount: z.number().min(1).optional(),
+//     durationSeconds: z.number().min(1).optional(),
+//     thumbnailUrl: z.string().trim().max(1200).optional().or(z.literal("")),
+//     thumbnailStoragePath: z
+//       .string()
+//       .trim()
+//       .max(500)
+//       .optional()
+//       .or(z.literal("")),
 
-    externalUrl: z.string().trim().max(1200).optional().or(z.literal("")),
-  })
-  .superRefine((data, ctx) => {
-    const isExternal = data.format === "external_link";
+//     externalUrl: z.string().trim().max(1200).optional().or(z.literal("")),
+//   })
+//   .superRefine((data, ctx) => {
+//     const isExternal = data.format === "external_link";
 
-    if (isExternal) {
-      if (!data.externalUrl) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["externalUrl"],
-          message: "Introduce la URL externa del recurso.",
-        });
-      } else if (!isValidUrl(data.externalUrl)) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["externalUrl"],
-          message: "La URL externa no es válida.",
-        });
-      }
+//     if (isExternal) {
+//       if (!data.externalUrl) {
+//         ctx.addIssue({
+//           code: "custom",
+//           path: ["externalUrl"],
+//           message: "Introduce la URL externa del recurso.",
+//         });
+//       } else if (!isValidUrl(data.externalUrl)) {
+//         ctx.addIssue({
+//           code: "custom",
+//           path: ["externalUrl"],
+//           message: "La URL externa no es válida.",
+//         });
+//       }
 
-      if (data.fileUrl || data.storagePath) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["format"],
-          message: "Un recurso externo no debe llevar fileUrl ni storagePath.",
-        });
-      }
-    } else {
-      if (!data.fileUrl && !data.storagePath) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["fileUrl"],
-          message:
-            "Para un recurso subido necesitas al menos fileUrl o storagePath.",
-        });
-      }
+//       if (data.fileUrl || data.storagePath) {
+//         ctx.addIssue({
+//           code: "custom",
+//           path: ["format"],
+//           message: "Un recurso externo no debe llevar fileUrl ni storagePath.",
+//         });
+//       }
+//     } else {
+//       if (!data.fileUrl && !data.storagePath) {
+//         ctx.addIssue({
+//           code: "custom",
+//           path: ["fileUrl"],
+//           message:
+//             "Para un recurso subido necesitas al menos fileUrl o storagePath.",
+//         });
+//       }
 
-      if (data.externalUrl) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["externalUrl"],
-          message: "externalUrl solo está permitido en external_link.",
-        });
-      }
-    }
+//       if (data.externalUrl) {
+//         ctx.addIssue({
+//           code: "custom",
+//           path: ["externalUrl"],
+//           message: "externalUrl solo está permitido en external_link.",
+//         });
+//       }
+//     }
 
-    if (data.format === "pdf") {
-      if (!data.fileUrl) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["fileUrl"],
-          message: "El PDF necesita fileUrl.",
-        });
-      }
+//     if (data.format === "pdf") {
+//       if (!data.fileUrl) {
+//         ctx.addIssue({
+//           code: "custom",
+//           path: ["fileUrl"],
+//           message: "El PDF necesita fileUrl.",
+//         });
+//       }
 
-      if (!data.thumbnailUrl) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["thumbnailUrl"],
-          message:
-            "El PDF necesita thumbnailUrl para la miniatura en biblioteca.",
-        });
-      }
-    }
+//       if (!data.thumbnailUrl) {
+//         ctx.addIssue({
+//           code: "custom",
+//           path: ["thumbnailUrl"],
+//           message:
+//             "El PDF necesita thumbnailUrl para la miniatura en biblioteca.",
+//         });
+//       }
+//     }
 
-    if (data.format === "pdf" && data.durationSeconds) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["durationSeconds"],
-        message: "durationSeconds solo aplica a audio o video.",
-      });
-    }
+//     if (data.format === "pdf" && data.durationSeconds) {
+//       ctx.addIssue({
+//         code: "custom",
+//         path: ["durationSeconds"],
+//         message: "durationSeconds solo aplica a audio o video.",
+//       });
+//     }
 
-    if (data.format !== "pdf" && typeof data.pageCount === "number") {
-      ctx.addIssue({
-        code: "custom",
-        path: ["pageCount"],
-        message: "pageCount solo aplica a PDF.",
-      });
-    }
-  });
+//     if (data.format !== "pdf" && typeof data.pageCount === "number") {
+//       ctx.addIssue({
+//         code: "custom",
+//         path: ["pageCount"],
+//         message: "pageCount solo aplica a PDF.",
+//       });
+//     }
+//   });
 
-type AddResourceFormValues = z.infer<typeof addResourceSchema>;
+type CreateResourceValues = z.infer<typeof createResourceSchema>;
 
 type AddResourceFormProps = {
   onSubmit: (payload: AddResourcePayload) => Promise<void> | void;
@@ -236,76 +203,8 @@ type AddResourceFormProps = {
     file: File,
     format: Exclude<FormatType, "external_link">,
   ) => Promise<UploadedResourceMeta>;
-  initialValues?: Partial<AddResourceFormValues>;
+  initialValues?: Partial<CreateResourceValues>;
 };
-
-/* ==================== */
-//!Helpers
-/* ==================== */
-
-function cn(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(" ");
-}
-
-function toDisplayLabel(value: string) {
-  return value
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function normalizeLooseStringArray(values: string): string[] {
-  return [
-    ...new Set(
-      values
-        .split(",")
-        .map((item) => item.trim().toLowerCase())
-        .filter(Boolean),
-    ),
-  ];
-}
-
-function isValidUrl(value?: string) {
-  if (!value) return false;
-  try {
-    new URL(value);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function formatBytes(bytes?: number) {
-  if (!bytes || bytes <= 0) return "-";
-  const units = ["B", "KB", "MB", "GB"];
-  let size = bytes;
-  let unitIndex = 0;
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024;
-    unitIndex += 1;
-  }
-  return `${size.toFixed(size >= 10 ? 0 : 1)} ${units[unitIndex]}`;
-}
-
-function getAcceptByFormat(format?: FormatType) {
-  switch (format) {
-    case "pdf":
-      return ".pdf,application/pdf";
-    case "image":
-      return "image/*";
-    case "audio":
-      return "audio/*";
-    case "video":
-      return "video/*";
-    default:
-      return "*/*";
-  }
-}
-
-function toggleArrayValue<T>(current: T[], value: T): T[] {
-  return current.includes(value)
-    ? current.filter((item) => item !== value)
-    : [...current, value];
-}
 
 const STEP_META: Record<Step, { title: string; hint: string }> = {
   1: {
@@ -325,44 +224,6 @@ const STEP_META: Record<Step, { title: string; hint: string }> = {
     hint: "Comprueba el resumen antes de guardar.",
   },
 };
-
-const FORMAT_CARDS: Array<{
-  value: FormatType;
-  title: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-}> = [
-  {
-    value: "pdf",
-    title: "PDF",
-    description: "Worksheets, readings, grammar sheets o fichas imprimibles.",
-    icon: FileText,
-  },
-  {
-    value: "image",
-    title: "Imagen",
-    description: "Flashcards, infografías, pósters visuales o capturas.",
-    icon: FileImage,
-  },
-  {
-    value: "audio",
-    title: "Audio",
-    description: "Listening tracks, dictados o pronunciación.",
-    icon: FileAudio,
-  },
-  {
-    value: "video",
-    title: "Vídeo",
-    description: "Video clips, explicaciones o tareas audiovisuales.",
-    icon: Film,
-  },
-  {
-    value: "external_link",
-    title: "Enlace externo",
-    description: "YouTube, Drive, article, app o recurso alojado fuera.",
-    icon: ExternalLink,
-  },
-];
 
 export default function AddResourceForm({
   onSubmit,
@@ -384,8 +245,8 @@ export default function AddResourceForm({
     trigger,
     resetField,
     formState: { errors, isSubmitting },
-  } = useForm<z.input<typeof addResourceSchema>>({
-    resolver: zodResolver(addResourceSchema),
+  } = useForm<z.input<typeof createResourceSchema>>({
+    resolver: zodResolver(createResourceSchema),
     mode: "onTouched",
     defaultValues: {
       title: "",
@@ -396,10 +257,10 @@ export default function AddResourceForm({
       skills: [],
       deliveryModes: ["classwork", "homework"],
       lessonStages: [],
-      grammarTopicsInput: "",
-      vocabularyTopicsInput: "",
+      grammarTopics: initialValues?.grammarTopics ?? [],
+      vocabularyTopics: initialValues?.vocabularyTopics ?? [],
       transcriptText: "",
-      tagsInput: "",
+      tags: initialValues?.vocabularyTopics ?? [],
       hasAnswerKey: false,
       requiresTeacherReview: false,
       storagePath: "",
@@ -612,24 +473,24 @@ export default function AddResourceForm({
     // }
   };
 
-  const submitForm = async (rawFormData: z.input<typeof addResourceSchema>) => {
-    const formData = rawFormData as AddResourceFormValues;
+  const submitForm = async (
+    rawFormData: z.input<typeof createResourceSchema>,
+  ) => {
+    const formData = rawFormData as CreateResourceValues;
     const payload: AddResourcePayload = {
       title: formData.title.trim(),
       description: formData.description.trim(),
-      status: formData.status,
-      visibility: formData.visibility,
+      status: formData.status ?? "draft",
+      visibility: formData.visibility ?? "private",
       pedagogicalType: formData.pedagogicalType,
       transcriptText: formData.transcriptText?.trim() || undefined,
       levels: formData.levels,
       skills: formData.skills,
       deliveryModes: formData.deliveryModes,
       lessonStage: formData.lessonStages, //?pllural o singular en singular deberia cambiarlo en el modelo tmb?
-      grammarTopics: normalizeLooseStringArray(formData.grammarTopicsInput),
-      vocabularyTopics: normalizeLooseStringArray(
-        formData.vocabularyTopicsInput,
-      ),
-      tags: normalizeLooseStringArray(formData.tagsInput),
+      grammarTopics: formData.grammarTopics,
+      vocabularyTopics: formData.vocabularyTopics,
+      tags: formData.tags,
       estimatedDurationMinutes: formData.estimatedDurationMinutes,
       difficulty: formData.difficulty,
       hasAnswerKey: formData.hasAnswerKey,
@@ -653,11 +514,11 @@ export default function AddResourceForm({
 
   return (
     <div className="mx-auto w-full max-w-5xl mt-5">
-      <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_20px_70px_-35px_rgba(15,23,42,0.25)]">
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_20px_70px_-35px_rgba(15,23,42,0.25)]">
         <div className="border-b border-slate-100 bg-linear-to-r from-slate-50 via-white to-red-50/40 px-6 py-6 sm:px-8">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-red-100 bg-red-50 px-3 py-1 text-xs font-medium text-red-700">
+              <div className="mb-2 inline-flex items-center gap-2 rounded-lg border border-red-100 bg-red-50 px-3 py-1 text-xs font-medium text-red-700">
                 <Sparkles className="h-3.5 w-3.5" />
                 Biblioteca de recursos
               </div>
@@ -731,64 +592,7 @@ export default function AddResourceForm({
           className="grid gap-0 lg:grid-cols-[1.4fr_0.8fr]"
         >
           <div className="px-6 py-6 sm:px-8 sm:py-8">
-            {step === 1 && (
-              <section className="space-y-6">
-                <SectionHeader
-                  title="¿Qué tipo de material quieres añadir?"
-                  description="Selecciona el formato principal. El siguiente paso cambia automáticamente según la elección."
-                />
-
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {FORMAT_CARDS.map((card) => {
-                    const Icon = card.icon;
-                    const selected = values.format === card.value;
-
-                    return (
-                      <button
-                        key={card.value}
-                        type="button"
-                        onClick={() => handleFormatSelection(card.value)}
-                        className={cn(
-                          "group rounded-3xl border p-5 text-left transition-all",
-                          "hover:-translate-y-0.5 hover:shadow-lg",
-                          selected
-                            ? "border-[#9e2727] bg-red-50 ring-2 ring-red-100"
-                            : "border-slate-200 bg-white hover:border-slate-300",
-                        )}
-                      >
-                        <div className="mb-4 flex items-start justify-between">
-                          <div
-                            className={cn(
-                              "inline-flex rounded-2xl p-3",
-                              selected
-                                ? "bg-[#9e2727] text-white"
-                                : "bg-slate-100 text-slate-700",
-                            )}
-                          >
-                            <Icon className="h-5 w-5" />
-                          </div>
-
-                          {selected && (
-                            <span className="rounded-full bg-[#9e2727] px-2.5 py-1 text-xs font-medium text-white">
-                              Seleccionado
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="mb-1 text-base font-semibold text-slate-900">
-                          {card.title}
-                        </div>
-                        <p className="text-sm leading-6 text-slate-600">
-                          {card.description}
-                        </p>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <FieldError error={errors.format?.message} />
-              </section>
-            )}
+            {step === 1 && <AddResourceFirstStep />}
 
             {step === 2 && (
               <section className="space-y-6">
@@ -922,7 +726,11 @@ export default function AddResourceForm({
                             />
                             <MetaRow
                               label="Tamaño"
-                              value={formatBytes(values.fileSizeBytes)}
+                              value={
+                                typeof values.fileSizeBytes === "number"
+                                  ? formatBytes(values.fileSizeBytes)
+                                  : "0 B"
+                              }
                             />
                             <MetaRow
                               label="fileUrl"
@@ -1295,41 +1103,39 @@ export default function AddResourceForm({
                   <FormField
                     label="Grammar topics"
                     hint="Separados por comas."
-                    error={errors.grammarTopicsInput?.message}
+                    error={errors.grammarTopics?.message}
                   >
                     <input
                       type="text"
                       placeholder="past simple, irregular verbs"
-                      {...register("grammarTopicsInput")}
-                      className={inputClass(Boolean(errors.grammarTopicsInput))}
+                      {...register("grammarTopics")}
+                      className={inputClass(Boolean(errors.grammarTopics))}
                     />
                   </FormField>
 
                   <FormField
                     label="Vocabulary topics"
                     hint="Separados por comas."
-                    error={errors.vocabularyTopicsInput?.message}
+                    error={errors.vocabularyTopics?.message}
                   >
                     <input
                       type="text"
                       placeholder="travel, holidays, transport"
-                      {...register("vocabularyTopicsInput")}
-                      className={inputClass(
-                        Boolean(errors.vocabularyTopicsInput),
-                      )}
+                      {...register("vocabularyTopics")}
+                      className={inputClass(Boolean(errors.vocabularyTopics))}
                     />
                   </FormField>
 
                   <FormField
                     label="Tags"
                     hint="Separados por comas."
-                    error={errors.tagsInput?.message}
+                    error={errors.tags?.message}
                   >
                     <input
                       type="text"
                       placeholder="b1, worksheet, exam prep"
-                      {...register("tagsInput")}
-                      className={inputClass(Boolean(errors.tagsInput))}
+                      {...register("tags")}
+                      className={inputClass(Boolean(errors.tags))}
                     />
                   </FormField>
                 </div>
@@ -1462,19 +1268,31 @@ export default function AddResourceForm({
                     />
                     <ReviewTags
                       title="Grammar topics"
-                      items={normalizeLooseStringArray(
-                        values.grammarTopicsInput || "",
-                      )}
+                      items={
+                        Array.isArray(values.grammarTopics)
+                          ? values.grammarTopics
+                          : normalizeLooseStringArray(
+                              values.grammarTopics || "",
+                            )
+                      }
                     />
                     <ReviewTags
                       title="Vocabulary topics"
-                      items={normalizeLooseStringArray(
-                        values.vocabularyTopicsInput || "",
-                      )}
+                      items={
+                        Array.isArray(values.vocabularyTopics)
+                          ? values.vocabularyTopics
+                          : normalizeLooseStringArray(
+                              values.vocabularyTopics || "",
+                            )
+                      }
                     />
                     <ReviewTags
                       title="Tags"
-                      items={normalizeLooseStringArray(values.tagsInput || "")}
+                      items={
+                        Array.isArray(values.tags)
+                          ? values.tags
+                          : normalizeLooseStringArray(values.tags || "")
+                      }
                     />
                   </div>
                 </div>
@@ -1552,7 +1370,11 @@ export default function AddResourceForm({
                   />
                   <MetaRow
                     label="Peso"
-                    value={formatBytes(values.fileSizeBytes)}
+                    value={
+                      typeof values.fileSizeBytes === "number"
+                        ? formatBytes(values.fileSizeBytes)
+                        : "0 B"
+                    }
                   />
                   <MetaRow
                     label="Estado"
@@ -1603,25 +1425,6 @@ function inputClass(hasError: boolean) {
     hasError
       ? "border-red-300 ring-2 ring-red-100"
       : "border-slate-200 focus:border-slate-400",
-  );
-}
-
-function SectionHeader({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <div>
-      <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
-        {title}
-      </h2>
-      <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-        {description}
-      </p>
-    </div>
   );
 }
 

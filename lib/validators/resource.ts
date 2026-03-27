@@ -14,25 +14,45 @@ const objectIdRegex = /^[a-f\d]{24}$/i;
 
 const dedupe = <T>(items: T[]) => [...new Set(items)];
 
-const optionalTrimmedString = (max = 3000) =>
-  z.preprocess(
-    (value) => {
-      if (typeof value !== "string") return value;
-      const trimmed = value.trim();
-      return trimmed === "" ? undefined : trimmed;
-    },
-    z.string().max(max).optional()
-  );
+// const optionalTrimmedString = (max = 3000) =>
+//   z.preprocess(
+//     (value) => {
+//       if (typeof value !== "string") return value;
+//       const trimmed = value.trim();
+//       return trimmed === "" ? undefined : trimmed;
+//     },
+//     z.string().max(max).optional()
+// );
+// const optionalUrlString = () =>
+// const  = () =>
+//   z.preprocess(
+//     (value) => {
+  //       if (typeof value !== "string") return value;
+  //       const trimmed = value.trim();
+  //       return trimmed === "" ? undefined : trimmed;
+  //     },
+  //     z.string().url().optional()
+//   );
+  
+// Modificaciones
+  const optionalTrimmedString = (max = 3000) =>
+    z.string()
+      .trim()
+      .max(max)
+      .or(z.literal(""))
+      .optional()
+      .default("")
+      .transform(val => val === "" ? undefined : val);
+  
+  const optionalUrlString = () =>
+    z.string()
+      .url("URL no válida")
+      .or(z.literal(""))
+      .optional()
+      .default("")
+      .transform(val => val === "" ? undefined : val);
 
-const optionalUrlString = () =>
-  z.preprocess(
-    (value) => {
-      if (typeof value !== "string") return value;
-      const trimmed = value.trim();
-      return trimmed === "" ? undefined : trimmed;
-    },
-    z.string().url().optional()
-  );
+
 
 const normalizedLooseStringArray = z
   .array(z.string().trim().toLowerCase().min(1).max(80))

@@ -1,4 +1,5 @@
 import FormSection from "@/components/dashboard/resources/edit/fields/FormSection";
+import Breadcrumbs from "@/components/ui/Breadcrumbs";
 import { ResourceDetailDTO, toResourceDetailDTO } from "@/lib/dto/resource.dto";
 import dbConnect from "@/lib/mongo";
 import { Resource } from "@/models/ResourceProfile";
@@ -31,5 +32,11 @@ export default async function EditResourcePage({
     { label: "Editing" },
   ];
 
-  return <FormSection resource={resource} locale={locale} />;
+  return (
+    <div className="container mx-auto max-w-7xl px-4 py-8 text-slate-800 md:px-8">
+      <Breadcrumbs items={breadcrumbItems} locale={locale} />
+      <h1 className="text-2xl">Panel de edición de recurso</h1>
+      <FormSection resource={resource} locale={locale} />
+    </div>
+  );
 }
