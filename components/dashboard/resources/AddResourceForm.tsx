@@ -27,7 +27,7 @@ import {
   UploadCloud,
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
-import { useForm } from "react-hook-form";
+import { FormProvider, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   cn,
@@ -43,8 +43,10 @@ import AddResourceFirstStep from "./addResourceFormComponents/AddResourceFirstSt
 import { createResourceSchema } from "@/lib/validators/resource";
 import { CreateResourceInput } from "../../../lib/validators/resource";
 import { AddResourcePayload } from "@/lib/utils/resource-mappers";
+import { useAddResourceForm } from "@/lib/hooks/useCreateResource";
+import AddResourceSecondStep from "./addResourceFormComponents/AddResourceSecondStep";
 
-type UploadedResourceMeta = {
+export type UploadedResourceMeta = {
   storagePath?: string;
   fileUrl?: string;
   originalFilename?: string;
@@ -195,7 +197,7 @@ type Step = 1 | 2 | 3 | 4;
 //     }
 //   });
 
-type CreateResourceValues = z.infer<typeof createResourceSchema>;
+export type CreateResourceValues = z.infer<typeof createResourceSchema>;
 
 type AddResourceFormProps = {
   onSubmit: (payload: AddResourcePayload) => Promise<void> | void;
@@ -230,12 +232,10 @@ export default function AddResourceForm({
   onUploadFile,
   initialValues,
 }: AddResourceFormProps) {
-  const [step, setStep] = useState<Step>(1);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState<string>("");
   const [uploadError, setUploadError] = useState<string>("");
   const inputFileRef = useRef<HTMLInputElement | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
 
   const {
     register,
@@ -260,7 +260,7 @@ export default function AddResourceForm({
       grammarTopics: initialValues?.grammarTopics ?? [],
       vocabularyTopics: initialValues?.vocabularyTopics ?? [],
       transcriptText: "",
-      tags: initialValues?.vocabularyTopics ?? [],
+      tags: initialValues?.tags ?? [],
       hasAnswerKey: false,
       requiresTeacherReview: false,
       storagePath: "",
@@ -271,6 +271,12 @@ export default function AddResourceForm({
       thumbnailStoragePath: "",
       externalUrl: "",
       ...initialValues,
+    },
+  });
+
+  const { form, step, handleFormatSelection, setStep } = useAddResourceForm({
+    onSubmit: async (payload) => {
+      console.log("¡Enviando datos a Mongo!", payload);
     },
   });
 
@@ -319,77 +325,6 @@ export default function AddResourceForm({
     if (step > 1) setStep((prev) => (prev - 1) as Step);
   };
 
-  const processFile = async (file: File) => {
-    if (!file || !selectedFormat || selectedFormat === "external_link") return;
-
-    setUploadError("");
-    setUploadMessage("");
-
-    setValue("originalFilename", file.name, { shouldDirty: true });
-    setValue("mimeType", file.type, { shouldDirty: true });
-    setValue("fileSizeBytes", file.size, { shouldDirty: true });
-
-    if (!onUploadFile) {
-      setUploadMessage("Archivo detectado. Falta conectar Firebase.");
-      return;
-    }
-
-    try {
-      setIsUploading(true);
-      const result = await onUploadFile(file, selectedFormat);
-
-      setValue("storagePath", result.storagePath ?? "", {
-        shouldValidate: true,
-      });
-      setValue("fileUrl", result.fileUrl ?? "", { shouldValidate: true });
-      setValue("thumbnailUrl", result.thumbnailUrl ?? "", {
-        shouldValidate: true,
-      });
-      setValue("thumbnailStoragePath", result.thumbnailStoragePath ?? "", {
-        shouldValidate: true,
-      });
-
-      if (result.pageCount) setValue("pageCount", result.pageCount);
-      if (result.durationSeconds)
-        setValue("durationSeconds", result.durationSeconds);
-
-      setUploadMessage("¡Archivo procesado con éxito!");
-      await trigger(getStepFields(2, selectedFormat));
-    } catch (error) {
-      setUploadError(
-        error instanceof Error ? error.message : "Error al procesar",
-      );
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
-  const handleDropFinal = (e: React.DragEvent) => {
-    setIsDragging(false);
-    handleDrop(e);
-  };
-
-  const handleDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const file = e.dataTransfer.files?.[0];
-    if (file) processFile(file);
-  };
-
-  const handleFormatSelection = (format: FormatType) => {
-    setValue("format", format, { shouldValidate: true, shouldDirty: true });
-    if (step === 1) setStep(2);
-  };
-
   const handleMultiToggle = <
     T extends CEFRLevel | SkillFocus | DeliveryModes | LessonStage,
   >(
@@ -402,75 +337,6 @@ export default function AddResourceForm({
       shouldValidate: true,
       shouldDirty: true,
     });
-  };
-
-  const handleRemoveUploadedData = () => {
-    setUploadError("");
-    setUploadMessage("");
-    resetField("storagePath");
-    resetField("fileUrl");
-    resetField("originalFilename");
-    resetField("mimeType");
-    resetField("fileSizeBytes");
-    resetField("pageCount");
-    resetField("durationSeconds");
-    resetField("thumbnailUrl");
-    resetField("thumbnailStoragePath");
-  };
-
-  const handlePickFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) processFile(file);
-    // if (!file || !selectedFormat || selectedFormat === "external_link") return;
-    // setUploadError("");
-    // setUploadMessage("");
-
-    // setValue("originalFilename", file.name, { shouldDirty: true });
-    // setValue("mimeType", file.type || "", { shouldDirty: true });
-    // setValue("fileSizeBytes", file.size, { shouldDirty: true });
-
-    // if (!onUploadFile) {
-    //   setUploadMessage(
-    //     "Archivo detectado. Falta conectar onUploadFile para rellenar fileUrl/storagePath automáticamente.",
-    //   );
-    //   return;
-    // }
-    // try {
-    //   setIsUploading(true);
-    //   const result = await onUploadFile(file, selectedFormat);
-
-    //   setValue("storagePath", result.storagePath ?? "", {
-    //     shouldValidate: true,
-    //   });
-    //   setValue("fileUrl", result.fileUrl ?? "", { shouldValidate: true });
-    //   setValue("originalFilename", result.originalFilename ?? file.name, {
-    //     shouldDirty: true,
-    //   });
-    //   setValue("mimeType", result.mimeType ?? file.type ?? "", {
-    //     shouldDirty: true,
-    //   });
-    //   setValue("fileSizeBytes", result.fileSizeBytes ?? file.size, {
-    //     shouldDirty: true,
-    //   });
-    //   setValue("pageCount", result.pageCount, { shouldDirty: true });
-    //   setValue("durationSeconds", result.durationSeconds, {
-    //     shouldDirty: true,
-    //   });
-    //   setValue("thumbnailUrl", result.thumbnailUrl ?? "", {
-    //     shouldValidate: true,
-    //   });
-
-    //   setUploadMessage("Archivo procesado correctamente.");
-    //   await trigger(getStepFields(2, selectedFormat));
-    // } catch (error) {
-    //   setUploadError(
-    //     error instanceof Error
-    //       ? error.message
-    //       : "No se pudo procesar el archivo.",
-    //   );
-    // } finally {
-    //   setIsUploading(false);
-    // }
   };
 
   const submitForm = async (
@@ -583,808 +449,446 @@ export default function AddResourceForm({
             })}
           </div>
         </div>
-
-        <form
-          onSubmit={handleSubmit(submitForm)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && step < 4) e.preventDefault();
-          }}
-          className="grid gap-0 lg:grid-cols-[1.4fr_0.8fr]"
-        >
-          <div className="px-6 py-6 sm:px-8 sm:py-8">
-            {step === 1 && <AddResourceFirstStep />}
-
-            {step === 2 && (
-              <section className="space-y-6">
-                <SectionHeader
-                  title="Contenido del recurso"
-                  description={
-                    selectedFormat === "external_link"
-                      ? "Añade la URL del recurso externo."
-                      : "Sube el archivo. El formulario puede rellenar automáticamente la metadata técnica."
-                  }
+        <FormProvider {...form}>
+          <form
+            onSubmit={handleSubmit(submitForm)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && step < 4) e.preventDefault();
+            }}
+            className="grid gap-0 lg:grid-cols-[1.4fr_0.8fr]"
+          >
+            <div className="px-6 py-6 sm:px-8 sm:py-8">
+              {step === 1 && (
+                <AddResourceFirstStep
+                  selectedFormat={watch("format")}
+                  errorMessage={errors.format?.message}
+                  onSelectFormat={handleFormatSelection}
                 />
+              )}
 
-                {!selectedFormat && (
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                    Primero selecciona un formato en el paso 1.
-                  </div>
-                )}
+              {step === 2 && (
+                <AddResourceSecondStep
+                  selectedFormat={selectedFormat}
+                  uploadMessage=""
+                  uploadError={uploadError}
+                />
+              )}
 
-                {selectedFormat === "external_link" && (
-                  <div className="space-y-4">
+              {step === 3 && (
+                <section className="space-y-8">
+                  <SectionHeader
+                    title="Detalles pedagógicos"
+                    description="Esta parte marca la diferencia entre una biblioteca caótica y una biblioteca reutilizable."
+                  />
+
+                  <div className="grid gap-5 sm:grid-cols-2">
                     <FormField
-                      label="URL externa"
-                      hint="Ejemplo: YouTube, Google Drive, artículo o herramienta web."
-                      error={errors.externalUrl?.message}
+                      label="Título"
+                      hint="Nombre corto, claro y fácil de encontrar."
+                      error={errors.title?.message}
+                      required
                     >
-                      <div className="relative">
-                        <Link2 className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 ps-5 -translate-y-1/2 text-slate-400" />
-                        <input
-                          type="url"
-                          placeholder="https://..."
-                          {...register("externalUrl")}
-                          className={inputClass(Boolean(errors.externalUrl))}
-                        />
-                      </div>
+                      <input
+                        type="text"
+                        placeholder="Past Simple - Reading Worksheet"
+                        {...register("title")}
+                        className={inputClass(Boolean(errors.title))}
+                      />
+                    </FormField>
+
+                    <FormField
+                      label="Tipo pedagógico"
+                      error={errors.pedagogicalType?.message}
+                      required
+                    >
+                      <select
+                        {...register("pedagogicalType")}
+                        className={inputClass(Boolean(errors.pedagogicalType))}
+                      >
+                        <option value="">Selecciona una opción</option>
+                        {PEDAGOGICAL_TYPES.map((type) => (
+                          <option key={type} value={type}>
+                            {toDisplayLabel(type)}
+                          </option>
+                        ))}
+                      </select>
                     </FormField>
                   </div>
-                )}
 
-                {selectedFormat && selectedFormat !== "external_link" && (
-                  <div className="space-y-6">
-                    <div className="rounded-3xl border border-slate-200 bg-slate-50/70 p-5">
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <div>
-                          <div className="text-sm font-medium text-slate-900">
-                            Subida del archivo
-                          </div>
-                          <div className="text-sm text-slate-600">
-                            Formato seleccionado:{" "}
-                            <span className="font-medium text-slate-900">
-                              {toDisplayLabel(selectedFormat)}
-                            </span>
-                          </div>
-                        </div>
+                  <FormField
+                    label="Descripción"
+                    hint="Contexto, uso sugerido o instrucciones para la profesora."
+                    error={errors.description?.message}
+                  >
+                    <textarea
+                      rows={5}
+                      placeholder="Short explanation, teaching notes, context of use..."
+                      {...register("description")}
+                      className={inputClass(Boolean(errors.description))}
+                    />
+                  </FormField>
 
-                        <button
-                          type="button"
-                          onClick={() => inputFileRef.current?.click()}
-                          disabled={isUploading}
-                          className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-60"
-                        >
-                          {isUploading ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <UploadCloud className="h-4 w-4" />
-                          )}
-                          {isUploading
-                            ? "Procesando..."
-                            : "Seleccionar archivo"}
-                        </button>
-                      </div>
+                  <div className="grid gap-6 lg:grid-cols-2">
+                    <SelectionGroup
+                      title="Niveles CEFR"
+                      options={CEFR_LEVELS}
+                      values={values.levels || []}
+                      onToggle={(value) => handleMultiToggle("levels", value)}
+                    />
 
-                      <button
-                        type="button"
-                        onClick={() => inputFileRef.current?.click()}
-                        onDragOver={handleDragOver}
-                        onDragLeave={handleDragLeave}
-                        onDrop={handleDropFinal}
-                        className="flex w-full flex-col items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center transition hover:border-slate-400 hover:bg-slate-50"
-                      >
-                        <UploadCloud className="mb-3 h-8 w-8 text-slate-400" />
-                        <div className="text-sm font-medium text-slate-900">
-                          Arrastra aquí o pulsa para elegir archivo
-                        </div>
-                        <div className="mt-1 text-sm text-slate-500">
-                          {selectedFormat === "pdf" &&
-                            "PDF con miniatura automática para biblioteca"}
-                          {selectedFormat === "image" &&
-                            "JPG, PNG, WEBP y otros formatos de imagen"}
-                          {selectedFormat === "audio" &&
-                            "MP3, WAV, M4A y formatos de audio"}
-                          {selectedFormat === "video" &&
-                            "MP4, MOV, WEBM y formatos de vídeo"}
-                        </div>
-                      </button>
+                    <SelectionGroup
+                      title="Skills"
+                      options={SKILL_FOCUS}
+                      values={values.skills || []}
+                      onToggle={(value) => handleMultiToggle("skills", value)}
+                    />
 
-                      <input
-                        ref={inputFileRef}
-                        type="file"
-                        accept={getAcceptByFormat(selectedFormat)}
-                        className="hidden"
-                        onChange={handlePickFile}
-                      />
+                    <SelectionGroup
+                      title="Modo de entrega"
+                      options={DELIVERY_MODES}
+                      values={values.deliveryModes || []}
+                      onToggle={(value) =>
+                        handleMultiToggle("deliveryModes", value)
+                      }
+                    />
 
-                      {(values.originalFilename ||
-                        values.fileUrl ||
-                        values.storagePath) && (
-                        <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                          <div className="mb-3 flex items-center justify-between gap-4">
-                            <div>
-                              <div className="text-sm font-medium text-emerald-900">
-                                Archivo detectado
-                              </div>
-                              <div className="text-sm text-emerald-800">
-                                {values.originalFilename || "Sin nombre"}
-                              </div>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={handleRemoveUploadedData}
-                              className="rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm text-emerald-900 transition hover:bg-emerald-100"
-                            >
-                              Limpiar
-                            </button>
-                          </div>
-
-                          <div className="grid gap-3 text-sm sm:grid-cols-2">
-                            <MetaRow
-                              label="MIME type"
-                              value={values.mimeType || "—"}
-                            />
-                            <MetaRow
-                              label="Tamaño"
-                              value={
-                                typeof values.fileSizeBytes === "number"
-                                  ? formatBytes(values.fileSizeBytes)
-                                  : "0 B"
-                              }
-                            />
-                            <MetaRow
-                              label="fileUrl"
-                              value={
-                                values.fileUrl ? "Disponible" : "Pendiente"
-                              }
-                            />
-                            <MetaRow
-                              label="storagePath"
-                              value={
-                                values.storagePath ? "Disponible" : "Pendiente"
-                              }
-                            />
-                            {selectedFormat === "pdf" && (
-                              <>
-                                <MetaRow
-                                  label="thumbnailUrl"
-                                  value={
-                                    values.thumbnailUrl
-                                      ? "Disponible"
-                                      : "Pendiente"
-                                  }
-                                />
-                                <MetaRow
-                                  label="thumbnailStoragePath"
-                                  value={
-                                    values.thumbnailStoragePath
-                                      ? "Disponible"
-                                      : "Pendiente"
-                                  }
-                                />
-                                <MetaRow
-                                  label="Páginas"
-                                  value={
-                                    typeof values.pageCount === "number"
-                                      ? String(values.pageCount)
-                                      : "Pendiente"
-                                  }
-                                />
-                              </>
-                            )}
-                            {(selectedFormat === "audio" ||
-                              selectedFormat === "video") && (
-                              <MetaRow
-                                label="Duración"
-                                value={
-                                  typeof values.durationSeconds === "number"
-                                    ? `${values.durationSeconds}s`
-                                    : "Pendiente"
-                                }
-                              />
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {uploadMessage && (
-                        <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-                          {uploadMessage}
-                        </div>
-                      )}
-
-                      {uploadError && (
-                        <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                          {uploadError}
-                        </div>
-                      )}
-                    </div>
-                    {(selectedFormat === "audio" ||
-                      selectedFormat === "video") && (
-                      <FormField
-                        label="Transcripción"
-                        hint="Opcional. Pega el texto completo del audio o vídeo."
-                        error={errors.transcriptText?.message}
-                      >
-                        <textarea
-                          rows={6}
-                          placeholder="Transcribe here the full content of the audio or video..."
-                          {...register("transcriptText")}
-                          className={inputClass(Boolean(errors.transcriptText))}
-                        />
-                      </FormField>
-                    )}
-                    {!onUploadFile && (
-                      <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5">
-                        <div>
-                          <div className="text-sm font-medium text-slate-900">
-                            Modo manual
-                          </div>
-                          <div className="text-sm text-slate-600">
-                            Útil mientras conectas Firebase o tu pipeline de
-                            procesamiento.
-                          </div>
-                        </div>
-
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          <FormField
-                            label="fileUrl"
-                            hint="URL pública del archivo ya subido."
-                            error={errors.fileUrl?.message}
-                          >
-                            <input
-                              type="url"
-                              placeholder="https://..."
-                              {...register("fileUrl")}
-                              className={inputClass(Boolean(errors.fileUrl))}
-                            />
-                          </FormField>
-
-                          <FormField
-                            label="storagePath"
-                            hint="Ruta interna en Firebase Storage."
-                            error={errors.storagePath?.message}
-                          >
-                            <input
-                              type="text"
-                              placeholder="resources/teacher-1/file.pdf"
-                              {...register("storagePath")}
-                              className={inputClass(
-                                Boolean(errors.storagePath),
-                              )}
-                            />
-                          </FormField>
-
-                          <FormField
-                            label="originalFilename"
-                            error={errors.originalFilename?.message}
-                          >
-                            <input
-                              type="text"
-                              placeholder="my-file.pdf"
-                              {...register("originalFilename")}
-                              className={inputClass(
-                                Boolean(errors.originalFilename),
-                              )}
-                            />
-                          </FormField>
-
-                          <FormField
-                            label="mimeType"
-                            error={errors.mimeType?.message}
-                          >
-                            <input
-                              type="text"
-                              placeholder="application/pdf"
-                              {...register("mimeType")}
-                              className={inputClass(Boolean(errors.mimeType))}
-                            />
-                          </FormField>
-
-                          <FormField
-                            label="fileSizeBytes"
-                            error={errors.fileSizeBytes?.message}
-                          >
-                            <input
-                              type="number"
-                              placeholder="245000"
-                              {...register("fileSizeBytes", {
-                                setValueAs: (value) =>
-                                  value === "" ? undefined : Number(value),
-                              })}
-                              className={inputClass(
-                                Boolean(errors.fileSizeBytes),
-                              )}
-                            />
-                          </FormField>
-
-                          {selectedFormat === "pdf" && (
-                            <>
-                              <FormField
-                                label="thumbnailUrl"
-                                hint="Obligatorio para la miniatura del PDF en biblioteca."
-                                error={errors.thumbnailUrl?.message}
-                              >
-                                <input
-                                  type="url"
-                                  placeholder="https://..."
-                                  {...register("thumbnailUrl")}
-                                  className={inputClass(
-                                    Boolean(errors.thumbnailUrl),
-                                  )}
-                                />
-                              </FormField>
-                              <FormField
-                                label="thumbnailStoragePath"
-                                hint="Obligatorio para la miniatura del PDF en biblioteca."
-                                error={errors.thumbnailStoragePath?.message}
-                              >
-                                <input
-                                  type="url"
-                                  placeholder="https://..."
-                                  {...register("thumbnailStoragePath")}
-                                  className={inputClass(
-                                    Boolean(errors.thumbnailStoragePath),
-                                  )}
-                                />
-                              </FormField>
-
-                              <FormField
-                                label="pageCount"
-                                error={errors.pageCount?.message}
-                              >
-                                <input
-                                  type="number"
-                                  placeholder="12"
-                                  {...register("pageCount", {
-                                    setValueAs: (value) =>
-                                      value === "" ? undefined : Number(value),
-                                  })}
-                                  className={inputClass(
-                                    Boolean(errors.pageCount),
-                                  )}
-                                />
-                              </FormField>
-                            </>
-                          )}
-
-                          {(selectedFormat === "audio" ||
-                            selectedFormat === "video") && (
-                            <FormField
-                              label="durationSeconds"
-                              error={errors.durationSeconds?.message}
-                            >
-                              <input
-                                type="number"
-                                placeholder="180"
-                                {...register("durationSeconds", {
-                                  setValueAs: (value) =>
-                                    value === "" ? undefined : Number(value),
-                                })}
-                                className={inputClass(
-                                  Boolean(errors.durationSeconds),
-                                )}
-                              />
-                            </FormField>
-                          )}
-                        </div>
-                      </div>
-                    )}
+                    <SelectionGroup
+                      title="Etapa de la clase"
+                      options={LESSON_STAGES}
+                      values={values.lessonStages || []}
+                      onToggle={(value) =>
+                        handleMultiToggle("lessonStages", value)
+                      }
+                    />
                   </div>
-                )}
-              </section>
-            )}
 
-            {step === 3 && (
-              <section className="space-y-8">
-                <SectionHeader
-                  title="Detalles pedagógicos"
-                  description="Esta parte marca la diferencia entre una biblioteca caótica y una biblioteca reutilizable."
-                />
-
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <FormField
-                    label="Título"
-                    hint="Nombre corto, claro y fácil de encontrar."
-                    error={errors.title?.message}
-                    required
-                  >
-                    <input
-                      type="text"
-                      placeholder="Past Simple - Reading Worksheet"
-                      {...register("title")}
-                      className={inputClass(Boolean(errors.title))}
-                    />
-                  </FormField>
-
-                  <FormField
-                    label="Tipo pedagógico"
-                    error={errors.pedagogicalType?.message}
-                    required
-                  >
-                    <select
-                      {...register("pedagogicalType")}
-                      className={inputClass(Boolean(errors.pedagogicalType))}
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <FormField
+                      label="Duración estimada (min)"
+                      error={errors.estimatedDurationMinutes?.message}
                     >
-                      <option value="">Selecciona una opción</option>
-                      {PEDAGOGICAL_TYPES.map((type) => (
-                        <option key={type} value={type}>
-                          {toDisplayLabel(type)}
-                        </option>
-                      ))}
-                    </select>
-                  </FormField>
-                </div>
+                      <input
+                        type="number"
+                        placeholder="20"
+                        {...register("estimatedDurationMinutes", {
+                          setValueAs: (value) =>
+                            value === "" ? undefined : Number(value),
+                        })}
+                        className={inputClass(
+                          Boolean(errors.estimatedDurationMinutes),
+                        )}
+                      />
+                    </FormField>
 
-                <FormField
-                  label="Descripción"
-                  hint="Contexto, uso sugerido o instrucciones para la profesora."
-                  error={errors.description?.message}
-                >
-                  <textarea
-                    rows={5}
-                    placeholder="Short explanation, teaching notes, context of use..."
-                    {...register("description")}
-                    className={inputClass(Boolean(errors.description))}
-                  />
-                </FormField>
-
-                <div className="grid gap-6 lg:grid-cols-2">
-                  <SelectionGroup
-                    title="Niveles CEFR"
-                    options={CEFR_LEVELS}
-                    values={values.levels || []}
-                    onToggle={(value) => handleMultiToggle("levels", value)}
-                  />
-
-                  <SelectionGroup
-                    title="Skills"
-                    options={SKILL_FOCUS}
-                    values={values.skills || []}
-                    onToggle={(value) => handleMultiToggle("skills", value)}
-                  />
-
-                  <SelectionGroup
-                    title="Modo de entrega"
-                    options={DELIVERY_MODES}
-                    values={values.deliveryModes || []}
-                    onToggle={(value) =>
-                      handleMultiToggle("deliveryModes", value)
-                    }
-                  />
-
-                  <SelectionGroup
-                    title="Etapa de la clase"
-                    options={LESSON_STAGES}
-                    values={values.lessonStages || []}
-                    onToggle={(value) =>
-                      handleMultiToggle("lessonStages", value)
-                    }
-                  />
-                </div>
-
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <FormField
-                    label="Duración estimada (min)"
-                    error={errors.estimatedDurationMinutes?.message}
-                  >
-                    <input
-                      type="number"
-                      placeholder="20"
-                      {...register("estimatedDurationMinutes", {
-                        setValueAs: (value) =>
-                          value === "" ? undefined : Number(value),
-                      })}
-                      className={inputClass(
-                        Boolean(errors.estimatedDurationMinutes),
-                      )}
-                    />
-                  </FormField>
-
-                  <FormField
-                    label="Dificultad (1-5)"
-                    error={errors.difficulty?.message}
-                  >
-                    <input
-                      type="number"
-                      min={1}
-                      max={5}
-                      placeholder="3"
-                      {...register("difficulty", {
-                        setValueAs: (value) =>
-                          value === "" ? undefined : Number(value),
-                      })}
-                      className={inputClass(Boolean(errors.difficulty))}
-                    />
-                  </FormField>
-                </div>
-
-                <div className="grid gap-5 sm:grid-cols-3">
-                  <FormField
-                    label="Grammar topics"
-                    hint="Separados por comas."
-                    error={errors.grammarTopics?.message}
-                  >
-                    <input
-                      type="text"
-                      placeholder="past simple, irregular verbs"
-                      {...register("grammarTopics")}
-                      className={inputClass(Boolean(errors.grammarTopics))}
-                    />
-                  </FormField>
-
-                  <FormField
-                    label="Vocabulary topics"
-                    hint="Separados por comas."
-                    error={errors.vocabularyTopics?.message}
-                  >
-                    <input
-                      type="text"
-                      placeholder="travel, holidays, transport"
-                      {...register("vocabularyTopics")}
-                      className={inputClass(Boolean(errors.vocabularyTopics))}
-                    />
-                  </FormField>
-
-                  <FormField
-                    label="Tags"
-                    hint="Separados por comas."
-                    error={errors.tags?.message}
-                  >
-                    <input
-                      type="text"
-                      placeholder="b1, worksheet, exam prep"
-                      {...register("tags")}
-                      className={inputClass(Boolean(errors.tags))}
-                    />
-                  </FormField>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <CheckboxCard
-                    title="Incluye answer key"
-                    description="Marca si el recurso tiene soluciones."
-                    checked={values.hasAnswerKey || false}
-                    onChange={(checked) =>
-                      setValue("hasAnswerKey", checked, { shouldDirty: true })
-                    }
-                  />
-
-                  <CheckboxCard
-                    title="Requiere revisión de la profesora"
-                    description="Útil para writing tasks, speaking prompts o homework corregible."
-                    checked={values.requiresTeacherReview || false}
-                    onChange={(checked) =>
-                      setValue("requiresTeacherReview", checked, {
-                        shouldDirty: true,
-                      })
-                    }
-                  />
-                </div>
-              </section>
-            )}
-
-            {step === 4 && (
-              <section className="space-y-8">
-                <SectionHeader
-                  title="Revisión y publicación"
-                  description="Último repaso antes de guardar el recurso."
-                />
-
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <FormField label="Estado" error={errors.status?.message}>
-                    <select
-                      {...register("status")}
-                      className={inputClass(false)}
+                    <FormField
+                      label="Dificultad (1-5)"
+                      error={errors.difficulty?.message}
                     >
-                      {RESOURCE_STATUS.map((status) => (
-                        <option key={status} value={status}>
-                          {toDisplayLabel(status)}
-                        </option>
-                      ))}
-                    </select>
-                  </FormField>
+                      <input
+                        type="number"
+                        min={1}
+                        max={5}
+                        placeholder="3"
+                        {...register("difficulty", {
+                          setValueAs: (value) =>
+                            value === "" ? undefined : Number(value),
+                        })}
+                        className={inputClass(Boolean(errors.difficulty))}
+                      />
+                    </FormField>
+                  </div>
 
-                  <FormField
-                    label="Visibilidad"
-                    error={errors.visibility?.message}
-                  >
-                    <select
-                      {...register("visibility")}
-                      className={inputClass(false)}
+                  <div className="grid gap-5 sm:grid-cols-3">
+                    <FormField
+                      label="Grammar topics"
+                      hint="Separados por comas."
+                      error={errors.grammarTopics?.message}
                     >
-                      {RESOURCE_VISIBILITY.map((visibility) => (
-                        <option key={visibility} value={visibility}>
-                          {toDisplayLabel(visibility)}
-                        </option>
-                      ))}
-                    </select>
-                  </FormField>
-                </div>
+                      <input
+                        type="text"
+                        placeholder="past simple, irregular verbs"
+                        {...register("grammarTopics")}
+                        className={inputClass(Boolean(errors.grammarTopics))}
+                      />
+                    </FormField>
 
-                <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                  <div className="mb-4 text-base font-semibold text-slate-900">
-                    Resumen del recurso
+                    <FormField
+                      label="Vocabulary topics"
+                      hint="Separados por comas."
+                      error={errors.vocabularyTopics?.message}
+                    >
+                      <input
+                        type="text"
+                        placeholder="travel, holidays, transport"
+                        {...register("vocabularyTopics")}
+                        className={inputClass(Boolean(errors.vocabularyTopics))}
+                      />
+                    </FormField>
+
+                    <FormField
+                      label="Tags"
+                      hint="Separados por comas."
+                      error={errors.tags?.message}
+                    >
+                      <input
+                        type="text"
+                        placeholder="b1, worksheet, exam prep"
+                        {...register("tags")}
+                        className={inputClass(Boolean(errors.tags))}
+                      />
+                    </FormField>
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <ReviewRow label="Título" value={values.title || "—"} />
-                    <ReviewRow
-                      label="Formato"
-                      value={
-                        values.format ? toDisplayLabel(values.format) : "—"
+                    <CheckboxCard
+                      title="Incluye answer key"
+                      description="Marca si el recurso tiene soluciones."
+                      checked={values.hasAnswerKey || false}
+                      onChange={(checked) =>
+                        setValue("hasAnswerKey", checked, { shouldDirty: true })
                       }
                     />
-                    <ReviewRow
-                      label="Tipo pedagógico"
-                      value={
-                        values.pedagogicalType
-                          ? toDisplayLabel(values.pedagogicalType)
-                          : "—"
-                      }
-                    />
-                    <ReviewRow
-                      label="Estado"
-                      value={
-                        values.status ? toDisplayLabel(values.status) : "—"
-                      }
-                    />
-                    <ReviewRow
-                      label="Visibilidad"
-                      value={
-                        values.visibility
-                          ? toDisplayLabel(values.visibility)
-                          : "—"
-                      }
-                    />
-                    <ReviewRow
-                      label="Archivo"
-                      value={values.originalFilename || "—"}
-                    />
-                    <ReviewRow
-                      label="fileUrl"
-                      value={values.fileUrl ? "Sí" : "No"}
-                    />
-                    <ReviewRow
-                      label="thumbnailUrl"
-                      value={values.thumbnailUrl ? "Sí" : "No"}
-                    />
-                    <ReviewRow
-                      label="thumbnailStoragePath"
-                      value={values.thumbnailStoragePath ? "Sí" : "No"}
-                    />
-                  </div>
 
-                  <div className="mt-5 space-y-4">
-                    <ReviewTags title="Niveles" items={values.levels || []} />
-                    <ReviewTags title="Skills" items={values.skills || []} />
-                    <ReviewTags
-                      title="Delivery"
-                      items={values.deliveryModes || []}
-                    />
-                    <ReviewTags
-                      title="Stages"
-                      items={values.lessonStages || []}
-                    />
-                    <ReviewTags
-                      title="Grammar topics"
-                      items={
-                        Array.isArray(values.grammarTopics)
-                          ? values.grammarTopics
-                          : normalizeLooseStringArray(
-                              values.grammarTopics || "",
-                            )
-                      }
-                    />
-                    <ReviewTags
-                      title="Vocabulary topics"
-                      items={
-                        Array.isArray(values.vocabularyTopics)
-                          ? values.vocabularyTopics
-                          : normalizeLooseStringArray(
-                              values.vocabularyTopics || "",
-                            )
-                      }
-                    />
-                    <ReviewTags
-                      title="Tags"
-                      items={
-                        Array.isArray(values.tags)
-                          ? values.tags
-                          : normalizeLooseStringArray(values.tags || "")
+                    <CheckboxCard
+                      title="Requiere revisión de la profesora"
+                      description="Útil para writing tasks, speaking prompts o homework corregible."
+                      checked={values.requiresTeacherReview || false}
+                      onChange={(checked) =>
+                        setValue("requiresTeacherReview", checked, {
+                          shouldDirty: true,
+                        })
                       }
                     />
                   </div>
-                </div>
-              </section>
-            )}
-
-            <div className="mt-10 flex items-center justify-between border-t border-slate-100 pt-6">
-              <button
-                type="button"
-                onClick={goToPreviousStep}
-                disabled={step === 1}
-                className="cursor-pointer inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-40"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Atrás
-              </button>
-
-              {step < 4 ? (
-                <button
-                  type="button"
-                  onClick={goToNextStep}
-                  className="cursor-pointer inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
-                >
-                  Siguiente
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleSubmit(submitForm)}
-                  disabled={isSubmitting || isUploading}
-                  className="cursor-pointer inline-flex items-center gap-2 rounded-2xl bg-[#9e2727] px-6 py-2.5 text-sm  text-white transition hover:bg-[#8d2323] disabled:opacity-60"
-                >
-                  {(isSubmitting || isUploading) && (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  )}
-                  Finalizar y guardar
-                </button>
+                </section>
               )}
-            </div>
-          </div>
 
-          <aside className="border-t border-slate-100 bg-slate-50/70 px-6 py-6 lg:border-l lg:border-t-0 sm:px-8">
-            <div className="sticky top-6 space-y-5">
-              <div className="rounded-3xl border border-slate-200 bg-white p-5">
-                <div className="mb-2 text-sm font-semibold text-slate-900">
-                  Ayuda contextual
-                </div>
-                <p className="text-sm leading-6 text-slate-600">
-                  {STEP_META[step].hint}
-                </p>
+              {step === 4 && (
+                <section className="space-y-8">
+                  <SectionHeader
+                    title="Revisión y publicación"
+                    description="Último repaso antes de guardar el recurso."
+                  />
+
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <FormField label="Estado" error={errors.status?.message}>
+                      <select
+                        {...register("status")}
+                        className={inputClass(false)}
+                      >
+                        {RESOURCE_STATUS.map((status) => (
+                          <option key={status} value={status}>
+                            {toDisplayLabel(status)}
+                          </option>
+                        ))}
+                      </select>
+                    </FormField>
+
+                    <FormField
+                      label="Visibilidad"
+                      error={errors.visibility?.message}
+                    >
+                      <select
+                        {...register("visibility")}
+                        className={inputClass(false)}
+                      >
+                        {RESOURCE_VISIBILITY.map((visibility) => (
+                          <option key={visibility} value={visibility}>
+                            {toDisplayLabel(visibility)}
+                          </option>
+                        ))}
+                      </select>
+                    </FormField>
+                  </div>
+
+                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                    <div className="mb-4 text-base font-semibold text-slate-900">
+                      Resumen del recurso
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <ReviewRow label="Título" value={values.title || "—"} />
+                      <ReviewRow
+                        label="Formato"
+                        value={
+                          values.format ? toDisplayLabel(values.format) : "—"
+                        }
+                      />
+                      <ReviewRow
+                        label="Tipo pedagógico"
+                        value={
+                          values.pedagogicalType
+                            ? toDisplayLabel(values.pedagogicalType)
+                            : "—"
+                        }
+                      />
+                      <ReviewRow
+                        label="Estado"
+                        value={
+                          values.status ? toDisplayLabel(values.status) : "—"
+                        }
+                      />
+                      <ReviewRow
+                        label="Visibilidad"
+                        value={
+                          values.visibility
+                            ? toDisplayLabel(values.visibility)
+                            : "—"
+                        }
+                      />
+                      <ReviewRow
+                        label="Archivo"
+                        value={values.originalFilename || "—"}
+                      />
+                      <ReviewRow
+                        label="fileUrl"
+                        value={values.fileUrl ? "Sí" : "No"}
+                      />
+                      <ReviewRow
+                        label="thumbnailUrl"
+                        value={values.thumbnailUrl ? "Sí" : "No"}
+                      />
+                      <ReviewRow
+                        label="thumbnailStoragePath"
+                        value={values.thumbnailStoragePath ? "Sí" : "No"}
+                      />
+                    </div>
+
+                    <div className="mt-5 space-y-4">
+                      <ReviewTags title="Niveles" items={values.levels || []} />
+                      <ReviewTags title="Skills" items={values.skills || []} />
+                      <ReviewTags
+                        title="Delivery"
+                        items={values.deliveryModes || []}
+                      />
+                      <ReviewTags
+                        title="Stages"
+                        items={values.lessonStages || []}
+                      />
+                      <ReviewTags
+                        title="Grammar topics"
+                        items={
+                          Array.isArray(values.grammarTopics)
+                            ? values.grammarTopics
+                            : normalizeLooseStringArray(
+                                values.grammarTopics || "",
+                              )
+                        }
+                      />
+                      <ReviewTags
+                        title="Vocabulary topics"
+                        items={
+                          Array.isArray(values.vocabularyTopics)
+                            ? values.vocabularyTopics
+                            : normalizeLooseStringArray(
+                                values.vocabularyTopics || "",
+                              )
+                        }
+                      />
+                      <ReviewTags
+                        title="Tags"
+                        items={
+                          Array.isArray(values.tags)
+                            ? values.tags
+                            : normalizeLooseStringArray(values.tags || "")
+                        }
+                      />
+                    </div>
+                  </div>
+                </section>
+              )}
+
+              <div className="mt-10 flex items-center justify-between border-t border-slate-100 pt-6">
+                <button
+                  type="button"
+                  onClick={goToPreviousStep}
+                  disabled={step === 1}
+                  className="cursor-pointer inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-40"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Atrás
+                </button>
+
+                {step < 4 ? (
+                  <button
+                    type="button"
+                    onClick={goToNextStep}
+                    className="cursor-pointer inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
+                  >
+                    Siguiente
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleSubmit(submitForm)}
+                    disabled={isSubmitting || isUploading}
+                    className="cursor-pointer inline-flex items-center gap-2 rounded-2xl bg-[#9e2727] px-6 py-2.5 text-sm  text-white transition hover:bg-[#8d2323] disabled:opacity-60"
+                  >
+                    {(isSubmitting || isUploading) && (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    )}
+                    Finalizar y guardar
+                  </button>
+                )}
               </div>
+            </div>
 
-              {/* <div className="rounded-3xl border border-slate-200 bg-white p-5">
+            <aside className="border-t border-slate-100 bg-slate-50/70 px-6 py-6 lg:border-l lg:border-t-0 sm:px-8">
+              <div className="sticky top-6 space-y-5">
+                <div className="rounded-3xl border border-slate-200 bg-white p-5">
+                  <div className="mb-2 text-sm font-semibold text-slate-900">
+                    Ayuda contextual
+                  </div>
+                  <p className="text-sm leading-6 text-slate-600">
+                    {STEP_META[step].hint}
+                  </p>
+                </div>
+
+                {/* <div className="rounded-3xl border border-slate-200 bg-white p-5">
                 <div className="mb-3 text-sm font-semibold text-slate-900">
                   Reglas activas
                 </div>
                 
               </div> */}
 
-              <div className="rounded-3xl border border-slate-200 bg-white p-5">
-                <div className="mb-3 text-sm font-semibold text-slate-900">
-                  Vista rápida
-                </div>
+                <div className="rounded-3xl border border-slate-200 bg-white p-5">
+                  <div className="mb-3 text-sm font-semibold text-slate-900">
+                    Vista rápida
+                  </div>
 
-                <div className="space-y-3 text-sm">
-                  <MetaRow
-                    label="Formato"
-                    value={values.format ? toDisplayLabel(values.format) : "—"}
-                  />
-                  <MetaRow label="Título" value={values.title || "—"} />
-                  <MetaRow
-                    label="Archivo"
-                    value={values.originalFilename || "—"}
-                  />
-                  <MetaRow
-                    label="Peso"
-                    value={
-                      typeof values.fileSizeBytes === "number"
-                        ? formatBytes(values.fileSizeBytes)
-                        : "0 B"
-                    }
-                  />
-                  <MetaRow
-                    label="Estado"
-                    value={values.status ? toDisplayLabel(values.status) : "—"}
-                  />
+                  <div className="space-y-3 text-sm">
+                    <MetaRow
+                      label="Formato"
+                      value={
+                        values.format ? toDisplayLabel(values.format) : "—"
+                      }
+                    />
+                    <MetaRow label="Título" value={values.title || "—"} />
+                    <MetaRow
+                      label="Archivo"
+                      value={values.originalFilename || "—"}
+                    />
+                    <MetaRow
+                      label="Peso"
+                      value={
+                        typeof values.fileSizeBytes === "number"
+                          ? formatBytes(values.fileSizeBytes)
+                          : "0 B"
+                      }
+                    />
+                    <MetaRow
+                      label="Estado"
+                      value={
+                        values.status ? toDisplayLabel(values.status) : "—"
+                      }
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          </aside>
-        </form>
+            </aside>
+          </form>
+        </FormProvider>
       </div>
     </div>
   );

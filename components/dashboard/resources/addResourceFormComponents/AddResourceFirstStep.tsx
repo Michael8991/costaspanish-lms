@@ -1,8 +1,19 @@
 import { FORMAT_CARDS } from "@/components/ui/addResourcesForm/FormatSelectorCards";
 import { SectionHeader } from "@/components/ui/addResourcesForm/FormSectionWrappers";
 import { cn } from "@/lib/utils/form-helpers";
+import { FormatType } from "@/models/ResourceProfile";
 
-export default function AddResourceFirstStep() {
+interface AddResourceFirstStepProps {
+  selectedFormat: FormatType | undefined;
+  errorMessage?: string;
+  onSelectFormat: (format: FormatType) => void;
+}
+
+export default function AddResourceFirstStep({
+  selectedFormat,
+  errorMessage,
+  onSelectFormat,
+}: AddResourceFirstStepProps) {
   return (
     <>
       <section className="space-y-6">
@@ -14,13 +25,13 @@ export default function AddResourceFirstStep() {
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {FORMAT_CARDS.map((card) => {
             const Icon = card.icon;
-            const selected = values.format === card.value;
+            const selected = selectedFormat === card.value;
 
             return (
               <button
                 key={card.value}
                 type="button"
-                onClick={() => handleFormatSelection(card.value)}
+                onClick={() => onSelectFormat(card.value as FormatType)}
                 className={cn(
                   "group rounded-3xl border p-5 text-left transition-all",
                   "hover:-translate-y-0.5 hover:shadow-lg",
@@ -59,7 +70,9 @@ export default function AddResourceFirstStep() {
           })}
         </div>
 
-        <FieldError error={errors.format?.message} />
+        {errorMessage && (
+          <p className="text-red-500 text-sm mt-2">{errorMessage}</p>
+        )}
       </section>
     </>
   );
