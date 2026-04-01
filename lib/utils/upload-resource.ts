@@ -19,11 +19,11 @@ export const uploadResourceFile = async (
       console.warn("No se pudo eliminar el archivo antiguo:", e);
     }
     if (oldThumbnailPath) {
-       try {
-      await deleteObject(ref(storage, oldStoragePath));
-    } catch (e) {
-      console.warn("No se pudo eliminar el thumnnail antiguo:", e);
-    }
+      try {
+        await deleteObject(ref(storage, oldThumbnailPath));
+      } catch (e) {
+        console.warn("No se pudo eliminar el thumnnail antiguo:", e);
+      }
     }
   }
   const result = await processAndUploadResource(file, format);
