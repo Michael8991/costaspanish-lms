@@ -1,12 +1,12 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { createResourceSchema } from "../validators/resource";
+import { updateResourceSchema } from "../validators/resource";
 import { AddResourcePayload } from "../utils/resource-mappers";
 import { FormatType } from "../constants/resource.constants";
 import z from "zod";
 import { useState } from "react";
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2;
 
 type UploadedResourceMeta = {
   storagePath?: string;
@@ -20,41 +20,27 @@ type UploadedResourceMeta = {
   fileSizeBytes?: number;
 };
 
-type CreateResourceValues = z.infer<typeof createResourceSchema>;
+type UpdateResourceValues = z.infer<typeof updateResourceSchema>;
 
-type UseAddResourceFormProps = {
+type UseUpdateResourceFormProps = {
   onSubmit: (payload: AddResourcePayload) => Promise<void> | void;
   onUploadFile?: (
     file: File,
     format: Exclude<FormatType, "external_link">,
   ) => Promise<UploadedResourceMeta>;
-  initialValues?: Partial<CreateResourceValues>;
+  initialValues?: Partial<UpdateResourceValues>;
 };
 
-export const useAddResourceForm = ({initialValues={}}: UseAddResourceFormProps) => {
+export const useUpdateResourceForm = ({initialValues={}}: UseUpdateResourceFormProps) => {
   const [step, setStep] = useState<Step>(1);
   const [uploadMessage, setUploadMessage] = useState<string>("");
   
     const [uploadError, setUploadError] = useState<string>("");
   
-  const form = useForm<z.input<typeof createResourceSchema>>({
-    resolver: zodResolver(createResourceSchema),
+  const form = useForm<z.input<typeof updateResourceSchema>>({
+    resolver: zodResolver(updateResourceSchema),
     mode: "onTouched",
     defaultValues: {
-      title: "",
-      description: "",
-      status: "draft",
-      visibility: "private",
-      levels: [],
-      skills: [],
-      deliveryModes: ["classwork", "homework"],
-      lessonStages: [],
-      grammarTopics: initialValues?.grammarTopics ?? [],
-      vocabularyTopics: initialValues?.vocabularyTopics ?? [],
-      transcriptText: "",
-      tags: initialValues?.tags ?? [],
-      hasAnswerKey: false,
-      requiresTeacherReview: false,
       storagePath: "",
       fileUrl: "",
       originalFilename: "",

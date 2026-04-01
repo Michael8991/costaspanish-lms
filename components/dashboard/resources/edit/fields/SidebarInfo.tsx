@@ -1,23 +1,28 @@
 import { cn, toDisplayLabel } from "@/lib/utils/form-helpers";
 import { Field } from "./Field";
 import {
+  FormatType,
   RESOURCE_STATUS,
   RESOURCE_VISIBILITY,
 } from "@/lib/constants/resource.constants";
 import { ResourceDetailDTO } from "@/lib/dto/resource.dto";
 import { Loader2, RotateCcw, Save } from "lucide-react";
-import { FieldErrors, UseFormRegister } from "react-hook-form";
-import { EditFormValues } from "./FormSection";
 import { useRouter } from "next/navigation";
 import { ResourcePreview } from "../../resourceDetails/PreviewResourceSection";
 import CustomModal from "../../../../ui/CustomModal";
+import { useState } from "react";
+import UpdateResourceFileForm from "./UpdateResourceFileForm";
+import z from "zod";
+import { updateResourceSchema } from "@/lib/validators/resource";
+import { useFormContext } from "react-hook-form";
+import { UploadedResourceMeta } from "../../AddResourceForm";
 
 interface SidebarInfoProps {
+  onUploadFile: (
+    file: File,
+    format: Exclude<FormatType, "external_link">,
+  ) => Promise<UploadedResourceMeta>;
   resource: ResourceDetailDTO;
-  register: UseFormRegister<EditFormValues>;
-  errors: FieldErrors<EditFormValues>;
-  isSubmitting: boolean;
-  isDirty: boolean;
 }
 
 function MetaItem({ label, value }: { label: string; value: string }) {
@@ -40,13 +45,23 @@ const inputClass = (hasError = false) =>
   );
 
 export default function SidebarInfo({
-  errors,
   resource,
-  isSubmitting,
-  register,
-  isDirty,
+  onUploadFile,
 }: SidebarInfoProps) {
   const router = useRouter();
+  const [isUpdateResourceModalOpen, setIsUpdateResourceModalOpen] =
+    useState(false);
+  const [resourceToUpdate, setResourceToUpdate] =
+    useState<ResourceDetailDTO | null>(null);
+
+  const {
+    register,
+    watch,
+    formState: { errors, isDirty, isSubmitting },
+  } = useFormContext<z.input<typeof updateResourceSchema>>();
+
+  const selectedFormat = watch("format");
+
   return (
     <div className="flex flex-col gap-4">
       <div className="sticky top-6 flex flex-col gap-4">
@@ -110,7 +125,13 @@ export default function SidebarInfo({
             )}
           </div>
           <div className="w-full flex items-center justify-center">
-            <button className="cursor-pointer bg-white hover:bg-blue-100 hover:text-blue-500 hover:border-blue-400 inline-flex border border-gray-100 items-center justify-center gap-2 rounded-lg px-4 py-2 text-xs font-light shadow-md text-gray-700 transition">
+            <button
+              type="button"
+              onClick={() => {
+                setIsUpdateResourceModalOpen(true);
+              }}
+              className="cursor-pointer bg-white hover:bg-blue-100 hover:text-blue-500 hover:border-blue-400 inline-flex border border-gray-100 items-center justify-center gap-2 rounded-lg px-4 py-2 text-xs font-light shadow-md text-gray-700 transition"
+            >
               <RotateCcw size={14} />
               Actualizar archivo
             </button>
@@ -145,17 +166,19 @@ export default function SidebarInfo({
         </button>
       </div>
       <CustomModal
-        isOpen={isArchiveModalOpen}
-        onClose={() => setIsArchiveModalOpen(false)}
-        title="Archivar material"
+        isOpen={isUpdateResourceModalOpen}
+        onClose={() => setIsUpdateResourceModalOpen(false)}
+        title="Editar archivo"
+        maxWidth="5xl"
       >
         <div className="p-4">
           <UpdateResourceFileForm
-            resource={resourceToArchive}
-            resourceName={resourceToArchiveName}
-            onSubmitForm={handleArchiveResource}
-            isSubmitting={isSubmittingArchiveResource}
-            onClose={() => setIsArchiveModalOpen(false)}
+            resourceId={resource.id}
+            selectedFormat={selectedFormat}
+            onUploadFile={onUploadFile}
+            // onSubmitForm={handleArchiveResource}
+            // isSubmitting={isSubmittingArchiveResource}
+            onClose={() => setIsUpdateResourceModalOpen(false)}
           />
         </div>
       </CustomModal>

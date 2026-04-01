@@ -1,18 +1,8 @@
 "use client";
-
-import {
-  CEFRLevel,
-  DeliveryModes,
-  LessonStage,
-  PEDAGOGICAL_TYPES,
-  RESOURCE_STATUS,
-  RESOURCE_VISIBILITY,
-  SkillFocus,
-} from "@/lib/constants/resource.constants";
 import { ResourceDetailDTO } from "@/lib/dto/resource.dto";
 import { useRouter } from "next/navigation";
-import { Path, PathValue, useForm } from "react-hook-form";
-import { cn, toDisplayLabel } from "@/lib/utils/form-helpers";
+import { FormProvider, Path, PathValue, useForm } from "react-hook-form";
+import { cn } from "@/lib/utils/form-helpers";
 import { Field } from "./Field";
 import ToggleGroupField from "./ToggleGroupField";
 import {
@@ -21,35 +11,15 @@ import {
 } from "@/lib/validators/resource";
 import SidebarInfo from "./SidebarInfo";
 import CheckToggleField from "./CheckToggleField";
+import { EditFormValues } from "@/lib/utils/resource-mappers";
+import { UploadedResourceMeta } from "../../AddResourceForm";
+import { FormatType } from "@/lib/constants/resource.constants";
+import { uploadResourceFile } from "@/lib/utils/upload-resource";
 
 interface EditResourceFormProps {
   locale: string;
   resource: ResourceDetailDTO;
 }
-
-export type EditFormValues = {
-  title?: string;
-  description?: string;
-  status?: (typeof RESOURCE_STATUS)[number];
-  visibility?: (typeof RESOURCE_VISIBILITY)[number];
-  pedagogicalType?: (typeof PEDAGOGICAL_TYPES)[number];
-  levels?: CEFRLevel[];
-  skills?: SkillFocus[];
-  deliveryModes?: DeliveryModes[];
-  lessonStages?: LessonStage[];
-  grammarTopics?: string[];
-  vocabularyTopics?: string[];
-  tags?: string[];
-  estimatedDurationMinutes?: number;
-  difficulty?: number;
-  hasAnswerKey?: boolean;
-  requiresTeacherReview?: boolean;
-  transcriptText?: string;
-  // inputs de texto para los array de strings
-  grammarTopicsInput: string;
-  vocabularyTopicsInput: string;
-  tagsInput: string;
-};
 
 const inputClass = (hasError = false) =>
   cn(
@@ -65,15 +35,10 @@ export default function FormSection({
 }: EditResourceFormProps) {
   const router = useRouter();
 
-  const {
-    register,
-    watch,
-    setValue,
-    handleSubmit,
-    formState: { errors, isSubmitting, isDirty },
-  } = useForm<EditFormValues>({
+  const form = useForm<EditFormValues>({
     values: {
       title: resource?.title || "",
+      format: resource.asset.format,
       description: resource.description ?? "",
       status: resource.status,
       visibility: resource.visibility,
@@ -94,17 +59,27 @@ export default function FormSection({
     },
   });
 
+  const {
+    register,
+    watch,
+    setValue,
+    handleSubmit,
+    getValues,
+    formState: { errors, isSubmitting, isDirty },
+  } = form;
+
   const values = watch();
 
-  const toggleField = (field: Path<EditFormValues>, value: string) => {
-    const current = (watch(field) as string[]) ?? [];
+  const toggleField = (field: string, value: string) => {
+    const typedField = field as Path<EditFormValues>;
+    const current = (getValues(typedField) as string[]) ?? [];
 
     const newValues = current.includes(value)
       ? current.filter((i) => i !== value)
       : [...current, value];
 
     setValue(
-      field,
+      typedField,
       newValues as PathValue<EditFormValues, Path<EditFormValues>>,
       {
         shouldDirty: true,
@@ -136,13 +111,24 @@ export default function FormSection({
       vocabularyTopics: parseCommaInput(data.vocabularyTopicsInput),
       tags: parseCommaInput(data.tagsInput),
       estimatedDurationMinutes: data.estimatedDurationMinutes,
+      format: data.format,
       difficulty: data.difficulty,
       hasAnswerKey: data.hasAnswerKey,
       requiresTeacherReview: data.requiresTeacherReview,
       transcriptText: data.transcriptText || "",
+      storagePath: data.storagePath, // o resource.storagePath
+      fileUrl: data.fileUrl,
+      originalFilename: data.originalFilename,
+      mimeType: data.mimeType,
+      fileSizeBytes: data.fileSizeBytes,
+      pageCount: data.pageCount,
+      durationSeconds: data.durationSeconds,
+      thumbnailUrl: data.thumbnailUrl,
+      thumbnailStoragePath: data.thumbnailStoragePath,
+
+      externalUrl: data.externalUrl,
     };
 
-    // Validamos contra updateResourceSchema antes de enviar
     const parsed = updateResourceSchema.safeParse(payload);
     if (!parsed.success) {
       console.error("Validation error:", parsed.error.issues);
@@ -169,8 +155,20 @@ export default function FormSection({
   const isAudioVideo =
     resource.asset.format === "audio" || resource.asset.format === "video";
 
+  const handleUploadFile = async (
+    file: File,
+    format: Exclude<FormatType, "external_link">,
+  ): Promise<UploadedResourceMeta> => {
+    return await uploadResourceFile(
+      file,
+      format,
+      resource.owner.teacherId,
+      resource.asset.storagePath,
+    );
+  };
+
   return (
-    <>
+    <FormProvider {...form}>
       <form
         onSubmit={handleSubmit(onSubmit)}
         className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[1fr_300px]"
@@ -214,14 +212,8 @@ export default function FormSection({
         </div>
 
         {/* ── Sidebar ── */}
-        <SidebarInfo
-          resource={resource}
-          errors={errors}
-          isDirty={isDirty}
-          register={register}
-          isSubmitting={isSubmitting}
-        />
+        <SidebarInfo resource={resource} onUploadFile={handleUploadFile} />
       </form>
-    </>
+    </FormProvider>
   );
 }

@@ -21,6 +21,7 @@ import { useAddResourceForm } from "@/lib/hooks/useCreateResource";
 import AddResourceSecondStep from "./addResourceFormComponents/AddResourceSecondStep";
 import AddResourceThirdStep from "./addResourceFormComponents/AddResourceThirdStep";
 import AddResourceFourthStep from "./addResourceFormComponents/AddResourceFourthStep";
+import { MetaRow } from "@/components/ui/addResourcesForm/FormSectionWrappers";
 
 export type UploadedResourceMeta = {
   storagePath?: string;
@@ -71,7 +72,6 @@ export default function AddResourceForm({
   onUploadFile,
 }: AddResourceFormProps) {
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadMessage, setUploadMessage] = useState<string>("");
   const [uploadError, setUploadError] = useState<string>("");
   const inputFileRef = useRef<HTMLInputElement | null>(null);
 
@@ -89,34 +89,6 @@ export default function AddResourceForm({
 
   const values = watch();
   const selectedFormat = values.format;
-
-  useEffect(() => {
-    if (!selectedFormat) return;
-
-    setUploadError("");
-    setUploadMessage("");
-
-    if (selectedFormat === "external_link") {
-      setValue("storagePath", "");
-      setValue("fileUrl", "");
-      setValue("originalFilename", "");
-      setValue("mimeType", "");
-      setValue("fileSizeBytes", undefined);
-      setValue("pageCount", undefined);
-      setValue("durationSeconds", undefined);
-      setValue("thumbnailUrl", "");
-    } else {
-      setValue("externalUrl", "");
-    }
-
-    if (selectedFormat !== "pdf") {
-      setValue("pageCount", undefined);
-    }
-
-    if (selectedFormat !== "audio" && selectedFormat !== "video") {
-      setValue("durationSeconds", undefined);
-    }
-  }, [selectedFormat, setValue]);
 
   const progress = (step / 4) * 100;
 
@@ -317,13 +289,6 @@ export default function AddResourceForm({
                   </p>
                 </div>
 
-                {/* <div className="rounded-3xl border border-slate-200 bg-white p-5">
-                <div className="mb-3 text-sm font-semibold text-slate-900">
-                  Reglas activas
-                </div>
-                
-              </div> */}
-
                 <div className="rounded-3xl border border-slate-200 bg-white p-5">
                   <div className="mb-3 text-sm font-semibold text-slate-900">
                     Vista rápida
@@ -405,13 +370,4 @@ function getStepFields(step: Step, format?: FormatType) {
     default:
       return [] as const;
   }
-}
-
-function MetaRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white px-3 py-2.5">
-      <span className="text-slate-500">{label}</span>
-      <span className="font-medium text-slate-900">{value}</span>
-    </div>
-  );
 }

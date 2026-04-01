@@ -7,8 +7,8 @@ import {
   PEDAGOGICAL_TYPES,
   SKILL_FOCUS,
 } from "@/lib/constants/resource.constants";
-import { EditFormValues } from "./FormSection";
 import { FieldErrors, UseFormRegister } from "react-hook-form";
+import { EditFormValues } from "@/lib/utils/resource-mappers";
 
 interface ToggleGroupFieldProps {
   resource: Partial<EditFormValues>;

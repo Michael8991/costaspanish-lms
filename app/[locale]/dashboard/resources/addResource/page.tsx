@@ -1,10 +1,9 @@
 "use client";
 
-import AddResourceForm, {
-  AddResourcePayload,
-} from "@/components/dashboard/resources/AddResourceForm";
+import AddResourceForm from "@/components/dashboard/resources/AddResourceForm";
 import Breadcrumbs from "@/components/ui/Breadcrumbs";
 import { processAndUploadResource } from "@/lib/resource/upload/processResourceUpload";
+import { AddResourcePayload } from "@/lib/utils/resource-mappers";
 
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";

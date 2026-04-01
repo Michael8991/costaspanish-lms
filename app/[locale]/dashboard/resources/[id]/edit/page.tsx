@@ -1,6 +1,6 @@
 import FormSection from "@/components/dashboard/resources/edit/fields/FormSection";
 import Breadcrumbs from "@/components/ui/Breadcrumbs";
-import { ResourceDetailDTO, toResourceDetailDTO } from "@/lib/dto/resource.dto";
+import { toResourceDetailDTO } from "@/lib/dto/resource.dto";
 import dbConnect from "@/lib/mongo";
 import { Resource } from "@/models/ResourceProfile";
 import { Types } from "mongoose";
