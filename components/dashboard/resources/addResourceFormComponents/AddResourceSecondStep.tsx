@@ -19,7 +19,6 @@ import z from "zod";
 import { useRef, useState } from "react";
 
 interface AddResourseSecondStepProps {
-  selectedFormat: FormatType | undefined;
   uploadMessage: string;
   uploadError: string;
   onUploadFile?: (
@@ -29,7 +28,6 @@ interface AddResourseSecondStepProps {
 }
 
 export default function AddResourceSecondStep({
-  selectedFormat,
   onUploadFile,
 }: AddResourseSecondStepProps) {
   const [isDragging, setIsDragging] = useState(false);
@@ -48,6 +46,7 @@ export default function AddResourceSecondStep({
   } = useFormContext<z.input<typeof createResourceSchema>>();
 
   const values = watch();
+  const selectedFormat = watch("format");
 
   const processFile = async (file: File) => {
     if (!file || !selectedFormat || selectedFormat === "external_link") return;
@@ -97,56 +96,6 @@ export default function AddResourceSecondStep({
   const handlePickFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) processFile(file);
-    // if (!file || !selectedFormat || selectedFormat === "external_link") return;
-    // setUploadError("");
-    // setUploadMessage("");
-
-    // setValue("originalFilename", file.name, { shouldDirty: true });
-    // setValue("mimeType", file.type || "", { shouldDirty: true });
-    // setValue("fileSizeBytes", file.size, { shouldDirty: true });
-
-    // if (!onUploadFile) {
-    //   setUploadMessage(
-    //     "Archivo detectado. Falta conectar onUploadFile para rellenar fileUrl/storagePath automáticamente.",
-    //   );
-    //   return;
-    // }
-    // try {
-    //   setIsUploading(true);
-    //   const result = await onUploadFile(file, selectedFormat);
-
-    //   setValue("storagePath", result.storagePath ?? "", {
-    //     shouldValidate: true,
-    //   });
-    //   setValue("fileUrl", result.fileUrl ?? "", { shouldValidate: true });
-    //   setValue("originalFilename", result.originalFilename ?? file.name, {
-    //     shouldDirty: true,
-    //   });
-    //   setValue("mimeType", result.mimeType ?? file.type ?? "", {
-    //     shouldDirty: true,
-    //   });
-    //   setValue("fileSizeBytes", result.fileSizeBytes ?? file.size, {
-    //     shouldDirty: true,
-    //   });
-    //   setValue("pageCount", result.pageCount, { shouldDirty: true });
-    //   setValue("durationSeconds", result.durationSeconds, {
-    //     shouldDirty: true,
-    //   });
-    //   setValue("thumbnailUrl", result.thumbnailUrl ?? "", {
-    //     shouldValidate: true,
-    //   });
-
-    //   setUploadMessage("Archivo procesado correctamente.");
-    //   await trigger(getStepFields(2, selectedFormat));
-    // } catch (error) {
-    //   setUploadError(
-    //     error instanceof Error
-    //       ? error.message
-    //       : "No se pudo procesar el archivo.",
-    //   );
-    // } finally {
-    //   setIsUploading(false);
-    // }
   };
 
   const handleRemoveUploadedData = () => {
@@ -186,7 +135,6 @@ export default function AddResourceSecondStep({
 
   return (
     <>
-      {" "}
       <section className="space-y-6">
         <SectionHeader
           title="Contenido del recurso"

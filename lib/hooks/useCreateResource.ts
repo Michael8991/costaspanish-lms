@@ -32,51 +32,46 @@ type UseAddResourceFormProps = {
 };
 
 export const useAddResourceForm = ({initialValues={}}: UseAddResourceFormProps) => {
-  const [step, setStep] = useState<Step>(1);
-    const form = useForm<z.input<typeof createResourceSchema>>({
-        resolver: zodResolver(createResourceSchema),
-        mode: "onTouched",
-        defaultValues: {
-          title: "",
-          description: "",
-          status: "draft",
-          visibility: "private",
-          levels: [],
-          skills: [],
-          deliveryModes: ["classwork", "homework"],
-          lessonStages: [],
-          grammarTopics: initialValues?.grammarTopics ?? [],
-          vocabularyTopics: initialValues?.vocabularyTopics ?? [],
-          transcriptText: "",
-          tags: initialValues?.tags ?? [],
-          hasAnswerKey: false,
-          requiresTeacherReview: false,
-          storagePath: "",
-          fileUrl: "",
-          originalFilename: "",
-          mimeType: "",
-          thumbnailUrl: "",
-          thumbnailStoragePath: "",
-          externalUrl: "",
-          ...initialValues,
-        },
-      });
-    
+ const [step, setStep] = useState<Step>(1);
+  
+  const form = useForm<z.input<typeof createResourceSchema>>({
+    resolver: zodResolver(createResourceSchema),
+    mode: "onTouched",
+    defaultValues: {
+      title: "",
+      description: "",
+      status: "draft",
+      visibility: "private",
+      levels: [],
+      skills: [],
+      deliveryModes: ["classwork", "homework"],
+      lessonStages: [],
+      grammarTopics: initialValues?.grammarTopics ?? [],
+      vocabularyTopics: initialValues?.vocabularyTopics ?? [],
+      transcriptText: "",
+      tags: initialValues?.tags ?? [],
+      hasAnswerKey: false,
+      requiresTeacherReview: false,
+      storagePath: "",
+      fileUrl: "",
+      originalFilename: "",
+      mimeType: "",
+      thumbnailUrl: "",
+      thumbnailStoragePath: "",
+      externalUrl: "",
+      ...initialValues,
+    },
+  });
+
     const handleFormatSelection = (format: FormatType) => {
-        form.setValue("format", format, { shouldValidate: true, shouldDirty: true });
-        if (step === 1) setStep(2);
+    form.setValue("format", format, { shouldValidate: true, shouldDirty: true });
+    if (step === 1) setStep(2);
   };
-  
-  
-    
 
-    
-    return {
-      form,
-      step,
-      setStep,
-        
-
-      handleFormatSelection,
-    }
+  return {
+    form,           // 👈 el objeto completo para FormProvider
+    step,
+    setStep,
+    handleFormatSelection,
+  };
 }

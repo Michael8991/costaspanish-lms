@@ -54,10 +54,25 @@ const dedupe = <T>(items: T[]) => [...new Set(items)];
 
 
 
-const normalizedLooseStringArray = z
-  .array(z.string().trim().toLowerCase().min(1).max(80))
-  .default([])
-  .transform((items) => dedupe(items));
+// const normalizedLooseStringArray = z
+//   .array(z.string().trim().toLowerCase().min(1).max(80))
+//   .default([])
+//   .transform((items) => dedupe(items));
+
+  const normalizedLooseStringArray = z.preprocess(
+  (val) => {
+    if (typeof val === "string") {
+      return val.split(",").filter(Boolean); 
+    }
+    if (Array.isArray(val)) {
+      return val;
+    }
+    return [];
+  },
+  z.array(z.string().trim().toLowerCase().min(1).max(80))
+    .default([])
+    .transform((items) => dedupe(items))
+);
 
 const levelsArraySchema = z
   .array(z.enum(CEFR_LEVELS))
