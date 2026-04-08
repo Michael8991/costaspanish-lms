@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils/form-helpers";
 import { Check } from "lucide-react";
-import { EditFormValues } from "./FormSection";
+import { EditFormValues } from "@/lib/utils/resource-mappers";
 import { UseFormSetValue } from "react-hook-form";
 
 interface CheckToggleField {
