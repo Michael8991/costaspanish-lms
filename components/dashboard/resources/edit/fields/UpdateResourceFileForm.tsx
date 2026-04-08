@@ -87,6 +87,40 @@ export default function UpdateResourceFileForm({
 
   const handleUpdateFormatSelection = (format: FormatType) => {
     uploadForm.setValue("format", format, { shouldValidate: true });
+    if (format !== "pdf") {
+      uploadForm.setValue("pageCount", undefined, { shouldValidate: true });
+      uploadForm.setValue("thumbnailUrl", undefined, { shouldValidate: true });
+      uploadForm.setValue("thumbnailStoragePath", undefined, {
+        shouldValidate: true,
+      });
+    }
+
+    if (format !== "audio" && format !== "video") {
+      uploadForm.setValue("durationSeconds", undefined, {
+        shouldValidate: true,
+      });
+    }
+
+    if (format === "external_link") {
+      uploadForm.setValue("storagePath", undefined, { shouldValidate: true });
+      uploadForm.setValue("fileUrl", undefined, { shouldValidate: true });
+      uploadForm.setValue("originalFilename", undefined, {
+        shouldValidate: true,
+      });
+      uploadForm.setValue("mimeType", undefined, { shouldValidate: true });
+      uploadForm.setValue("fileSizeBytes", undefined, { shouldValidate: true });
+      uploadForm.setValue("pageCount", undefined, { shouldValidate: true });
+      uploadForm.setValue("durationSeconds", undefined, {
+        shouldValidate: true,
+      });
+      uploadForm.setValue("thumbnailUrl", undefined, { shouldValidate: true });
+      uploadForm.setValue("thumbnailStoragePath", undefined, {
+        shouldValidate: true,
+      });
+    } else {
+      uploadForm.setValue("externalUrl", undefined, { shouldValidate: true });
+    }
+
     setStep(2);
   };
 
@@ -110,40 +144,69 @@ export default function UpdateResourceFileForm({
     const uploadValues = uploadForm.getValues();
     const format = uploadValues.format;
 
-    const payload =
-      format === "external_link"
-        ? {
-            format,
-            externalUrl: uploadValues.externalUrl,
-            storagePath: null,
-            fileUrl: null,
-            originalFilename: null,
-            mimeType: null,
-            fileSizeBytes: null,
-            pageCount: null,
-            durationSeconds: null,
-            thumbnailUrl: null,
-            thumbnailStoragePath: null,
-          }
-        : {
-            format,
-            storagePath: uploadValues.storagePath,
-            fileUrl: uploadValues.fileUrl,
-            originalFilename: uploadValues.originalFilename,
-            mimeType: uploadValues.mimeType,
-            fileSizeBytes: uploadValues.fileSizeBytes,
-            pageCount: uploadValues.pageCount,
-            durationSeconds: uploadValues.durationSeconds,
-            thumbnailUrl: uploadValues.thumbnailUrl,
-            thumbnailStoragePath: uploadValues.thumbnailStoragePath,
-            externalUrl: null,
-          };
+    let payload: Record<string, unknown> = { format };
 
-    await fetch(`/api/resources/${resourceId}`, {
+    if (format === "external_link") {
+      payload = {
+        format,
+        externalUrl: uploadValues.externalUrl,
+        storagePath: null,
+        fileUrl: null,
+        originalFilename: null,
+        mimeType: null,
+        fileSizeBytes: null,
+        pageCount: null,
+        durationSeconds: null,
+        thumbnailUrl: null,
+        thumbnailStoragePath: null,
+      };
+    } else {
+      payload = {
+        format,
+        storagePath: uploadValues.storagePath,
+        fileUrl: uploadValues.fileUrl,
+        originalFilename: uploadValues.originalFilename,
+        mimeType: uploadValues.mimeType,
+        fileSizeBytes: uploadValues.fileSizeBytes,
+        externalUrl: null,
+      };
+
+      if (format === "pdf") {
+        payload.pageCount = uploadValues.pageCount;
+        payload.thumbnailUrl = uploadValues.thumbnailUrl;
+        payload.thumbnailStoragePath = uploadValues.thumbnailStoragePath;
+        payload.durationSeconds = null;
+      }
+
+      if (format === "audio" || format === "video") {
+        payload.durationSeconds = uploadValues.durationSeconds;
+        payload.pageCount = null;
+        payload.thumbnailUrl = null;
+        payload.thumbnailStoragePath = null;
+      }
+
+      if (format === "image") {
+        payload.pageCount = null;
+        payload.durationSeconds = null;
+        payload.thumbnailUrl = null;
+        payload.thumbnailStoragePath = null;
+      }
+    }
+
+    console.log("🔍 uploadForm values al submit:", uploadValues);
+    console.log("📦 payload final:", payload);
+
+    const res = await fetch(`/api/resources/${resourceId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error("❌ API error response:", JSON.stringify(err, null, 2));
+      return;
+    }
 
     onClose();
     router.refresh();

@@ -164,6 +164,7 @@ export default function FormSection({
       format,
       resource.owner.teacherId,
       resource.asset.storagePath,
+      resource.asset.thumbnailStoragePath ?? null,
     );
   };
 

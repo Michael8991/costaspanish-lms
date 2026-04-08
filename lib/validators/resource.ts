@@ -40,6 +40,7 @@ const dedupe = <T>(items: T[]) => [...new Set(items)];
       .trim()
       .max(max)
       .or(z.literal(""))
+      .nullable()    
       .optional()
       .default("")
       .transform(val => val === "" ? undefined : val);
@@ -48,6 +49,7 @@ const dedupe = <T>(items: T[]) => [...new Set(items)];
     z.string()
       .url("URL no válida")
       .or(z.literal(""))
+      .nullable()  
       .optional()
       .default("")
       .transform(val => val === "" ? undefined : val);
@@ -309,6 +311,7 @@ export const updateResourceSchema = z
     if (!touchesAssetFields || !format) return;
 
     const isExternal = format === "external_link";
+    
 
     if (isExternal) {
       if ("externalUrl" in data && !data.externalUrl) {
