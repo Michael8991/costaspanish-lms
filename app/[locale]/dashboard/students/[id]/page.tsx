@@ -268,7 +268,6 @@ export default async function StudentPage({
             <div className="flex items-center justify-center">
               <ChevronDown
                 size={24}
-                // Magia pura de Tailwind: group-open:rotate-180 gira la flecha sola
                 className="text-[#9e2727] group-open:rotate-180 hover:text-white hover:bg-[#9e2727] rounded-full p-0.5 transition-all transform duration-300 ease-in-out"
               />
             </div>
