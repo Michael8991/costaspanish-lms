@@ -1,10 +1,10 @@
 import { Schema, model, models } from "mongoose";
 import { Types, HydratedDocument } from "mongoose";
+import { CurrencyCode, ParticipantMode } from "./CourseTemplate";
 
 export type CourseProfileStatus = "draft" | "active" | "paused" | "archived";
 export type CourseVisibility = "private" | "unlisted" | "public";
 export type CourseType = "regular_group" | "intensive_group" | "private_flexible";
-export type CurrencyCode = "EUR";
 export type StorefrontPriceMode = "monthly" | "package" | "free" | "custom_label";
 export type ConsumptionOutcome = "consume" | "do_not_consume" | "reschedule";
 export type DayOfWeek = 1 | 2 | 3 | 4 | 5 | 6 | 7;
@@ -54,7 +54,7 @@ export interface IConsumptionPolicies {
 }
 
 export interface IPriceCondition {
-  participantMode?: "solo" | "pair" | "trio" | "group";
+  participantMode?: ParticipantMode;
   participantCount?: number;
   packageClasses?: number;
   monthlyClasses?: number;
