@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { CURRENCY_CODES, PARTICIPANT_MODES, STORE_FRONT_PRICE_MODE } from "../constants/courseTemplate.constants";
+import { COURSETEMPLATE_STATUS, CURRENCY_CODES, PARTICIPANT_MODES, STORE_FRONT_PRICE_MODE } from "../constants/courseTemplate.constants";
 import { CEFR_LEVELS } from "../constants/resource.constants";
-import { STOREFRONT_PRICE_MODES } from "../constants/course.constants";
+
 
 // Helpers
 
@@ -60,55 +60,56 @@ const nonNegativeNumber = (fieldName: string) =>
     .min(0, `${fieldName} must be greater than or equal to 0` )
 
 //Subschemas
-export const priceConditionSchema = z
-  .object({
-    participantMode: z.enum(PARTICIPANT_MODES).optional(),
-    participantCount: z.number().int().min(1).optional(),
-    packageClasses: z.number().int().min(1).optional(),
-    monthlyClasses: z.number().int().min(1).optional(),
-  })
-  .superRefine((data, ctx) => {
-    if (data.packageClasses && data.monthlyClasses) {
-      ctx.addIssue({
-        code: "custom",
-        message: "A price condition cannot define both packageClasses and monthlyClasses",
-        path: ["monthlyClasses"],
-      });
-    }
+export const priceConditionSchema =
+  z
+    .object({
+      participantMode: z.enum(PARTICIPANT_MODES).optional(),
+      participantCount: z.number().int().min(1).optional(),
+      packageClasses: z.number().int().min(1).optional(),
+      monthlyClasses: z.number().int().min(1).optional(),
+    })
+    .superRefine((data, ctx) => {
+      if (data.packageClasses && data.monthlyClasses) {
+        ctx.addIssue({
+          code: "custom",
+          message: "A price condition cannot define both packageClasses and monthlyClasses",
+          path: ["monthlyClasses"],
+        });
+      }
 
-    if (data.participantMode === "solo" && data.participantCount && data.participantCount !== 1) {
-      ctx.addIssue({
-        code: "custom",
-        message: 'participantCount must be 1 when participantMode is "solo"',
-        path: ["participantCount"],
-      });
-    }
+      if (data.participantMode === "solo" && data.participantCount && data.participantCount !== 1) {
+        ctx.addIssue({
+          code: "custom",
+          message: 'participantCount must be 1 when participantMode is "solo"',
+          path: ["participantCount"],
+        });
+      }
 
-    if (data.participantMode === "pair" && data.participantCount && data.participantCount !== 2) {
-      ctx.addIssue({
-        code: "custom",
-        message: 'participantCount must be 2 when participantMode is "pair"',
-        path: ["participantCount"],
-      });
-    }
+      if (data.participantMode === "pair" && data.participantCount && data.participantCount !== 2) {
+        ctx.addIssue({
+          code: "custom",
+          message: 'participantCount must be 2 when participantMode is "pair"',
+          path: ["participantCount"],
+        });
+      }
 
-    if (data.participantMode === "trio" && data.participantCount && data.participantCount !== 3) {
-      ctx.addIssue({
-        code: "custom",
-        message: 'participantCount must be 3 when participantMode is "trio"',
-        path: ["participantCount"],
-      });
-    }
+      if (data.participantMode === "trio" && data.participantCount && data.participantCount !== 3) {
+        ctx.addIssue({
+          code: "custom",
+          message: 'participantCount must be 3 when participantMode is "trio"',
+          path: ["participantCount"],
+        });
+      }
 
-    if (data.participantMode === "group" && data.participantCount && data.participantCount < 2) {
-      ctx.addIssue({
-        code: "custom",
-        message: 'participantCount should be >= 2 when participantMode is "group"',
-        path: ["participantCount"],
-      });
-    }
-  
-  })
+      if (data.participantMode === "group" && data.participantCount && data.participantCount < 2) {
+        ctx.addIssue({
+          code: "custom",
+          message: 'participantCount should be >= 2 when participantMode is "group"',
+          path: ["participantCount"],
+        });
+      }
+    
+    })
 
   export const priceOptionSchema = z.object({
     label: nonEmptyTrimmedString("label", 120),
@@ -197,16 +198,105 @@ export const priceConditionSchema = z
     }
   });
 
+export const pedagogicalMetaSchema = z.object({
+  level: z.enum(CEFR_LEVELS),
+  category: nonEmptyTrimmedString("category", 80),
+  objectives: normalizeStringArray(200),
+  methodology: optionalTrimmedString,
+  estimatedDurationLabel: optionalTrimmedString,
+  targetAudience: optionalTrimmedString,
+});
+  
+export const subModuleSchema = z.object({
+  title: nonEmptyTrimmedString("category", 80),
+  type: optionalTrimmedString,
+  durationLabel: optionalTrimmedString,
+});
+
+export const moduleDataSchema = z.object({
+  title: nonEmptyTrimmedString("title", 120),
+  durationLabel: optionalTrimmedString,
+  type: optionalTrimmedString,
+  submodules: z.array(subModuleSchema).default([]),
+})
+
+export const curriculumSchema = z.object({
+  modules: z.array(moduleDataSchema).default([]),
+  units: normalizeStringArray(120),
+})
+
 //Base courseTemplate Schema
 
 
+export const courseTemplateBaseSchema = z.object({
+  code: nonEmptyTrimmedString("code", 60).transform((value) => value.toUpperCase()),
+  internalName: nonEmptyTrimmedString("internalName", 140),
+  status: z.enum(COURSETEMPLATE_STATUS).default("draft"),
+  version: z.number().int().min(1).default(1),
+  pedagogicalMeta: pedagogicalMetaSchema,
+  defaultStorefront: defaultStorefrontSchema,
+  curriculum: curriculumSchema.default({
+    modules: [],
+    units:[],
+  })
+})
+
 //Create Schema
-// export const createCourseTemplateSchema = z
-    
+
+    export const createCourseTemplateSchema = courseTemplateBaseSchema.superRefine(
+  (data, ctx) => {
+    if (data.status === "ready") {
+      if (data.defaultStorefront.publicTitle.trim().length === 0) {
+        ctx.addIssue({
+          code: "custom",
+          message: "publicTitle is required when template status is ready",
+          path: ["defaultStorefront", "publicTitle"],
+        });
+      }
+
+      if (data.defaultStorefront.shortDescription.trim().length === 0) {
+        ctx.addIssue({
+          code: "custom",
+          message: "shortDescription is required when template status is ready",
+          path: ["defaultStorefront", "shortDescription"],
+        });
+      }
+    }
+  }
+);
 
 //Update Schema
+
+export const updateCourseTemplateSchema = courseTemplateBaseSchema
+  .partial()
+  .superRefine((data, ctx) => {
+    if (
+      data.defaultStorefront?.priceMode === "free" &&
+      data.defaultStorefront?.priceOptions
+    ) {
+      for (const [index, option] of data.defaultStorefront.priceOptions.entries()) {
+        if (typeof option.amount === "number" && option.amount !== 0) {
+          ctx.addIssue({
+            code: "custom",
+            message: 'When priceMode is "free", every price option amount must be 0',
+            path: ["defaultStorefront", "priceOptions", index, "amount"],
+          });
+        }
+      }
+    }
+  });
 
 
 //Internal / DB schema
 
+export const courseTemplateDbSchema = courseTemplateBaseSchema.extend({
+  ownerTeacherId: z.string().trim().min(1, "ownerTeacherId is required"),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+
 //Types inferidos
+
+export type CreateCourseTemplateInput = z.infer<typeof createCourseTemplateSchema>;
+export type UpdateCourseTemplateInput = z.infer<typeof updateCourseTemplateSchema>;
+export type CourseTemplateDbShape = z.infer<typeof courseTemplateDbSchema>;
