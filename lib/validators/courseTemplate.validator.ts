@@ -1,63 +1,7 @@
 import { z } from "zod";
 import { COURSETEMPLATE_STATUS, CURRENCY_CODES, PARTICIPANT_MODES, STORE_FRONT_PRICE_MODE } from "../constants/courseTemplate.constants";
 import { CEFR_LEVELS } from "../constants/resource.constants";
-
-
-// Helpers
-
-const optionalTrimmedString =
-  z
-  .string()
-  .trim()
-  .optional()
-  .transform((value) => {
-    if (value === "") return undefined;
-    return value;
-  });
-
-const normalizeStringArray = (maxItemLength = 120) =>
-  z.array(z.string().trim().min(1).max(maxItemLength))
-    .default([])
-    .transform((items) => {
-      const cleaned = items
-        .map((item) => item.trim())
-        .filter(Boolean);
-      return Array.from(new Set(cleaned))
-})
-
-  const optionalHttpUrlString = () =>
-    z
-      .url({
-        protocol: /^https?$/,
-        hostname: z.regexes.domain,
-        error: "Url no válida",
-      })
-      .or(z.literal(""))
-      .nullable()  
-      .optional()
-      .default("")
-    .transform(val => val === "" ? undefined : val);
-      
-const nonEmptyTrimmedString = (fieldName: string, max = 200) =>
-  z.string({
-    error: (issue) =>
-      issue.input === undefined
-        ? `${fieldName} is required`
-        : `${fieldName} must be a string`, 
-    })
-    .trim()
-    .min(1, `${fieldName} is required`)
-    .max(max, `${fieldName} must be at most  ${max} characters`)
-
-const nonNegativeNumber = (fieldName: string) => 
-  z
-    .number({
-      error: (issue) => 
-        issue.input === undefined
-          ? `${fieldName} is required`
-          : `${fieldName} must be a number`
-    })
-    .min(0, `${fieldName} must be greater than or equal to 0` )
+import { nonEmptyTrimmedString, nonNegativeNumber, normalizeStringArray, optionalHttpUrlString, optionalTrimmedString } from "../utils/course-helpers";
 
 //Subschemas
 export const priceConditionSchema =

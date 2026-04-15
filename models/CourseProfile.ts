@@ -1,6 +1,7 @@
 import { Schema, model, models } from "mongoose";
 import { Types, HydratedDocument } from "mongoose";
 import { CurrencyCode, ParticipantMode } from "./CourseTemplate";
+import { COURSE_STATUSES } from "@/lib/constants/course.constants";
 
 export type CourseProfileStatus = "draft" | "active" | "paused" | "archived";
 export type CourseVisibility = "private" | "unlisted" | "public";
@@ -534,7 +535,7 @@ const CourseProfileSchema = new Schema<ICourseProfile>(
 
     status: {
       type: String,
-      enum: ["draft", "active", "paused", "archived"],
+      enum: COURSE_STATUSES,
       required: true,
       default: "draft",
       index: true,

@@ -5,3 +5,4 @@ export const COURSE_TYPES = ["regular_group", "intensive_group", "private_flexib
 export const STOREFRONT_PRICE_MODES = ["monthly", "package", "free", "custom_label"] as const;
 export const CURRENCY_CODES = ["EUR"] as const;
 export const CONSUMPTION_OUTCOMES = ["consume", "do_not_consume", "reschedule"] as const;
+export const DAYS_OF_WEEK = [1, 2, 3, 4, 5, 6, 7] as const;
