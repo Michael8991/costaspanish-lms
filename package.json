@@ -13,6 +13,7 @@
     "@types/mongoose": "^5.11.96",
     "bcryptjs": "^3.0.3",
     "firebase": "^12.10.0",
+    "firebase-admin": "^13.8.0",
     "framer-motion": "^12.37.0",
     "lucide-react": "^0.575.0",
     "mongodb": "^7.0.0",

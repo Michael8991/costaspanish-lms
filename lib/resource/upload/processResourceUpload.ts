@@ -1,63 +1,104 @@
 import { extractPdfMetadata, getMediaDuration } from "@/lib/utils/fileExtractors";
-import { RESOURCE_UPLOAD_RULES, STORAGE_PATHS, UploadableFormat } from "./rule";
-import { uploadFileWithProgress } from "@/lib/firebase/storage";
+import { RESOURCE_UPLOAD_RULES, UploadableFormat } from "./rule";
 
-export const processAndUploadResource = async (file: File, format: UploadableFormat) => {
-    const rules = RESOURCE_UPLOAD_RULES[format];
-    const mainPath = STORAGE_PATHS[format];
+type UploadApiResponse = {
+  fileUrl: string;
+  storagePath: string;
+  originalFilename: string;
+  mimeType: string;
+  fileSizeBytes: number;
+};
 
-    let pageCount: number | undefined;
-    let durationSeconds: number | undefined;
-    let thumbnailUrl: string | undefined;
-    let thumbnailStoragePath: string | undefined;
+async function uploadFileThroughApi(
+  file: File,
+  format: UploadableFormat,
+  variant: "main" | "thumbnail"
+): Promise<UploadApiResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("format", format);
+  formData.append("variant", variant);
 
-    try {
-      if (format === "audio" || format === "video") {
-        durationSeconds = await getMediaDuration(file);
-      }
+  const response = await fetch("/api/resources/upload", {
+    method: "POST",
+    body: formData,
+  });
 
-      if (format === "pdf") {
-        const pdfData = await extractPdfMetadata(file);
-        pageCount = pdfData.pageCount;
+  const data = await response.json();
 
-        const safeBaseName = file.name.replace(/\.pdf$/i, "");
-        const thumbFile = new File(
-          [pdfData.thumbnailBlob],
-          `thumb_${safeBaseName}.jpg`,
-          { type: "image/jpeg" },
-        );
+  if (!response.ok) {
+    throw new Error(data.error || "Error al subir el archivo");
+  }
 
-        const thumbResult = await uploadFileWithProgress(
-          thumbFile,
-          "resources/pdfs/thumbnails",
-          {
-            allowedTypes: ["image/jpeg"],
-            maxSizeBytes: 2 * 1024 * 1024,
-          },
-        ).promise;
+  return data;
+}
 
-        thumbnailUrl = thumbResult.downloadUrl;
-        thumbnailStoragePath = thumbResult.storagePath;
-      }
+export const processAndUploadResource = async (
+  file: File,
+  format: UploadableFormat
+) => {
+  const rules = RESOURCE_UPLOAD_RULES[format];
 
-      const mainResult = await uploadFileWithProgress(file, mainPath, {
-        allowedTypes: rules.allowedTypes,
-        maxSizeBytes: rules.maxSizeBytes,
-      }).promise;
+  let pageCount: number | undefined;
+  let durationSeconds: number | undefined;
+  let thumbnailUrl: string | undefined;
+  let thumbnailStoragePath: string | undefined;
 
-      return {
-        storagePath: mainResult.storagePath,
-        fileUrl: mainResult.downloadUrl,
-        originalFilename: file.name,
-        mimeType: file.type || "application/octet-stream",
-        fileSizeBytes: file.size,
-        pageCount,
-        durationSeconds,
-        thumbnailUrl,
-        thumbnailStoragePath,
-      };
-    } catch (error) {
-      console.error("Error uploading resource:", error);
-      throw new Error("No se pudo procesar y subir el recurso");
+  try {
+    if (!rules.allowedTypes.includes(file.type)) {
+      throw new Error(`Tipo de archivo no permitido: ${file.type}`);
     }
-  };
+
+    if (file.size > rules.maxSizeBytes) {
+      throw new Error(
+        `Archivo demasiado grande. Máximo permitido: ${rules.maxSizeBytes} bytes`
+      );
+    }
+
+    if (format === "audio" || format === "video") {
+      durationSeconds = await getMediaDuration(file);
+    }
+
+    if (format === "pdf") {
+      const pdfData = await extractPdfMetadata(file);
+      pageCount = pdfData.pageCount;
+
+      const safeBaseName = file.name.replace(/\.pdf$/i, "");
+      const thumbFile = new File(
+        [pdfData.thumbnailBlob],
+        `thumb_${safeBaseName}.jpg`,
+        { type: "image/jpeg" }
+      );
+
+      const thumbResult = await uploadFileThroughApi(
+        thumbFile,
+        "image",
+        "thumbnail"
+      );
+
+      thumbnailUrl = thumbResult.fileUrl;
+      thumbnailStoragePath = thumbResult.storagePath;
+    }
+
+    const mainResult = await uploadFileThroughApi(file, format, "main");
+
+    return {
+      storagePath: mainResult.storagePath,
+      fileUrl: mainResult.fileUrl,
+      originalFilename: file.name,
+      mimeType: file.type || "application/octet-stream",
+      fileSizeBytes: file.size,
+      pageCount,
+      durationSeconds,
+      thumbnailUrl,
+      thumbnailStoragePath,
+    };
+  } catch (error) {
+    console.error("Error uploading resource:", error);
+    throw new Error(
+      error instanceof Error
+        ? error.message
+        : "No se pudo procesar y subir el recurso"
+    );
+  }
+};
