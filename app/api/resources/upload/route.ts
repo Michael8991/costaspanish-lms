@@ -128,14 +128,12 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const [signedUrl] = await bucketFile.getSignedUrl({
-      action: "read",
-      expires: Date.now() + 1000 * 60 * 60 * 24 * 7,
-    });
+  const bucketName = process.env.FIREBASE_STORAGE_BUCKET;
+  const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(storagePath)}?alt=media`;
 
     return NextResponse.json(
       {
-        fileUrl: signedUrl,
+        fileUrl: publicUrl,
         storagePath,
         originalFilename: file.name,
         mimeType: file.type || "application/octet-stream",
