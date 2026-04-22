@@ -16,7 +16,7 @@ export const DashboardShell = ({
     <div className="w-full min-h-screen bg-white">
       <Topbar locale={locale} userName={userName} role={role} />
       {children}
-      <ErrorMessages />
+      {/* <ErrorMessages /> */}
     </div>
   );
 };
