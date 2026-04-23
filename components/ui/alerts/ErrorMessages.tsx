@@ -7,12 +7,9 @@ export default function ErrorMessages() {
           <AlertCircle size={16} />
           Es posible que el sistema presente problemas en la subida de recursos.
         </p>
-<<<<<<< HEAD
         <p className="text-center">
           Se deshabilitará la subida hasta que se solucione.
         </p>
-=======
->>>>>>> main
       </div>
     </div>
   );
