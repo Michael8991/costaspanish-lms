@@ -70,7 +70,7 @@ export interface CourseTemplateDetailDTO {
   version: number;
 
   pedagogicalMeta: PedagogicalMetaDTO;
-  defaultStorefront: DefaultStorefrontDTO;
+  storefront: DefaultStorefrontDTO;
   curriculum: CurriculumDTO;
 
   createdAt: string;

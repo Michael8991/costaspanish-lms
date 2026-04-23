@@ -1,5 +1,6 @@
 import { GoogleConnected, Hello } from "@/components";
 import TeacherTodaySchedule from "@/components/dashboard/teacher/TeacherTodaySchedule";
+import { OnProgressPage } from "@/components/ui/onProgressPage/OnProgressPage";
 import { authOptions } from "@/lib/auth";
 import { getServerSession } from "next-auth";
 
@@ -50,6 +51,7 @@ export default async function TeacherHome({ locale }: { locale: string }) {
           <TeacherTodaySchedule />
         </div>
       </div>
+      <OnProgressPage locale={locale} />
     </div>
   );
 }

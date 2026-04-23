@@ -5,7 +5,7 @@ import { COURSE_STATUSES } from "@/lib/constants/course.constants";
 
 export type CourseProfileStatus = "draft" | "active" | "paused" | "archived";
 export type CourseVisibility = "private" | "unlisted" | "public";
-export type CourseType = "regular_group" | "intensive_group" | "private_flexible";
+export type CourseType = "regular_group" | "intensive_group" | "private_flexible" | "semi-intensive_group";
 export type StorefrontPriceMode = "monthly" | "package" | "free" | "custom_label";
 export type ConsumptionOutcome = "consume" | "do_not_consume" | "reschedule";
 export type DayOfWeek = 1 | 2 | 3 | 4 | 5 | 6 | 7;

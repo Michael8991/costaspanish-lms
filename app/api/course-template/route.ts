@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("GET /api/course-templates error:", error);
+    console.error("GET /api/course-template error:", error);
 
     return NextResponse.json(
       { ok: false, error: "Failed to fetch course templates" },
@@ -65,7 +65,6 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-
 export async function POST(request: NextRequest) {
   try {
     await dbConnect();
@@ -81,9 +80,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    console.log("1. BODY", body);
+
     const parsed = createCourseTemplateSchema.safeParse(body);
 
     if (!parsed.success) {
+      console.log("2. ZOD ERROR", parsed.error.flatten());
+
       return NextResponse.json(
         {
           ok: false,
@@ -95,22 +98,29 @@ export async function POST(request: NextRequest) {
     }
 
     const payload = parsed.data;
+    console.log("3. PARSED", payload);
+
     const persistenceInput = toCourseTemplatePersistenceInput(payload);
+    console.log("4. PERSISTENCE INPUT", persistenceInput);
 
     const created = await CourseTemplate.create({
       ownerTeacherId,
       ...persistenceInput,
     });
+    console.log("5. CREATED", created);
+
+    const dto = toCourseTemplateDetailDTO(created.toObject());
+    console.log("6. DTO", dto);
 
     return NextResponse.json(
       {
         ok: true,
-        data: toCourseTemplateDetailDTO(created.toObject()),
+        data: dto,
       },
       { status: 201 }
     );
   } catch (error: unknown) {
-    console.error("POST /api/course-templates error:", error);
+    console.error("POST /api/course-template FULL ERROR:", error);
 
     const maybeMongoError = error as { code?: number };
 
@@ -125,7 +135,14 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { ok: false, error: "Failed to create course template" },
+      {
+        ok: false,
+        error:
+          error instanceof Error ? error.message : "Failed to create course template",
+        stack: process.env.NODE_ENV === "development" && error instanceof Error
+          ? error.stack
+          : undefined,
+      },
       { status: 500 }
     );
   }

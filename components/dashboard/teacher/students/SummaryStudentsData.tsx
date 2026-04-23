@@ -1,4 +1,6 @@
 import { authOptions } from "@/lib/auth";
+import dbConnect from "@/lib/mongo";
+import { StudentProfile } from "@/models/StudentProfile";
 import { AlertCircle, GraduationCap, Users } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
@@ -8,34 +10,31 @@ export default async function SummaryStudentsData() {
   if (!session?.user || session.user.role === "student") {
     redirect(`/en/dashboard`);
   }
-
-  //   // 1. Te conectas a la base de datos
-  //   await dbConnect();
-
-  //   // 2. Cuentas los alumnos activos
-  //   const activeCount = await StudentProfile.countDocuments({ isActive: true });
-
-  //   // 3. Cuentas los que tienen nivel "Evaluando"
-  //   const pendingLevelCount = await StudentProfile.countDocuments({
-  //     level: "Evaluando",
-  //     isActive: true,
-  //   });
-
-  //   // 4. ¡LA MAGIA DE MONGODB! Cuentas los que tienen algún bono con 2 clases o menos
-  //   const expiringPlansCount = await StudentProfile.countDocuments({
-  //     activePlans: {
-  //       $elemMatch: {
-  //         status: "active",
-  //         creditsRemaining: { $lte: 2 }, // $lte significa "Less Than or Equal" (Menor o igual a 2)
-  //       },
-  //     },
-  //   });
+  let activeCount = 0;
+  let pendingLevelCount = 0;
+  let expiringPlansCount = 0;
+  try {
+    await dbConnect();
+    [activeCount, pendingLevelCount, expiringPlansCount] = await Promise.all([
+      StudentProfile.countDocuments({ isActive: true }),
+      StudentProfile.countDocuments({ level: "Evaluando", isActive: true }),
+      StudentProfile.countDocuments({
+        activePlans: {
+          $elemMatch: {
+            status: "active",
+            creditsRemaining: { $lte: 2 },
+          },
+        },
+      }),
+    ]);
+  } catch (error) {
+    console.error("Error fetching summary stats:", error);
+  }
 
   const stats = [
     {
       title: "Alumnos Activos",
-      // value: activeCount.toString()
-      value: "24",
+      value: activeCount.toString(),
       icon: Users,
       color: "text-blue-600",
       bg: "bg-blue-50",
@@ -43,8 +42,7 @@ export default async function SummaryStudentsData() {
     },
     {
       title: "Bonos que terminarán pronto",
-      // value: expiringPlanCount.toString()
-      value: "3",
+      value: expiringPlansCount.toString(),
       icon: AlertCircle,
       color: "text-red-600",
       bg: "bg-red-50",
@@ -52,8 +50,7 @@ export default async function SummaryStudentsData() {
     },
     {
       title: "Nivel Pendiente",
-      // value: pendingLevelCount.toString()
-      value: "2",
+      value: pendingLevelCount.toString(),
       icon: GraduationCap,
       color: "text-amber-600",
       bg: "bg-amber-50",

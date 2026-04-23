@@ -23,6 +23,7 @@ type QuickOptionsMenu = {
   href: (id: string) => string;
   icon: LucideIcon;
 };
+
 const quickOptionsMenu: QuickOptionsMenu[] = [
   {
     label: "Profile details",
@@ -61,11 +62,22 @@ const getLevelBadge = (level: string) => {
   return "bg-purple-100 text-purple-700 border-purple-200";
 };
 
+type StudentTableRow = Omit<
+  TableStudent,
+  "status" | "planType" | "creditsRemaining"
+> & {
+  status: "active" | "inactive";
+  activePlansCount: number;
+  highlightedPlanName: string;
+  highlightedPlanCreditsRemaining: number;
+  highlightedPlanCreditsTotal: number;
+};
+
 export default function StudentsTable({ locale }: { locale: string }) {
   const withLocale = (path: string) =>
     `/${locale}${path.startsWith("/") ? path : `/${path}`}`;
 
-  const [students, setStudents] = useState<TableStudent[]>([]);
+  const [students, setStudents] = useState<StudentTableRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,24 +91,33 @@ export default function StudentsTable({ locale }: { locale: string }) {
         }
         const data = await response.json();
 
-        const formattedData: TableStudent[] = data.items.map(
+        const formattedData: StudentTableRow[] = data.items.map(
           (student: DBStudent) => {
-            const currentPlan =
-              student.activePlans && student.activePlans.length > 0
-                ? student.activePlans[0]
-                : null;
+            const allPlans = Array.isArray(student.activePlans)
+              ? student.activePlans
+              : [];
+
+            const activePlans = allPlans.filter(
+              (plan) => plan.status === "active",
+            );
+
+            const highlightedPlan =
+              [...activePlans].sort(
+                (a, b) => (b.creditsRemaining ?? 0) - (a.creditsRemaining ?? 0),
+              )[0] ?? null;
 
             return {
               id: student._id,
               name: student.fullName,
               email: student.contactEmail,
               level: student.level,
-              status: student.isActive ? "active" : "exhausted",
-              planType: currentPlan ? currentPlan.name : "Sin plan",
-              creditsRemaining:
-                currentPlan && currentPlan.creditsRemaining
-                  ? currentPlan.creditsRemaining
-                  : 0,
+              status: student.isActive ? "active" : "inactive",
+              activePlansCount: activePlans.length,
+              highlightedPlanName:
+                highlightedPlan?.name ?? "Sin planes activos",
+              highlightedPlanCreditsRemaining:
+                highlightedPlan?.creditsRemaining ?? 0,
+              highlightedPlanCreditsTotal: highlightedPlan?.creditsTotal ?? 0,
             };
           },
         );
@@ -112,6 +133,7 @@ export default function StudentsTable({ locale }: { locale: string }) {
         setIsLoading(false);
       }
     };
+
     fetchStudent();
   }, []);
 
@@ -217,70 +239,125 @@ export default function StudentsTable({ locale }: { locale: string }) {
               <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 text-xs uppercase tracking-wider">
                 <th className="px-6 py-4 font-medium">Alumno</th>
                 <th className="px-6 py-4 font-medium">Nivel</th>
-                <th className="px-6 py-4 font-medium">Plan Actual</th>
-                <th className="px-6 py-4 font-medium">Clases Restantes</th>
+                <th className="px-6 py-4 font-medium">Estado del Alumno</th>
+                <th className="px-6 py-4 font-medium">Planes Activos</th>
                 <th className="px-6 py-4 font-medium text-right">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {students.map((student) => (
-                <tr
-                  key={student.id}
-                  className="hover:bg-gray-50/50 transition-colors group"
-                >
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center font-bold text-sm">
-                        {student.name.charAt(0)}
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {student.name}
-                        </p>
-                        <div className="flex items-center gap-1 text-gray-500 text-sm">
-                          <Mail size={12} />
-                          <span>{student.email}</span>
+              {students.map((student) => {
+                const progressPercentage =
+                  student.highlightedPlanCreditsTotal > 0
+                    ? Math.min(
+                        100,
+                        Math.max(
+                          0,
+                          (student.highlightedPlanCreditsRemaining /
+                            student.highlightedPlanCreditsTotal) *
+                            100,
+                        ),
+                      )
+                    : 0;
+
+                return (
+                  <tr
+                    key={student.id}
+                    className="hover:bg-gray-50/50 transition-colors group"
+                  >
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center font-bold text-sm">
+                          {student.name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900">
+                            {student.name}
+                          </p>
+                          <div className="flex items-center gap-1 text-gray-500 text-sm">
+                            <Mail size={12} />
+                            <span>{student.email}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </td>
+                    </td>
 
-                  <td className="px-6 py-4">
-                    <span
-                      className={`px-3 py-1 text-xs font-semibold rounded-full border ${getLevelBadge(student.level)}`}
-                    >
-                      {student.level}
-                    </span>
-                  </td>
-
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {student.planType}
-                  </td>
-
-                  <td className="px-6 py-4">
-                    {student.creditsRemaining > 0 ? (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 text-green-700 text-sm font-medium border border-green-100">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                        {student.creditsRemaining} clases
+                    <td className="px-6 py-4">
+                      <span
+                        className={`px-3 py-1 text-xs font-semibold rounded-full border ${getLevelBadge(student.level)}`}
+                      >
+                        {student.level}
                       </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 text-red-700 text-sm font-medium border border-red-100">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
-                        Agotado
-                      </span>
-                    )}
-                  </td>
+                    </td>
 
-                  <td className="px-6 py-4 text-right">
-                    <button
-                      onClick={(e) => toggleQuickOptionsMenu(student.id, e)}
-                      className="menu-button p-2 text-gray-400 hover:text-[#9e2727] hover:bg-red-50 rounded-lg transition-colors hover:cursor-pointer"
-                    >
-                      <MoreVertical size={20} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    <td className="px-6 py-4">
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium border ${
+                          student.status === "active"
+                            ? "bg-green-50 text-green-700 border-green-100"
+                            : "bg-gray-100 text-gray-600 border-gray-200"
+                        }`}
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            student.status === "active"
+                              ? "bg-green-500"
+                              : "bg-gray-400"
+                          }`}
+                        ></span>
+                        {student.status === "active" ? "Activo" : "Inactivo"}
+                      </span>
+                    </td>
+
+                    <td className="px-6 py-4 min-w-70">
+                      {student.activePlansCount > 0 ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium border border-blue-100">
+                              {student.activePlansCount}{" "}
+                              {student.activePlansCount === 1
+                                ? "plan activo"
+                                : "planes activos"}
+                            </span>
+                          </div>
+
+                          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                              <p className="text-sm font-medium text-gray-800 truncate">
+                                {student.highlightedPlanName}
+                              </p>
+                              <span className="text-xs text-gray-500 whitespace-nowrap">
+                                {student.highlightedPlanCreditsRemaining}/
+                                {student.highlightedPlanCreditsTotal}
+                              </span>
+                            </div>
+
+                            <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-[#9e2727] rounded-full transition-all"
+                                style={{ width: `${progressPercentage}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 text-red-700 text-sm font-medium border border-red-100">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                          Sin planes activos
+                        </span>
+                      )}
+                    </td>
+
+                    <td className="px-6 py-4 text-right">
+                      <button
+                        onClick={(e) => toggleQuickOptionsMenu(student.id, e)}
+                        className="menu-button p-2 text-gray-400 hover:text-[#9e2727] hover:bg-red-50 rounded-lg transition-colors hover:cursor-pointer"
+                      >
+                        <MoreVertical size={20} />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

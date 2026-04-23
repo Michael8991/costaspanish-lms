@@ -164,7 +164,7 @@ export function toCourseTemplateDetailDTO(
     version: source.version,
 
     pedagogicalMeta: toPedagogicalMetaDTO(source.pedagogicalMeta),
-    defaultStorefront: toDefaultStorefrontDTO(source.storefront),
+    storefront: toDefaultStorefrontDTO(source.storefront),
     curriculum: toCurriculumDTO(source.curriculum),
 
     createdAt: toIsoDate(source.createdAt),

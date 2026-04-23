@@ -1,4 +1,3 @@
-import ErrorMessages from "../ui/alerts/ErrorMessages";
 import { Topbar } from "./Topbar";
 
 export const DashboardShell = ({
@@ -16,7 +15,6 @@ export const DashboardShell = ({
     <div className="w-full min-h-screen bg-white">
       <Topbar locale={locale} userName={userName} role={role} />
       {children}
-      <ErrorMessages />
     </div>
   );
 };

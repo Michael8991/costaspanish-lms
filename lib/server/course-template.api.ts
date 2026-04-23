@@ -45,7 +45,7 @@ export function toCourseTemplatePersistenceInput(input: CreateCourseTemplateInpu
     status: input.status,
     version: input.version,
     pedagogicalMeta: input.pedagogicalMeta,
-    storefront: input.defaultStorefront,
+    storefront: input.storefront,
     curriculum: input.curriculum,
   };
 }

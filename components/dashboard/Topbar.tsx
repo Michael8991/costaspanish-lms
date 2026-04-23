@@ -35,14 +35,14 @@ type NavMenuItem = {
 
 const navMenuItems: NavMenuItem[] = [
   { label: "Home", href: "/dashboard" },
-  { label: "Course", href: "/course" },
-  { label: "Calendar", href: "/calendar" },
+  { label: "Course", href: "/dashboard/courses" },
+  { label: "Calendar", href: "/dashboard/calendar" },
   { label: "Resources", href: "/dashboard/resources" },
 ];
 const navMenuItemsTeacher: NavMenuItem[] = [
   { label: "Home", href: "/dashboard" },
-  { label: "Course", href: "/course" },
-  { label: "Calendar", href: "/calendar" },
+  { label: "Course", href: "/dashboard/courses" },
+  { label: "Calendar", href: "/dashboard/calendar" },
   { label: "Resources", href: "/dashboard/resources" },
   { label: "Students", href: "/dashboard/students" },
 ];
