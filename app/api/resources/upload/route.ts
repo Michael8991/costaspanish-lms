@@ -3,8 +3,7 @@ import { ensureFirebaseAdmin } from "@/lib/firebase/admin";
 import { RESOURCE_UPLOAD_RULES } from "@/lib/resource/upload/rule";
 import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { getStorage } from "firebase-admin/storage";
-
+import { getStorage, getDownloadURL } from "firebase-admin/storage";
 export const runtime = "nodejs";
 
 type UploadableFormat = keyof typeof RESOURCE_UPLOAD_RULES;
@@ -128,12 +127,17 @@ export async function POST(req: NextRequest) {
       },
     });
 
-  const bucketName = process.env.FIREBASE_STORAGE_BUCKET;
-  const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(storagePath)}?alt=media`;
+    await bucketFile.save(buffer, {
+      metadata: {
+        contentType: file.type || "application/octet-stream",
+      },
+    });
+
+    const fileUrl = await getDownloadURL(bucketFile);
 
     return NextResponse.json(
       {
-        fileUrl: publicUrl,
+        fileUrl,
         storagePath,
         originalFilename: file.name,
         mimeType: file.type || "application/octet-stream",
