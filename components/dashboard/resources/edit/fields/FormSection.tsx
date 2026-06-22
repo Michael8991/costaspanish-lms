@@ -14,7 +14,7 @@ import CheckToggleField from "./CheckToggleField";
 import { EditFormValues } from "@/lib/utils/resource-mappers";
 import { UploadedResourceMeta } from "../../AddResourceForm";
 import { FormatType } from "@/lib/constants/resource.constants";
-import { uploadResourceFile } from "@/lib/utils/upload-resource";
+import { processAndUploadResource } from "@/lib/resource/upload/processResourceUpload";
 
 interface EditResourceFormProps {
   locale: string;
@@ -159,15 +159,10 @@ export default function FormSection({
     file: File,
     format: Exclude<FormatType, "external_link">,
   ): Promise<UploadedResourceMeta> => {
-    return await uploadResourceFile(
-      file,
-      format,
-      resource.owner.teacherId,
-      resource.asset.storagePath,
-      resource.asset.thumbnailStoragePath ?? null,
-    );
-  };
+    const uploadedMeta = await processAndUploadResource(file, format);
 
+    return uploadedMeta;
+  };
   return (
     <FormProvider {...form}>
       <form
@@ -213,7 +208,7 @@ export default function FormSection({
         </div>
 
         {/* ── Sidebar ── */}
-        <SidebarInfo resource={resource} onUploadFile={handleUploadFile} />
+        <SidebarInfo resource={resource} onUpdateFile={handleUploadFile} />
       </form>
     </FormProvider>
   );

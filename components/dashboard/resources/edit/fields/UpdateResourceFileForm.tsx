@@ -1,19 +1,10 @@
 import { FORMAT_CARDS } from "@/components/ui/addResourcesForm/FormatSelectorCards";
-import {
-  MetaRow,
-  SectionHeader,
-} from "@/components/ui/addResourcesForm/FormSectionWrappers";
+import { SectionHeader } from "@/components/ui/addResourcesForm/FormSectionWrappers";
 import { FormatType } from "@/lib/constants/resource.constants";
 import { useUpdateResourceForm } from "@/lib/hooks/useUpdateResource";
 import { cn, formatBytes, toDisplayLabel } from "@/lib/utils/form-helpers";
 import { updateResourceSchema } from "@/lib/validators/resource";
-import {
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Loader2,
-  Sparkles,
-} from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Loader2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { FormProvider, useForm, useFormContext } from "react-hook-form";
@@ -26,7 +17,7 @@ interface UpdateResourceProps {
   resourceId: string | null;
   onClose: () => void;
   selectedFormat: FormatType | undefined;
-  onUploadFile: (
+  onUpdateFile: (
     file: File,
     format: Exclude<FormatType, "external_link">,
   ) => Promise<UploadedResourceMeta>;
@@ -49,7 +40,7 @@ export default function UpdateResourceFileForm({
   selectedFormat,
   onClose,
   resourceId,
-  onUploadFile,
+  onUpdateFile,
 }: UpdateResourceProps) {
   const [isUploading, setIsUploading] = useState(false);
   const {
@@ -70,6 +61,39 @@ export default function UpdateResourceFileForm({
     trigger,
     formState: { isSubmitting },
   } = form;
+
+  const submitUpdateFile = async () => {
+    if (!resourceId) return;
+
+    const values = uploadForm.getValues();
+
+    const res = await fetch(`/api/resources/${resourceId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        fileUrl: values.fileUrl,
+        storagePath: values.storagePath,
+        originalFilename: values.originalFilename,
+        mimeType: values.mimeType,
+        fileSizeBytes: values.fileSizeBytes,
+        pageCount: values.pageCount,
+        durationSeconds: values.durationSeconds,
+        thumbnailUrl: values.thumbnailUrl,
+        thumbnailStoragePath: values.thumbnailStoragePath,
+      }),
+    });
+
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      console.error("Error updating resource file:", error);
+      return;
+    }
+
+    onClose();
+    router.refresh();
+  };
 
   const uploadForm = useForm<z.input<typeof updateResourceSchema>>({
     resolver: zodResolver(updateResourceSchema),
@@ -140,76 +164,97 @@ export default function UpdateResourceFileForm({
     if (step > 1) setStep((prev) => (prev - 1) as Step);
   };
 
-  const submitUpdateFile = async () => {
-    const uploadValues = uploadForm.getValues();
-    const format = uploadValues.format;
+  // const submitUpdateFile = async () => {
+  //   const uploadValues = uploadForm.getValues();
+  //   const format = uploadValues.format;
 
-    let payload: Record<string, unknown> = { format };
+  //   let payload: Record<string, unknown> = { format };
 
-    if (format === "external_link") {
-      payload = {
-        format,
-        externalUrl: uploadValues.externalUrl,
-        storagePath: null,
-        fileUrl: null,
-        originalFilename: null,
-        mimeType: null,
-        fileSizeBytes: null,
-        pageCount: null,
-        durationSeconds: null,
-        thumbnailUrl: null,
-        thumbnailStoragePath: null,
-      };
-    } else {
-      payload = {
-        format,
-        storagePath: uploadValues.storagePath,
-        fileUrl: uploadValues.fileUrl,
-        originalFilename: uploadValues.originalFilename,
-        mimeType: uploadValues.mimeType,
-        fileSizeBytes: uploadValues.fileSizeBytes,
-        externalUrl: null,
-      };
+  //   if (format === "external_link") {
+  //     payload = {
+  //       format,
+  //       externalUrl: uploadValues.externalUrl,
+  //       storagePath: null,
+  //       fileUrl: null,
+  //       originalFilename: null,
+  //       mimeType: null,
+  //       fileSizeBytes: null,
+  //       pageCount: null,
+  //       durationSeconds: null,
+  //       thumbnailUrl: null,
+  //       thumbnailStoragePath: null,
+  //     };
+  //   } else {
+  //     payload = {
+  //       format,
+  //       storagePath: uploadValues.storagePath,
+  //       fileUrl: uploadValues.fileUrl,
+  //       originalFilename: uploadValues.originalFilename,
+  //       mimeType: uploadValues.mimeType,
+  //       fileSizeBytes: uploadValues.fileSizeBytes,
+  //       externalUrl: null,
+  //     };
 
-      if (format === "pdf") {
-        payload.pageCount = uploadValues.pageCount;
-        payload.thumbnailUrl = uploadValues.thumbnailUrl;
-        payload.thumbnailStoragePath = uploadValues.thumbnailStoragePath;
-        payload.durationSeconds = null;
-      }
+  //     if (format === "pdf") {
+  //       payload.pageCount = uploadValues.pageCount;
+  //       payload.thumbnailUrl = uploadValues.thumbnailUrl;
+  //       payload.thumbnailStoragePath = uploadValues.thumbnailStoragePath;
+  //       payload.durationSeconds = null;
+  //     }
 
-      if (format === "audio" || format === "video") {
-        payload.durationSeconds = uploadValues.durationSeconds;
-        payload.pageCount = null;
-        payload.thumbnailUrl = null;
-        payload.thumbnailStoragePath = null;
-      }
+  //     if (format === "audio" || format === "video") {
+  //       payload.durationSeconds = uploadValues.durationSeconds;
+  //       payload.pageCount = null;
+  //       payload.thumbnailUrl = null;
+  //       payload.thumbnailStoragePath = null;
+  //     }
 
-      if (format === "image") {
-        payload.pageCount = null;
-        payload.durationSeconds = null;
-        payload.thumbnailUrl = null;
-        payload.thumbnailStoragePath = null;
+  //     if (format === "image") {
+  //       payload.pageCount = null;
+  //       payload.durationSeconds = null;
+  //       payload.thumbnailUrl = null;
+  //       payload.thumbnailStoragePath = null;
+  //     }
+  //   }
+
+  //   console.log("🔍 uploadForm values al submit:", uploadValues);
+  //   console.log("📦 payload final:", payload);
+
+  //   const res = await fetch(`/api/resources/${resourceId}`, {
+  //     method: "PATCH",
+  //     headers: { "Content-Type": "application/json" },
+  //     body: JSON.stringify(payload),
+  //   });
+
+  //   if (!res.ok) {
+  //     const err = await res.json().catch(() => ({}));
+  //     console.error("❌ API error response:", JSON.stringify(err, null, 2));
+  //     return;
+  //   }
+
+  //   onClose();
+  //   router.refresh();
+  // };
+
+  const methods = useFormContext();
+
+  const handleCancel = async () => {
+    const currentStoragePath = methods.getValues("storagePath");
+    const currentThumbnailPath = methods.getValues("thumbnailStoragePath");
+
+    if (currentStoragePath) {
+      try {
+        // await deleteFileFromFirebase(currentStoragePath);
+        console.log("hay cambio");
+        if (currentThumbnailPath) {
+          // await deleteFileFromFirebase(currentThumbnailPath);
+          console.log("hay thumbnail");
+        }
+      } catch (error) {
+        console.log("Error borrando archivo huérfano: ", error);
       }
     }
-
-    console.log("🔍 uploadForm values al submit:", uploadValues);
-    console.log("📦 payload final:", payload);
-
-    const res = await fetch(`/api/resources/${resourceId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      console.error("❌ API error response:", JSON.stringify(err, null, 2));
-      return;
-    }
-
     onClose();
-    router.refresh();
   };
   return (
     <div className="mx-auto w-full max-w-5xl mt-5">
@@ -338,21 +383,31 @@ export default function UpdateResourceFileForm({
                 <AddResourceSecondStep
                   uploadMessage=""
                   uploadError=""
-                  onUploadFile={onUploadFile}
+                  onUploadFile={onUpdateFile}
                 />
               </FormProvider>
             )}
 
             <div className="mt-10 flex items-center justify-between border-t border-slate-100 pt-6">
-              <button
-                type="button"
-                onClick={goToPreviousStep}
-                disabled={step === 1}
-                className="cursor-pointer inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-40"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Atrás
-              </button>
+              <div className="flex items-center justify-start gap-2">
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  className="cursor-pointer inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-40"
+                >
+                  <X className="h-4 w-4" />
+                  Cerrar
+                </button>
+                <button
+                  type="button"
+                  onClick={goToPreviousStep}
+                  disabled={step === 1}
+                  className="cursor-pointer inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-40"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Atrás
+                </button>
+              </div>
 
               {step < 2 ? (
                 <button
@@ -366,8 +421,8 @@ export default function UpdateResourceFileForm({
               ) : (
                 <button
                   type="button"
-                  onClick={() => submitUpdateFile()}
-                  disabled={isSubmitting || isUploading}
+                  onClick={submitUpdateFile}
+                  disabled={!uploadForm.getValues("storagePath")}
                   className="cursor-pointer inline-flex items-center gap-2 rounded-2xl bg-[#9e2727] px-6 py-2.5 text-sm  text-white transition hover:bg-[#8d2323] disabled:opacity-60"
                 >
                   {(isSubmitting || isUploading) && (

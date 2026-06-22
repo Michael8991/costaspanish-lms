@@ -18,7 +18,7 @@ import { useFormContext } from "react-hook-form";
 import { UploadedResourceMeta } from "../../AddResourceForm";
 
 interface SidebarInfoProps {
-  onUploadFile: (
+  onUpdateFile: (
     file: File,
     format: Exclude<FormatType, "external_link">,
   ) => Promise<UploadedResourceMeta>;
@@ -46,7 +46,7 @@ const inputClass = (hasError = false) =>
 
 export default function SidebarInfo({
   resource,
-  onUploadFile,
+  onUpdateFile,
 }: SidebarInfoProps) {
   const router = useRouter();
   const [isUpdateResourceModalOpen, setIsUpdateResourceModalOpen] =
@@ -175,7 +175,7 @@ export default function SidebarInfo({
           <UpdateResourceFileForm
             resourceId={resource.id}
             selectedFormat={selectedFormat}
-            onUploadFile={onUploadFile}
+            onUpdateFile={onUpdateFile}
             // onSubmitForm={handleArchiveResource}
             // isSubmitting={isSubmittingArchiveResource}
             onClose={() => setIsUpdateResourceModalOpen(false)}
