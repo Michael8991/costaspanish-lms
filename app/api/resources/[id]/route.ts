@@ -10,6 +10,7 @@ import {
   updateResourceSchema,
 } from "@/lib/validators/resource";
 import { toResourceDetailDTO } from "@/lib/dto/resource.dto";
+import { deleteFirebaseFile } from "@/lib/firebase/deleteFirebaseFile";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -132,14 +133,14 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
   try {
     const user = await requireAuth(req);
 
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     if (!requireRole(user, ["admin", "teacher"])) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
+    }
       
-      if (!user) {
-         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
-
     const currentUserObjectId = getCurrentUserObjectId(user);
     if (!currentUserObjectId) {
       return NextResponse.json(
@@ -194,9 +195,19 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
 
     const payload = parsedBody.data;
 
+    const oldStoragePath = resource.storagePath;
+    const oldThumbnailStoragePath = resource.thumbnailStoragePath;
+
     Object.assign(resource, payload);
 
     await resource.save();
+
+    if (oldStoragePath && payload.storagePath && oldStoragePath !== payload.storagePath) {
+      await deleteFirebaseFile(oldStoragePath);
+    }
+    if (oldThumbnailStoragePath && payload.thumbnailStoragePath && oldThumbnailStoragePath !== payload.thumbnailStoragePath) {
+      await deleteFirebaseFile(oldThumbnailStoragePath);
+    }
 
     return NextResponse.json(
       {

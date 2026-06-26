@@ -110,42 +110,53 @@ export default function UpdateResourceFileForm({
   });
 
   const handleUpdateFormatSelection = (format: FormatType) => {
-    uploadForm.setValue("format", format, { shouldValidate: true });
-    if (format !== "pdf") {
-      uploadForm.setValue("pageCount", undefined, { shouldValidate: true });
-      uploadForm.setValue("thumbnailUrl", undefined, { shouldValidate: true });
-      uploadForm.setValue("thumbnailStoragePath", undefined, {
-        shouldValidate: true,
-      });
-    }
+    try {
+      uploadForm.setValue("format", format, { shouldValidate: true });
+      if (format !== "pdf") {
+        uploadForm.setValue("pageCount", undefined, { shouldValidate: true });
+        uploadForm.setValue("thumbnailUrl", undefined, {
+          shouldValidate: true,
+        });
+        uploadForm.setValue("thumbnailStoragePath", undefined, {
+          shouldValidate: true,
+        });
+      }
 
-    if (format !== "audio" && format !== "video") {
-      uploadForm.setValue("durationSeconds", undefined, {
-        shouldValidate: true,
-      });
-    }
+      if (format !== "audio" && format !== "video") {
+        uploadForm.setValue("durationSeconds", undefined, {
+          shouldValidate: true,
+        });
+      }
 
-    if (format === "external_link") {
-      uploadForm.setValue("storagePath", undefined, { shouldValidate: true });
-      uploadForm.setValue("fileUrl", undefined, { shouldValidate: true });
-      uploadForm.setValue("originalFilename", undefined, {
-        shouldValidate: true,
-      });
-      uploadForm.setValue("mimeType", undefined, { shouldValidate: true });
-      uploadForm.setValue("fileSizeBytes", undefined, { shouldValidate: true });
-      uploadForm.setValue("pageCount", undefined, { shouldValidate: true });
-      uploadForm.setValue("durationSeconds", undefined, {
-        shouldValidate: true,
-      });
-      uploadForm.setValue("thumbnailUrl", undefined, { shouldValidate: true });
-      uploadForm.setValue("thumbnailStoragePath", undefined, {
-        shouldValidate: true,
-      });
-    } else {
-      uploadForm.setValue("externalUrl", undefined, { shouldValidate: true });
+      if (format === "external_link") {
+        uploadForm.setValue("storagePath", undefined, { shouldValidate: true });
+        uploadForm.setValue("fileUrl", undefined, { shouldValidate: true });
+        uploadForm.setValue("originalFilename", undefined, {
+          shouldValidate: true,
+        });
+        uploadForm.setValue("mimeType", undefined, { shouldValidate: true });
+        uploadForm.setValue("fileSizeBytes", undefined, {
+          shouldValidate: true,
+        });
+        uploadForm.setValue("pageCount", undefined, { shouldValidate: true });
+        uploadForm.setValue("durationSeconds", undefined, {
+          shouldValidate: true,
+        });
+        uploadForm.setValue("thumbnailUrl", undefined, {
+          shouldValidate: true,
+        });
+        uploadForm.setValue("thumbnailStoragePath", undefined, {
+          shouldValidate: true,
+        });
+      } else {
+        uploadForm.setValue("externalUrl", undefined, { shouldValidate: true });
+      }
+    } catch (error) {
+      if (error instanceof Error) return error.message;
+      else return "Unknown error in uploading update method";
+    } finally {
+      setStep(2);
     }
-
-    setStep(2);
   };
 
   const progress = (step / 2) * 100;
@@ -238,24 +249,46 @@ export default function UpdateResourceFileForm({
 
   const methods = useFormContext();
 
-  const handleCancel = async () => {
-    const currentStoragePath = methods.getValues("storagePath");
-    const currentThumbnailPath = methods.getValues("thumbnailStoragePath");
+  const handleUpdateFile = async (
+    file: File,
+    format: Exclude<FormatType, "external_link">,
+  ): Promise<UploadedResourceMeta> => {
+    setIsUploading(true);
 
-    if (currentStoragePath) {
-      try {
-        // await deleteFileFromFirebase(currentStoragePath);
-        console.log("hay cambio");
-        if (currentThumbnailPath) {
-          // await deleteFileFromFirebase(currentThumbnailPath);
-          console.log("hay thumbnail");
-        }
-      } catch (error) {
-        console.log("Error borrando archivo huérfano: ", error);
-      }
+    try {
+      return await onUpdateFile(file, format);
+    } finally {
+      setIsUploading(false);
     }
-    onClose();
   };
+
+  const cleanupUploadedFile = async () => {
+    const values = uploadForm.getValues();
+
+    if (!values.storagePath && !values.thumbnailStoragePath) return;
+
+    await fetch("/api/resources/upload/cleanup", {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        storagePath: values.storagePath,
+        thumbnailStoragePath: values.thumbnailStoragePath,
+      }),
+    });
+  };
+
+  const handleCancel = async () => {
+    try {
+      await cleanupUploadedFile();
+    } catch (error) {
+      console.warn("The image could not be deleted, error:", error);
+    } finally {
+      onClose();
+    }
+  };
+
   return (
     <div className="mx-auto w-full max-w-5xl mt-5">
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_20px_70px_-35px_rgba(15,23,42,0.25)]">
@@ -383,7 +416,7 @@ export default function UpdateResourceFileForm({
                 <AddResourceSecondStep
                   uploadMessage=""
                   uploadError=""
-                  onUploadFile={onUpdateFile}
+                  onUploadFile={handleUpdateFile}
                 />
               </FormProvider>
             )}
@@ -393,6 +426,7 @@ export default function UpdateResourceFileForm({
                 <button
                   type="button"
                   onClick={handleCancel}
+                  disabled={isUploading}
                   className="cursor-pointer inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-40"
                 >
                   <X className="h-4 w-4" />
