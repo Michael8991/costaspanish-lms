@@ -71,6 +71,22 @@ export default function ToggleGroupField({
           <h2 className="text-sm font-semibold text-slate-700">Identidad</h2>
         </div>
 
+        {resource.format === "external_link" && (
+          <Field
+            label="External link"
+            hint="Update the URL used by this resource."
+            error={errors.externalUrl?.message}
+            required
+          >
+            <input
+              type="url"
+              placeholder={"externalUrl"}
+              {...register("externalUrl")}
+              className={inputClass(Boolean(errors.externalUrl))}
+            />
+          </Field>
+        )}
+
         <Field label="Título" required error={errors.title?.message}>
           <input
             type="text"

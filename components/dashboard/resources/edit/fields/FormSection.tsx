@@ -56,6 +56,7 @@ export default function FormSection({
       hasAnswerKey: resource.hasAnswerKey,
       requiresTeacherReview: resource.requiresTeacherReview,
       transcriptText: resource.storage?.transcriptText ?? "",
+      externalUrl: resource.asset.externalUrl ?? "",
     },
   });
 
