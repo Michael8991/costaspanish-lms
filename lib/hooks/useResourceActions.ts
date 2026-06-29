@@ -135,31 +135,9 @@ const handleActionClick = (
   const handlePermanentDelete = async (resourceId: string | null) => {
     if (!resourceId) return;
     
-    const resource = Array.isArray(resources) 
-      ? resources.find((r) => r.id === resourceId)
-      : (resources.id === resourceId ? resources : null);
- 
-    if (!resource) {
-      toast.error("No se encontró el recurso en la memoria.");
-      return;
-    }
     setIsDelettingResource(true);
     try {
-      if (resource.asset.storagePath) {
-        const fileRef = ref(storage, resource.asset.storagePath);
-        await deleteObject(fileRef).catch((err) =>
-          console.warn("El archivo ya no existía en Firebase o falló:", err),
-        );
-      }
-
-      if (resource.asset.thumbnailStoragePath) {
-        const thumbRef = ref(storage, resource.asset.thumbnailStoragePath);
-        await deleteObject(thumbRef).catch((err) =>
-          console.warn("La miniatura ya no existía en Firebase o falló:", err),
-        );
-      }
-
-      const res = await fetch(`/api/resources/${resource.id}`, {
+      const res = await fetch(`/api/resources/${resourceId}`, {
         method: "DELETE",
         cache: "no-store",
       });

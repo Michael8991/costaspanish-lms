@@ -245,13 +245,14 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
   try {
     const user = await requireAuth(req);
 
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     if (!requireRole(user, ["admin", "teacher"])) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
+    }
       
-      if (!user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
 
     const currentUserObjectId = getCurrentUserObjectId(user);
     if (!currentUserObjectId) {
@@ -289,7 +290,8 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
- 
+    const storagePathToDelete = resource.storagePath;
+    const thumbnailStoragePathToDelete = resource.thumbnailStoragePath;
 
     const updatedResource = await Resource.findByIdAndUpdate(
       resource._id,
@@ -308,6 +310,13 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
       },
       { new: true } 
     );
+
+    if (!updatedResource) {
+      return NextResponse.json({error: "The resource was not found."}, {status: 404})
+    }
+
+    await deleteFirebaseFile(storagePathToDelete);
+    await deleteFirebaseFile(thumbnailStoragePathToDelete);
     
     return NextResponse.json(
       {
