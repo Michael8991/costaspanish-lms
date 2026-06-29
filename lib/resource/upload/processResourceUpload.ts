@@ -51,7 +51,7 @@ export const processAndUploadResource = async (
 
     if (file.size > rules.maxSizeBytes) {
       throw new Error(
-        `Archivo demasiado grande. Máximo permitido: ${rules.maxSizeBytes} bytes`
+        `Archivo demasiado grande. Máximo permitido: ${(rules.maxSizeBytes / (1024 * 1024)).toFixed(0)} MB`
       );
     }
 

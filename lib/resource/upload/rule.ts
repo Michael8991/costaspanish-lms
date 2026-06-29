@@ -24,7 +24,7 @@ export const RESOURCE_UPLOAD_RULES = {
   },
   video: {
     allowedTypes: ["video/mp4", "video/webm", "video/quicktime"],
-    maxSizeBytes: 150 * 1024 * 1024,
+    maxSizeBytes: 10 * 1024 * 1024,
   },
 } satisfies Record<
   UploadableFormat,
