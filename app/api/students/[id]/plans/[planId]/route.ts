@@ -60,10 +60,18 @@ type PatchQuery = mongoose.QueryFilter<StudentProfileDoc> & {
 };
 
 export async function PATCH(req: NextRequest, { params }: Ctx) {
+
+  let finalCreditsRemaining: number | undefined;
+  let finalValidUntil: Date | undefined;
+
   try {
     const user = await requireAuth(req);
-    if (!requireRole(user, ["teacher", "admin"])) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!requireRole(user, ["teacher", "admin"])) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const { id, planId } = await params;
@@ -113,6 +121,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       const d = parseDate(body.validUntil);
       if (!d) return NextResponse.json({ error: "Invalid validUntil" }, { status: 400 });
       set["activePlans.$.validUntil"] = d;
+      finalValidUntil = d;
     }
 
     if (body.creditsTotal !== undefined) {
@@ -124,7 +133,25 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     if (body.creditsRemaining !== undefined) {
       const n = Number(body.creditsRemaining);
       if (!Number.isFinite(n)) return NextResponse.json({ error: "creditsRemaining must be a number" }, { status: 400 });
+      if (n < 0) {
+        return NextResponse.json(
+          { error: "creditsRemaining cannot be negative" },
+          { status: 400 }
+        ) 
+      }
       set["activePlans.$.creditsRemaining"] = n;
+      finalCreditsRemaining = n;
+    }
+
+    if (
+      finalCreditsRemaining !== undefined &&
+      body.creditsTotal !== undefined &&
+      finalCreditsRemaining > Number(body.creditsTotal)
+    ) {
+      return NextResponse.json(
+        { error: "creditsRemaining cannot be greater than creditsTotal" },
+        { status: 400 }
+      );
     }
 
     if (Object.keys(set).length === 0) {
@@ -146,7 +173,9 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
    
     const needsCurrent =
       (finalStatus === "active" && !finalClassType) || 
-      (!!finalClassType && !finalStatus);
+      (!!finalClassType && !finalStatus) ||
+      finalCreditsRemaining === undefined ||
+      finalValidUntil === undefined;
 
     if (needsCurrent) {
       const current = await StudentProfile.findOne(
@@ -161,6 +190,23 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       const currentPlan = current.activePlans[0];
       if (!finalStatus) finalStatus = currentPlan.status;
       if (!finalClassType) finalClassType = currentPlan.classType;
+      if (finalCreditsRemaining === undefined) {
+        finalCreditsRemaining = currentPlan.creditsRemaining;
+      }
+      if (finalValidUntil === undefined) {
+        finalValidUntil = new Date(currentPlan.validUntil);
+      }
+    }
+
+    if (finalStatus !== "canceled") {
+      if (finalValidUntil && new Date(finalValidUntil) < new Date()) {
+        finalStatus = "expired";
+      } else if(finalCreditsRemaining === 0) {
+        finalStatus = "exhausted";
+      } else {
+        finalStatus = "active"
+      }
+      set["activePlans.$.status"] = finalStatus;
     }
 
     const query: PatchQuery = {
@@ -170,16 +216,16 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 
     // Aplica el guard SOLO si el plan va a quedar activo y tenemos classType final
     if (finalStatus === "active" && finalClassType) {
-      query.activePlans = {
-        $not: {
-          $elemMatch: {
-            _id: { $ne: planObjectId },
-            classType: finalClassType,
-            status: "active",
-          },
+    query.activePlans = {
+      $not: {
+        $elemMatch: {
+          _id: { $ne: planObjectId },
+          classType: finalClassType,
+          status: "active",
         },
-      };
-    }
+      },
+    };
+  }
 
     const updated = await StudentProfile.findOneAndUpdate(query, { $set: set }, { new: true, runValidators: true }).lean();
 

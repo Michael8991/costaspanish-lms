@@ -225,7 +225,7 @@ export default function EditVoucherForm({
               name="creditsRemaining"
               type="number"
               min={0}
-              value={formData.creditsRemaining || ""}
+              value={formData.creditsRemaining ?? ""}
               onChange={handleChange}
               required
               className={inputClass}
