@@ -41,7 +41,7 @@ export const lessonBlockSchema = z.object({
   studentDifficultyLevel: z.coerce.number().min(1).max(5).optional(),
   engagementLevel: z.coerce.number().min(1).max(5).optional(),
 
-  primaryErrorCategory: z.enum(LESSON_ERROR_CATEGORIES).default("none"),
+  primaryErrorCategory: z.array(z.enum(LESSON_ERROR_CATEGORIES)).default([]),
 
   studentDifficultiesText: z.string().trim().optional(),
   teacherReflection: z.string().trim().optional(),

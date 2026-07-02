@@ -7,15 +7,15 @@ export type LessonAttendanceStatus = (typeof LESSON_ATTENDANCE_STATUSES)[number]
 
 export type LessonClassType = (typeof LESSON_CLASS_TYPES)[number];
 
-export type LessonBlockTypes = (typeof LESSON_BLOCK_TYPES)[number];
+export type LessonBlockType = (typeof LESSON_BLOCK_TYPES)[number];
 
 export type LessonSkill = (typeof LESSON_SKILLS)[number];
 
-export type CerfLevel = (typeof CEFR_LEVELS)[number];
+export type CefrLevel = (typeof CEFR_LEVELS)[number];
 
-export type LessonErrorCategories = (typeof LESSON_ERROR_CATEGORIES)[number];
+export type LessonErrorCategory = (typeof LESSON_ERROR_CATEGORIES)[number];
 
-export type LessonCreationSources = (typeof LESSON_CREATION_SOURCES)[number];
+export type LessonCreationSource = (typeof LESSON_CREATION_SOURCES)[number];
 
 export interface LessonAttendee{
     studentId: Types.ObjectId;
@@ -26,9 +26,9 @@ export interface LessonAttendee{
 
 export interface LessonBlock{
     title: string;
-    type: LessonBlockTypes;
+    type: LessonBlockType;
 
-    cerfLevels: CerfLevel[];
+    cerfLevels: CefrLevel[];
     skills: LessonSkill[];
     tags: string[];
     resources: Types.ObjectId;
@@ -46,7 +46,7 @@ export interface LessonBlock{
     studentDifficultyLevel: number;
     engagementLevel?: number;
 
-    primaryErrorCategory?: LessonErrorCategories;
+    primaryErrorCategory?: LessonErrorCategory[];
 
     studentDifficultiesText?: string;
     teacherReflection?: string;
@@ -77,7 +77,7 @@ export interface Lesson{
     homeworkAssigned?: string;
     nextLessonFocus?: string;
 
-    creationSource: LessonCreationSources;
+    creationSource: LessonCreationSource;
 
     integration?: {
         provider: "google_calendar" | "preply" | "italki" | "manual";

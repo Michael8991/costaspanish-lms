@@ -1,4 +1,4 @@
-import mongoose, { Model, Schema } from "mongoose";
+import mongoose, { Schema } from "mongoose";
 import {
   CEFR_LEVELS,
   LESSON_ATTENDANCE_STATUSES,
@@ -115,9 +115,9 @@ const LessonBlockSchema = new Schema(
     },
 
     primaryErrorCategory: {
-      type: String,
+      type: [String],
       enum: LESSON_ERROR_CATEGORIES,
-      default: "none",
+      default: [],
     },
 
     studentDifficultiesText: {
