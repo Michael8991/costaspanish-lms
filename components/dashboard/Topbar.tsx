@@ -38,6 +38,7 @@ const navMenuItems: NavMenuItem[] = [
   { label: "Course", href: "/dashboard/courses" },
   { label: "Calendar", href: "/dashboard/calendar" },
   { label: "Resources", href: "/dashboard/resources" },
+  { label: "Lessons", href: "/dashboard/lessons" },
 ];
 const navMenuItemsTeacher: NavMenuItem[] = [
   { label: "Home", href: "/dashboard" },
@@ -45,6 +46,7 @@ const navMenuItemsTeacher: NavMenuItem[] = [
   { label: "Calendar", href: "/dashboard/calendar" },
   { label: "Resources", href: "/dashboard/resources" },
   { label: "Students", href: "/dashboard/students" },
+  { label: "Lessons", href: "/dashboard/lessons" },
 ];
 
 export const Topbar = ({
