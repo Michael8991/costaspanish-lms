@@ -17,7 +17,7 @@ export interface LessonAttendeeDTO {
 }
 
 export interface LessonBlockDTO {
-  id?: string;
+  _id?: string;
 
   title: string;
   type: LessonBlockType;
@@ -40,7 +40,7 @@ export interface LessonBlockDTO {
   studentDifficultyLevel?: number;
   engagementLevel?: number;
 
-  primaryErrorCategory: LessonErrorCategory[];
+  errorCategories: LessonErrorCategory[];
 
   studentDifficultiesText?: string;
   teacherReflection?: string;

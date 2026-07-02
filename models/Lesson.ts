@@ -114,7 +114,7 @@ const LessonBlockSchema = new Schema(
       max: 5,
     },
 
-    primaryErrorCategory: {
+    errorCategories: {
       type: [String],
       enum: LESSON_ERROR_CATEGORIES,
       default: [],

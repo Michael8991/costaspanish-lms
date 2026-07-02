@@ -46,7 +46,7 @@ export interface LessonBlock{
     studentDifficultyLevel: number;
     engagementLevel?: number;
 
-    primaryErrorCategory?: LessonErrorCategory[];
+    errorCategories?: LessonErrorCategory[];
 
     studentDifficultiesText?: string;
     teacherReflection?: string;
@@ -86,5 +86,5 @@ export interface Lesson{
     };
 
     createdAt: Date;
-    updateAt: Date;
+    updatedAt: Date;
 }
