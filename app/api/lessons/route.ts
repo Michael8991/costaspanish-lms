@@ -1,9 +1,12 @@
 import { requireAuth, requireRole } from '@/lib/auth/apiAuth';
 import dbConnect from '@/lib/mongo';
 import { getLessonDateRange } from '@/lib/utils/lesson-date-range';
-import { toLessonListDTO } from '@/lib/utils/lesson.mapper';
+import { toLessonDetailDTO, toLessonListDTO } from '@/lib/utils/lesson.mapper';
+import { createLessonSchema } from '@/lib/validators/lesson';
 import Lesson from '@/models/Lesson';
 import { NextRequest, NextResponse } from 'next/server';
+import z from 'zod';
+import { LessonDetailDTO } from '../../../lib/dto/lesson.dto';
 
 function getCurrentUserId(user: { id?: string; _id?: string }) {
   return String(user.id ?? user._id ?? "");
@@ -61,5 +64,44 @@ export async function GET(req: NextRequest) {
         console.error("Error GET /api/lessons: ", message);
 
         return NextResponse.json({ ok: false, error: "Internal Server Error"}, {status: 500})
+    }
+}
+
+
+export async function POST(req: NextRequest) {
+    try { 
+        const user = await requireAuth(req);
+        if (!user) {
+            return NextResponse.json({ok: false, error: "Unauthorized"}, {status: 401})
+        }
+        if (!requireRole(user, ["teacher", "admin"])) {
+            return NextResponse.json({ok: false, error: "Forbidden"}, {status: 403})
+        }
+
+        const body = await req.json();
+
+        const parsed = createLessonSchema.safeParse(body);
+        if (!parsed.success) {
+            return NextResponse.json({ok: false, error:"Invalid lesson payload", issues: z.flattenError(parsed.error)},{status:400})
+        }
+        
+        await dbConnect();
+
+        const currentUserObjectId = getCurrentUserId(user);
+
+        if (!currentUserObjectId) {
+           return NextResponse.json(
+        { ok: false, error: "Invalid user id" },
+        { status: 500 },
+            );
+        }
+        
+        const lesson = await Lesson.create({ ...parsed.data, teacherId: currentUserObjectId });
+
+        return NextResponse.json({ ok: true, item: toLessonDetailDTO(lesson)}, {status: 201})
+    } catch (error) {
+        console.error("Error en POST /api/lessons: ", error);
+
+        return NextResponse.json({ ok: false, error: "Internal Server Error" }, { status: 500})
     }
 }
