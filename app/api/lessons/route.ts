@@ -1,4 +1,6 @@
 import { requireAuth, requireRole } from '@/lib/auth/apiAuth';
+import dbConnect from '@/lib/mongo';
+import { getLessonDateRange } from '@/lib/utils/lesson-date-range';
 import { toLessonListDTO } from '@/lib/utils/lesson.mapper';
 import Lesson from '@/models/Lesson';
 import { NextRequest, NextResponse } from 'next/server';
@@ -20,21 +22,44 @@ export async function GET(req: NextRequest) {
                 {status:403}
             )
         }
-        const page = Number(req.nextUrl.searchParams.get("page") ?? 1);
-        const limit = Number(req.nextUrl.searchParams.get("limit") ?? 20);
-        const skip = (page - 1) * limit;
+       
+        const searchParams = req.nextUrl.searchParams;
 
-        const filter = { teacherId: getCurrentUserId }
+        const rawView = searchParams.get("view");
+        const view = rawView === "day" || rawView === "week" || rawView === "month" ? rawView : "week";
+
+        const rawDate = searchParams.get("date");
+
+        const date = rawDate ? new Date(rawDate) : new Date();
+
+        if (Number.isNaN(date.getTime())) {
+            return NextResponse.json(
+                { error: "Invalid date parameter" },
+                { status: 400 },
+            )
+        }
+
+        const { start, end } = getLessonDateRange({ view, date });
+
+        const filter = {
+            teacherId: getCurrentUserId(user),
+            scheduledStart: {
+                $gte: start,
+                $lt: end
+            }
+        }
+
+        await dbConnect();
+
+        const items = await Lesson.find(filter).sort({ scheduledStart: 1 }).lean().limit(300);
         
-        const sort={scheduledStart:1}
+        return NextResponse.json({ ok: true, view, range:{start: start.toISOString(), end: end.toISOString()}, items: items.map(toLessonListDTO)})
 
-        const [items, total] = await Promise.all([
-  Lesson.find(filter).sort(sort).skip(skip).limit(limit).lean(),
-  Lesson.countDocuments(filter),
-]);
+       } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown error";
 
-        return NextResponse.json({ok: true, data: items.map(toLessonListDTO), meta:{page, limit, total, totalPages: Math.ceil(total/limit)}})
-    } catch (error) {
-        return NextResponse.json({error:error},{status:500})
+        console.error("Error GET /api/lessons: ", message);
+
+        return NextResponse.json({ ok: false, error: "Internal Server Error"}, {status: 500})
     }
 }
