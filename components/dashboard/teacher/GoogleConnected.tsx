@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 
 export function GoogleConnected() {
   const [connected, setConnected] = useState<boolean | null>(null);
-
   useEffect(() => {
     fetch("/api/integrations/google/status", { credentials: "include" })
       .then((r) => r.json())

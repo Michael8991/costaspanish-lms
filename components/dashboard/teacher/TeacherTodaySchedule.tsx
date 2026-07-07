@@ -42,6 +42,9 @@ export default function TeacherTodaySchedule() {
         });
 
         if (!res.ok) {
+          const errorData = await res.json().catch(() => null);
+          console.error(errorData);
+
           setConnected(false);
           setLoading(false);
           return;

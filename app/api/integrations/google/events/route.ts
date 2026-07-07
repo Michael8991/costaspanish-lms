@@ -142,18 +142,60 @@ const isExpired = !google.expiresAt || google.expiresAt <= Date.now() + 30_000;
 //   await saveGoogleAccessToken(userId, refreshed.accessToken, refreshed.expiresAt);
   // }
   
-  if (isExpired) {
-  if (!google.refreshToken) {
-    return NextResponse.json({ connected: false, error: "missing_refresh_token", events: [] }, { status: 401 });
-  }
+if (isExpired && !google.refreshToken) {
+  await User.updateOne(
+    { _id: userId },
+    {
+      $set: {
+        "google.connected": false,
+        "google.updatedAt": new Date(),
+      },
+    },
+  );
 
-  try {
+  return NextResponse.json(
+    {
+      connected: false,
+      needsReconnect: true,
+      error: "missing_refresh_token",
+      events: [] satisfies CalendarEventDTO[],
+    },
+    { status: 401 },
+  );
+}
+
+   try {
     const refreshed = await refreshGoogleAccessToken(google.refreshToken);
+
     accessToken = refreshed.accessToken;
-    await saveGoogleAccessToken(userId, refreshed.accessToken, refreshed.expiresAt);
+
+    await saveGoogleAccessToken(
+      userId,
+      refreshed.accessToken,
+      refreshed.expiresAt,
+    );
   } catch (err) {
-    console.error("❌ Token refresh failed:", err);
-    return NextResponse.json({ connected: false, error: "token_refresh_failed", events: [] }, { status: 401 });
+    console.error("Token refresh failed:", err);
+
+    await User.updateOne(
+      { _id: userId },
+      {
+        $set: {
+          "google.connected": false,
+          "google.updatedAt": new Date(),
+        },
+      },
+    );
+
+    return NextResponse.json(
+      {
+        connected: false,
+        needsReconnect: true,
+        error: "token_refresh_failed",
+        events: [] satisfies CalendarEventDTO[],
+      },
+      { status: 401 },
+    );
   }
 }
   const calendarId = encodeURIComponent(google.calendarId);
