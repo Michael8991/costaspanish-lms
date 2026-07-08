@@ -33,7 +33,8 @@ export default function TeacherTodaySchedule() {
   const [events, setEvents] = useState<EventDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState<boolean | null>(null);
-
+  const [needsReconnect, setNeedsReconnect] = useState<boolean | null>(null);
+  const [googleError, setGoogleError] = useState<string | null>(null);
   useEffect(() => {
     const load = async () => {
       try {
@@ -43,9 +44,11 @@ export default function TeacherTodaySchedule() {
 
         if (!res.ok) {
           const errorData = await res.json().catch(() => null);
-          console.error(errorData);
+          console.error("Google events error: ", errorData);
 
           setConnected(false);
+          setNeedsReconnect(Boolean(errorData?.needsReconnect));
+          setGoogleError(errorData?.error ?? "google_events_error");
           setLoading(false);
           return;
         }
@@ -84,18 +87,21 @@ export default function TeacherTodaySchedule() {
         </div>
         <div>
           <p className="text-sm font-medium text-gray-700">
-            Google Calendar no conectado
+            {needsReconnect
+              ? "Google Calendar necesita reconexión"
+              : "Google Calendar no conectado"}
           </p>
+
           <p className="mt-0.5 text-xs text-gray-400">
-            Conecta tu cuenta para ver tus clases de hoy
+            {needsReconnect
+              ? "Vuelve a conectar tu cuenta para renovar los permisos"
+              : "Conecta tu cuenta para ver tus clases de hoy"}
           </p>
         </div>
-        <Link
-          href="/api/integrations/google/start"
-          className="mt-1 inline-flex items-center gap-2 rounded-lg bg-[#9e2727] px-4 py-2 text-sm font-medium text-white transition-all hover:bg-[#8d2323]"
-        >
-          <CalendarDays size={14} />
-          Conectar Google Calendar
+        <Link href="/api/integrations/google/start">
+          {needsReconnect
+            ? "Reconectar Google Calendar"
+            : "Conectar Google Calendar"}
         </Link>
       </div>
     );

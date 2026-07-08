@@ -104,8 +104,13 @@ export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
   const userId = session?.user?.id;
 
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (session.user.role !== "teacher") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (session.user.role !== "teacher") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const { searchParams } = new URL(req.url);
   const from = searchParams.get("from");
@@ -113,93 +118,95 @@ export async function GET(req: Request) {
 
   const now = new Date();
 
-const startOfDay = new Date(now);
-startOfDay.setHours(0, 0, 0, 0);
+  const startOfDay = new Date(now);
+  startOfDay.setHours(0, 0, 0, 0);
 
-const endOfDay = new Date(now);
-endOfDay.setHours(23, 59, 59, 999);
+  const endOfDay = new Date(now);
+  endOfDay.setHours(23, 59, 59, 999);
 
-const fromDate = from ? new Date(from) : startOfDay;
-const toDate = to ? new Date(to) : endOfDay;
+  const fromDate = from ? new Date(from) : startOfDay;
+  const toDate = to ? new Date(to) : endOfDay;
 
   const google = await loadGoogleTokens(userId);
-if (!google?.connected || !google.accessToken) {
-  return NextResponse.json({ connected: false, events: [] satisfies CalendarEventDTO[] });
-}
 
-let accessToken = google.accessToken;
-const isExpired = !google.expiresAt || google.expiresAt <= Date.now() + 30_000;
-
-// if (isExpired) {
-//   if (!google.refreshToken) {
-//     return NextResponse.json(
-//       { connected: false, error: "missing_refresh_token", events: [] satisfies CalendarEventDTO[] },
-//       { status: 401 }
-//     );
-//   }
-//   const refreshed = await refreshGoogleAccessToken(google.refreshToken);
-//   accessToken = refreshed.accessToken;
-//   await saveGoogleAccessToken(userId, refreshed.accessToken, refreshed.expiresAt);
-  // }
-  
-if (isExpired && !google.refreshToken) {
-  await User.updateOne(
-    { _id: userId },
-    {
-      $set: {
-        "google.connected": false,
-        "google.updatedAt": new Date(),
-      },
-    },
-  );
-
-  return NextResponse.json(
-    {
+  if (!google?.connected || !google.accessToken) {
+    return NextResponse.json({
       connected: false,
-      needsReconnect: true,
-      error: "missing_refresh_token",
       events: [] satisfies CalendarEventDTO[],
-    },
-    { status: 401 },
-  );
-}
-
-   try {
-    const refreshed = await refreshGoogleAccessToken(google.refreshToken);
-
-    accessToken = refreshed.accessToken;
-
-    await saveGoogleAccessToken(
-      userId,
-      refreshed.accessToken,
-      refreshed.expiresAt,
-    );
-  } catch (err) {
-    console.error("Token refresh failed:", err);
-
-    await User.updateOne(
-      { _id: userId },
-      {
-        $set: {
-          "google.connected": false,
-          "google.updatedAt": new Date(),
-        },
-      },
-    );
-
-    return NextResponse.json(
-      {
-        connected: false,
-        needsReconnect: true,
-        error: "token_refresh_failed",
-        events: [] satisfies CalendarEventDTO[],
-      },
-      { status: 401 },
-    );
+    });
   }
-}
+
+  let accessToken = google.accessToken;
+
+  const isExpired =
+    !google.expiresAt || google.expiresAt <= Date.now() + 30_000;
+
+  if (isExpired) {
+    const refreshToken = google.refreshToken;
+
+    if (!refreshToken) {
+      await User.updateOne(
+        { _id: userId },
+        {
+          $set: {
+            "google.connected": false,
+            "google.updatedAt": new Date(),
+          },
+        },
+      );
+
+      return NextResponse.json(
+        {
+          connected: false,
+          needsReconnect: true,
+          error: "missing_refresh_token",
+          events: [] satisfies CalendarEventDTO[],
+        },
+        { status: 401 },
+      );
+    }
+
+    try {
+      const refreshed = await refreshGoogleAccessToken(refreshToken);
+
+      accessToken = refreshed.accessToken;
+
+      await saveGoogleAccessToken(
+        userId,
+        refreshed.accessToken,
+        refreshed.expiresAt,
+      );
+    } catch (err) {
+      console.error("Token refresh failed:", err);
+
+      await User.updateOne(
+        { _id: userId },
+        {
+          $set: {
+            "google.connected": false,
+            "google.updatedAt": new Date(),
+          },
+        },
+      );
+
+      return NextResponse.json(
+        {
+          connected: false,
+          needsReconnect: true,
+          error: "token_refresh_failed",
+          events: [] satisfies CalendarEventDTO[],
+        },
+        { status: 401 },
+      );
+    }
+  }
+
   const calendarId = encodeURIComponent(google.calendarId);
-  const url = new URL(`https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events`);
+
+  const url = new URL(
+    `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events`,
+  );
+
   url.searchParams.set("timeZone", "Europe/Madrid");
   url.searchParams.set("timeMin", toISO(fromDate));
   url.searchParams.set("timeMax", toISO(toDate));
@@ -207,15 +214,27 @@ if (isExpired && !google.refreshToken) {
   url.searchParams.set("orderBy", "startTime");
 
   const gRes = await fetch(url.toString(), {
-    headers: { Authorization: `Bearer ${accessToken}` },
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
   });
 
   const payload = (await gRes.json()) as GoogleEventsListResponse;
 
   if (!gRes.ok) {
-    return NextResponse.json({ error: "Google API error", details: payload }, { status: 502 });
+    return NextResponse.json(
+      {
+        error: "Google API error",
+        details: payload,
+      },
+      { status: 502 },
+    );
   }
 
   const events = (payload.items ?? []).map(mapToDTO);
-  return NextResponse.json({ connected: true, events });
+
+  return NextResponse.json({
+    connected: true,
+    events,
+  });
 }
