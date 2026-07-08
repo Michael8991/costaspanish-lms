@@ -20,7 +20,7 @@ export const lessonAttendeeSchema = z.object({
 });
 
 export const lessonBlockSchema = z.object({
-  title: z.string().trim().min(8),
+  title: z.string().trim().min(1),
   type: z.enum(LESSON_BLOCK_TYPES),
 
   cefrLevels: z.array(z.enum(CEFR_LEVELS)).default([]),
@@ -48,7 +48,7 @@ export const lessonBlockSchema = z.object({
   nextStepSuggestion: z.string().trim().optional(),
 });
 
-export const createLessonSchema = z.object({
+const lessonBaseSchema = z.object({
   courseId: objectIdSchema.optional(),
 
   title: z.string().trim().min(1),
@@ -78,13 +78,17 @@ export const createLessonSchema = z.object({
       meetUrl: z.string().trim().url().optional(),
     })
     .optional(),
-})
-.refine((data) => data.scheduledEnd > data.scheduledStart, {
-  message: "scheduledEnd must be after scheduledStart",
-  path: ["scheduledEnd"],
 });
 
-export const updateLessonSchema = createLessonSchema.partial().refine(
+export const createLessonSchema = lessonBaseSchema.refine(
+  (data) => data.scheduledEnd > data.scheduledStart,
+  {
+    message: "scheduledEnd must be after scheduledStart",
+    path: ["scheduledEnd"],
+  },
+);
+
+export const updateLessonSchema = lessonBaseSchema.partial().refine(
   (data) => {
     if (data.scheduledStart && data.scheduledEnd) {
       return data.scheduledEnd > data.scheduledStart;

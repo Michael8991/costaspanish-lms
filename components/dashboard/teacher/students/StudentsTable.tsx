@@ -37,7 +37,7 @@ const quickOptionsMenu: QuickOptionsMenu[] = [
   },
   {
     label: "New Lesson",
-    href: (id) => `/dashboard/students/${id}/lessons/newLesson`,
+    href: (id) => `/dashboard/lessons/add`,
     icon: CalendarPlus,
   },
   {
@@ -320,12 +320,12 @@ export default function StudentsTable({ locale }: { locale: string }) {
                             </span>
                           </div>
 
-                          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 w-75">
                             <div className="flex items-center justify-between gap-2 mb-2">
                               <p className="text-sm font-medium text-gray-800 truncate">
                                 {student.highlightedPlanName}
                               </p>
-                              <span className="text-xs text-gray-500 whitespace-nowrap">
+                              <span className="text-xs truncate text-gray-500 whitespace-nowrap">
                                 {student.highlightedPlanCreditsRemaining}/
                                 {student.highlightedPlanCreditsTotal}
                               </span>

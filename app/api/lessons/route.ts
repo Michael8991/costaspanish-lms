@@ -6,7 +6,6 @@ import { createLessonSchema } from '@/lib/validators/lesson';
 import Lesson from '@/models/Lesson';
 import { NextRequest, NextResponse } from 'next/server';
 import z from 'zod';
-import { LessonDetailDTO } from '../../../lib/dto/lesson.dto';
 
 function getCurrentUserId(user: { id?: string; _id?: string }) {
   return String(user.id ?? user._id ?? "");
@@ -59,11 +58,14 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ ok: true, view, range:{start: start.toISOString(), end: end.toISOString()}, items: items.map(toLessonListDTO)})
 
        } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
+          const message = error instanceof Error ? error.message : "Unknown error";
 
-        console.error("Error GET /api/lessons: ", message);
+  console.error("Error GET /api/lessons:", error);
 
-        return NextResponse.json({ ok: false, error: "Internal Server Error"}, {status: 500})
+  return NextResponse.json(
+    { ok: false, error: message },
+    { status: 500 },
+  );
     }
 }
 

@@ -244,7 +244,8 @@ const LessonSchema = new Schema(
 );
 
 LessonSchema.index({ teacherId: 1, scheduledStart: 1 });
-LessonSchema.index({ "attendees.studentId": 1, scheduledStart: 1 });
+LessonSchema.index({ "attendees.studentId": 1, scheduledStart: -1 });
+LessonSchema.index({"attendees.voucherId":1})
 
 const Lesson = mongoose.models.Lesson || mongoose.model("Lesson", LessonSchema);
 export default Lesson;
