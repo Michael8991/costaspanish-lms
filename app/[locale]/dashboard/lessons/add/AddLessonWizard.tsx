@@ -1,7 +1,10 @@
+"use client";
+
 import FirstStepAddLesson from "@/components/dashboard/lessons/add/FirstStepAddLesson";
-import { Divide } from "lucide-react";
+import SecondStepAddLesson from "@/components/dashboard/lessons/add/SecondStepAddLesson";
+import ThirdStepAddLesson from "@/components/dashboard/lessons/add/ThirdStepAddLesson";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { FormProvider, useForm } from "react-hook-form";
 
 export type AddLessonFormValues = {
   title: string;
@@ -14,17 +17,32 @@ export type AddLessonFormValues = {
   scheduledStart: string;
   scheduledEnd: string;
   timezone: string;
-  isTrial: boolean;
+
+  attendees: {
+    studentId: string;
+    voucherId: string;
+    attendanceStatus: "pending";
+    creditsToConsume: number;
+    isTrial?: boolean;
+  }[];
+
   blocks: {
     title: string;
     type: string;
+    cefrLevels: string[];
+    skills: string[];
+    tags: string[];
+    resources: string[];
     plannedContent: string;
     estimatedMinutes?: number;
+    errorCategories: string[];
   }[];
 
   preparationNotes?: string;
   homeworkAssigned?: string;
   nextLessonFocus?: string;
+
+  syncGoogleCalendar?: boolean;
 };
 
 const defaultValues: AddLessonFormValues = {
@@ -33,13 +51,24 @@ const defaultValues: AddLessonFormValues = {
   scheduledStart: "",
   scheduledEnd: "",
   timezone: "Europe/Madrid",
-  isTrial: false,
 
-  blocks: [],
+  attendees: [
+    {
+      studentId: "",
+      voucherId: "",
+      attendanceStatus: "pending",
+      creditsToConsume: 1,
+      isTrial: false,
+    },
+  ],
 
   preparationNotes: "",
   homeworkAssigned: "",
   nextLessonFocus: "",
+
+  blocks: [],
+
+  syncGoogleCalendar: false,
 };
 
 export default function AddLessonWizard() {
@@ -54,7 +83,6 @@ export default function AddLessonWizard() {
       "scheduledStart",
       "scheduledEnd",
       "timezone",
-      "isTrial",
     ]);
 
     if (!isValid) {
@@ -78,27 +106,54 @@ export default function AddLessonWizard() {
   };
 
   return (
-    <form
-      onSubmit={form.handleSubmit(onSubmit)}
-      className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
-    >
-      <div className="mb-6">
+    <FormProvider {...form}>
+      <form
+        onSubmit={form.handleSubmit(onSubmit)}
+        className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
+      >
+        <div className="mb-6">
+          <h2 className="mt-1 text-xl font-bold text-gray-900">
+            Nueva lección
+          </h2>
+          <p className="mt-1 text-sm text-gray-500 mb-6">
+            Prepara una clase manualmente y añade los detalles necesarios.
+          </p>
+        </div>
+
         <p className="text-sm font-medium text-[#9e2727]">
           Paso {currentStep + 1} de 3
         </p>
-        <h2 className="mt-1 text-xl font-bold text-gray-900">Nueva lección</h2>
-        <p className="mt01 text-sm text-gray-500">
-          Prepara una clase manualmente y añade los detalles necesarios.
-        </p>
-      </div>
+        {currentStep === 0 && <FirstStepAddLesson />}
 
-      {currentStep === 0 && <FirstStepAddLesson />}
-
-      {currentStep === 2 && (
-        <div className=" rounded-xl border border-dashed border-gray-200 p-6 text-sm text-gray-500">
-          Paso 2: Contenido de la lección.
+        {currentStep === 1 && <SecondStepAddLesson />}
+        {currentStep === 2 && <ThirdStepAddLesson />}
+        <div className="mt-8 flex items-center justify-between border-t border-gray-100 pt-5">
+          <button
+            type="button"
+            onClick={handlePrevious}
+            disabled={currentStep === 0}
+            className="cursor-pointer rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Anterior
+          </button>
+          {currentStep < 2 ? (
+            <button
+              type="button"
+              onClick={handleNext}
+              className="cursor-pointer rounded-xl bg-[#9e2727] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#8d2323]"
+            >
+              Siguiente
+            </button>
+          ) : (
+            <button
+              type="submit"
+              className="cursor-pointer  rounded-xl bg-[#9e2727] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#8d2323]"
+            >
+              Guardar lección
+            </button>
+          )}
         </div>
-      )}
-    </form>
+      </form>
+    </FormProvider>
   );
 }

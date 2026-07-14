@@ -1,7 +1,5 @@
-import FirstStepAddLesson from "@/components/dashboard/lessons/add/FirstStepAddLesson";
-import SecondStepAddLesson from "@/components/dashboard/lessons/add/SecondStepAddLesson";
-import ThirdStepAddLesson from "@/components/dashboard/lessons/add/ThirdStepAddLesson";
 import Breadcrumbs from "@/components/ui/Breadcrumbs";
+import AddLessonWizard from "./AddLessonWizard";
 
 export default async function AddLessonPage({
   params,
@@ -21,9 +19,7 @@ export default async function AddLessonPage({
         <h1 className="text-2xl">Agregar Lección</h1>
       </div>
       <div className="w-full flex-col items-center">
-        <FirstStepAddLesson />
-        <SecondStepAddLesson />
-        <ThirdStepAddLesson />
+        <AddLessonWizard />
       </div>
     </div>
   );
