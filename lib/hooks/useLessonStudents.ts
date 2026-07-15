@@ -2,23 +2,6 @@
 
 import { useEffect, useState } from "react";
 
-type RawStudent = {
-  _id: string;
-  fullName?: string;
-  name?: string;
-  contactEmail?: string;
-  activePlans?: RawPlans[];
-}
-
-type RawPlans = {
-  _id: string;
-  classType: string;
-  status: string;
-  creditsRemaining: number;
-  creditsTotal?: number;
-  validUntil: string | null;
-}
-
 export type LessonStudentPlan = {
   _id: string;
   classType: string;

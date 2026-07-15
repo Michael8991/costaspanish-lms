@@ -7,8 +7,10 @@ import {
   LESSON_ERROR_CATEGORIES,
   LESSON_SKILLS,
 } from "@/lib/constants/lesson.constants";
+import { useLessonStudents } from "@/lib/hooks/useLessonStudents";
 import { Plus, Trash2 } from "lucide-react";
 import { useFieldArray, useFormContext } from "react-hook-form";
+import LessonToolBox from "./LessonToolBox";
 
 export default function SecondStepAddLesson() {
   const {

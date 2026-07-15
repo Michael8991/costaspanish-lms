@@ -5,6 +5,7 @@ import SecondStepAddLesson from "@/components/dashboard/lessons/add/SecondStepAd
 import ThirdStepAddLesson from "@/components/dashboard/lessons/add/ThirdStepAddLesson";
 import { useState } from "react";
 import { FormProvider, useForm } from "react-hook-form";
+import LessonToolBox from "../../../../../components/dashboard/lessons/add/LessonToolBox";
 
 export type AddLessonFormValues = {
   title: string;
@@ -107,53 +108,62 @@ export default function AddLessonWizard() {
 
   return (
     <FormProvider {...form}>
-      <form
-        onSubmit={form.handleSubmit(onSubmit)}
-        className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
-      >
-        <div className="mb-6">
-          <h2 className="mt-1 text-xl font-bold text-gray-900">
-            Nueva lección
-          </h2>
-          <p className="mt-1 text-sm text-gray-500 mb-6">
-            Prepara una clase manualmente y añade los detalles necesarios.
+      <div className="items-center justify-center gap-2 grid grid-cols-12">
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          className={`${currentStep === 1 ? "col-span-11" : "col-span-12"} rounded-2xl border border-gray-200 bg-white p-6 shadow-sm `}
+        >
+          <div className="mb-6">
+            <h2 className="mt-1 text-xl font-bold text-gray-900">
+              Nueva lección
+            </h2>
+            <p className="mt-1 text-sm text-gray-500 mb-6">
+              Prepara una clase manualmente y añade los detalles necesarios.
+            </p>
+          </div>
+
+          <p className="text-sm font-medium text-[#9e2727]">
+            Paso {currentStep + 1} de 3
           </p>
-        </div>
+          {currentStep === 0 && <FirstStepAddLesson />}
 
-        <p className="text-sm font-medium text-[#9e2727]">
-          Paso {currentStep + 1} de 3
-        </p>
-        {currentStep === 0 && <FirstStepAddLesson />}
-
-        {currentStep === 1 && <SecondStepAddLesson />}
-        {currentStep === 2 && <ThirdStepAddLesson />}
-        <div className="mt-8 flex items-center justify-between border-t border-gray-100 pt-5">
-          <button
-            type="button"
-            onClick={handlePrevious}
-            disabled={currentStep === 0}
-            className="cursor-pointer rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Anterior
-          </button>
-          {currentStep < 2 ? (
+          {currentStep === 1 && <SecondStepAddLesson />}
+          {currentStep === 2 && <ThirdStepAddLesson />}
+          <div className="mt-8 flex items-center justify-between border-t border-gray-100 pt-5">
             <button
               type="button"
-              onClick={handleNext}
-              className="cursor-pointer rounded-xl bg-[#9e2727] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#8d2323]"
+              onClick={handlePrevious}
+              disabled={currentStep === 0}
+              className="cursor-pointer rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              Siguiente
+              Anterior
             </button>
-          ) : (
-            <button
-              type="submit"
-              className="cursor-pointer  rounded-xl bg-[#9e2727] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#8d2323]"
-            >
-              Guardar lección
-            </button>
-          )}
-        </div>
-      </form>
+            {currentStep < 2 ? (
+              <button
+                type="button"
+                onClick={handleNext}
+                className="cursor-pointer rounded-xl bg-[#9e2727] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#8d2323]"
+              >
+                Siguiente
+              </button>
+            ) : (
+              <button
+                type="submit"
+                className="cursor-pointer  rounded-xl bg-[#9e2727] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#8d2323]"
+              >
+                Guardar lección
+              </button>
+            )}
+          </div>
+        </form>
+        {currentStep === 1 ? (
+          <div className="col-span-1 flex items-center justify-center h-full  transition-all duration-150 ease-in-out">
+            <LessonToolBox />
+          </div>
+        ) : (
+          ""
+        )}
+      </div>
     </FormProvider>
   );
 }

@@ -112,11 +112,6 @@ export default function ThirdStepAddLesson() {
 
         <div className="mt-3 space-y-2 text-sm">
           <ReviewTextRow
-            label="Clase de prueba"
-            value={values.isTrial ? "Sí" : "No"}
-          />
-
-          <ReviewTextRow
             label="Zona horaria"
             value={values.timezone || "Europe/Madrid"}
           />

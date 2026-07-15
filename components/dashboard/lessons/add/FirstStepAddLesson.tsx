@@ -21,13 +21,9 @@ export default function FirstStepAddLesson() {
   });
 
   const attendees = watch("attendees");
-  const isTrial = watch("isTrial");
-
   const selectedStudentIds = attendees
     .map((attendee) => attendee.studentId)
     .filter(Boolean);
-
-  console.log("Estudiantes con voucher status active", students);
 
   return (
     <section className="space-y-5">
@@ -58,41 +54,7 @@ export default function FirstStepAddLesson() {
           )}
         </div>
         {/* Select alumnos */}
-        {/* <select
-          className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none transition focus:border-[#9e2727] focus:ring-2 focus:ring-[#9e2727]/10"
-          {...register("attendees.0.studentId", {
-            required: "Selecciona un alumno",
-            onChange: () => {
-              setValue("attendees.0.voucherId", "");
-            },
-          })}
-        >
-          <option value="">Selecciona un alumno</option>
 
-          {students.map((student) => {
-            return (
-              <option key={student._id} value={student._id}>
-                {student.fullName}
-              </option>
-            );
-          })}
-        </select>
-
-        <select
-          className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none transition focus:border-[#9e2727] focus:ring-2 focus:ring-[#9e2727]/10"
-          {...register("attendees.0.voucherId", {
-            required: "Selecciona un bono",
-          })}
-          disabled={!selectedStudentId}
-        >
-          <option value="">Selecciona un bono</option>
-
-          {activePlans.map((plan) => (
-            <option key={plan.id} value={plan.id}>
-              {plan.classType} · {plan.creditsRemaining} créditos
-            </option>
-          ))}
-        </select> */}
         {fields.map((field, index) => {
           const selectedStudentId = watch(`attendees.${index}.studentId`);
 
@@ -323,24 +285,6 @@ export default function FirstStepAddLesson() {
               {errors.scheduledEnd.message}
             </p>
           )}
-        </div>
-
-        <div className="md:col-span-2">
-          <label className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3">
-            <input
-              type="checkbox"
-              {...register("isTrial")}
-              className="h-4 w-4 rounded border-gray-300 text-[#9e2727] focus:ring-[#9e2727]"
-            />
-            <div>
-              <p className="text-sm font-medium text-gray-800">
-                Clase de prueba
-              </p>
-              <p className="text-xs text-gray-500">
-                No consumirá créditos del bono cuando se complete.
-              </p>
-            </div>
-          </label>
         </div>
       </div>
     </section>

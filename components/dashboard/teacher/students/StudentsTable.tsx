@@ -365,7 +365,7 @@ export default function StudentsTable({ locale }: { locale: string }) {
 
       {isOpenQO && menuPosition && (
         <div
-          className="menu-dropdown fixed z-[9999] py-4 px-4 min-w-[220px] flex flex-col rounded-lg bg-[#9e2727] gap-3 shadow-xl"
+          className="menu-dropdown fixed z-9999 py-4 px-4 min-w-55 flex flex-col rounded-lg bg-[#9e2727] gap-3 shadow-xl"
           style={{ top: menuPosition.top, left: menuPosition.left }}
         >
           {quickOptionsMenu.map((object, index) => {

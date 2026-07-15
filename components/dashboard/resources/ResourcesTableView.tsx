@@ -88,7 +88,7 @@ export const listRowVariants: Variants = {
   },
 };
 
-const toDisplayLabel = (value: string) => {
+export const toDisplayLabel = (value: string) => {
   if (!value) return "";
   return value
     .replace(/[_-]/g, " ")
@@ -97,7 +97,7 @@ const toDisplayLabel = (value: string) => {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
-const formatDuration = (seconds?: number) => {
+export const formatDuration = (seconds?: number) => {
   if (!seconds || seconds <= 0) return null;
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
@@ -147,7 +147,7 @@ export const getFileTypeBadge = (format: FormatType | string) => {
   );
 };
 
-const getPedagogicalTypeLabel = (value: string) => {
+export const getPedagogicalTypeLabel = (value: string) => {
   const map: Record<string, string> = {
     worksheet: "Worksheet",
     audio: "Audio Activity",
@@ -168,7 +168,7 @@ const getPedagogicalTypeLabel = (value: string) => {
   return map[value] || toDisplayLabel(value);
 };
 
-const getSkillLabel = (skill: string) => {
+export const getSkillLabel = (skill: string) => {
   const map: Record<string, string> = {
     speaking: "Speaking",
     listening: "Listening",
@@ -182,7 +182,7 @@ const getSkillLabel = (skill: string) => {
   return map[skill] || toDisplayLabel(skill);
 };
 
-const getVisibilityMeta = (visibility: ResourceVisibility | string) => {
+export const getVisibilityMeta = (visibility: ResourceVisibility | string) => {
   const isShared = visibility === "shared";
   return {
     icon: isShared ? Eye : EyeOff,
@@ -193,7 +193,7 @@ const getVisibilityMeta = (visibility: ResourceVisibility | string) => {
   };
 };
 
-const getStatusBadge = (rawStatus: string) => {
+export const getStatusBadge = (rawStatus: string) => {
   const status = (rawStatus || "").trim().toLowerCase();
   if (status === "draft")
     return "bg-amber-50 border border-amber-200/90 text-amber-700";
@@ -204,7 +204,7 @@ const getStatusBadge = (rawStatus: string) => {
   return "bg-slate-50 border border-dashed border-slate-200 text-slate-500";
 };
 
-const getLevelBadge = (level: string) => {
+export const getLevelBadge = (level: string) => {
   if (["A1", "A2"].includes(level))
     return "bg-emerald-50 text-emerald-700 border-emerald-200/90";
   if (["B1", "B2"].includes(level))
@@ -212,7 +212,7 @@ const getLevelBadge = (level: string) => {
   return "bg-violet-50 text-violet-700 border-violet-200/90";
 };
 
-const getSkillBadge = () =>
+export const getSkillBadge = () =>
   "bg-slate-50 text-slate-700 border border-slate-200/80";
 
 export default function ResourceTableView({
