@@ -128,7 +128,7 @@ export function useResources({
         params.set("ownership", ownership);
       }
 
-      return `/api/resources?${params.toString()}`;
+      return `/api/resources?status=published&${params.toString()}`;
     },
     [
       limit,

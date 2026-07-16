@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
+  ExternalLink,
   Loader2,
   Plus,
   Search,
@@ -21,17 +22,19 @@ import {
   listContainerVariants,
   listRowVariants,
 } from "../../resources/ResourcesTableView";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 
 interface ResourceSelectorProps {
-  selectedResourceIds?: string[];
-  onToggleResource?: (resource: ResourceListItemDTO) => void;
   onClose: () => void;
+  locale: string;
+  onCreateBlocks: (resources: ResourceListItemDTO[]) => void;
 }
 
 export default function ResourceSelector({
-  selectedResourceIds = [],
-  onToggleResource,
   onClose,
+  locale,
+  onCreateBlocks,
 }: ResourceSelectorProps) {
   const {
     resources,
@@ -52,6 +55,30 @@ export default function ResourceSelector({
   const canGoPrevious = page > 1;
   const canGoNext = page < totalPages;
 
+  const [selectedResources, setSelectedResources] = useState<
+    ResourceListItemDTO[]
+  >([]);
+
+  const selectedResourceIdSet = useMemo(() => {
+    return new Set(selectedResources.map((resource) => resource.id));
+  }, [selectedResources]);
+
+  function toggleResource(resource: ResourceListItemDTO) {
+    setSelectedResources((currentResources) => {
+      const alreadySelected = currentResources.some(
+        (item) => item.id === resource.id,
+      );
+
+      if (alreadySelected) {
+        return currentResources.filter((item) => item.id !== resource.id);
+      }
+      return [...currentResources, resource];
+    });
+  }
+
+  useEffect(() => {
+    console.log("Selected resources:", selectedResources);
+  }, [selectedResources]);
   return (
     <motion.div
       variants={listContainerVariants}
@@ -71,7 +98,7 @@ export default function ResourceSelector({
         />
       </div>
 
-      <div className="min-h-[28rem] space-y-3">
+      <div className="min-h-112 space-y-3">
         {isLoading ? (
           <div className="flex min-h-40 items-center justify-center rounded-2xl border border-slate-700/70 bg-slate-800/40 text-sm text-slate-400">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -87,8 +114,9 @@ export default function ResourceSelector({
           </div>
         ) : (
           resources.map((resource) => {
-            const isSelected = selectedResourceIds.includes(resource.id);
+            const isSelected = selectedResourceIdSet.has(resource.id);
             const isArchived = resource.status === "archived";
+            const detailHref = `/${locale}/dashboard/resources/${resource.id}`;
 
             const { icon: FormatIcon, label: formatLabel } = getFileTypeBadge(
               resource.asset.format,
@@ -157,27 +185,43 @@ export default function ResourceSelector({
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => onToggleResource?.(resource)}
-                  className={`flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs transition ${
-                    isSelected
-                      ? "border-[#9e2727] bg-[#9e2727] text-white"
-                      : "border-slate-600 bg-slate-700/40 text-slate-300 hover:bg-slate-700"
-                  }`}
-                >
-                  {isSelected ? (
-                    <>
-                      <Check size={13} />
-                      Añadido
-                    </>
-                  ) : (
-                    <>
-                      <Plus size={13} />
-                      Añadir
-                    </>
-                  )}
-                </button>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Link
+                    href={detailHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-600/70 bg-slate-800/50 px-3 py-1.5 text-xs text-slate-300 transition hover:border-slate-500 hover:bg-slate-700/70 hover:text-white"
+                  >
+                    <ExternalLink size={13} />
+                    Ver
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      toggleResource(resource);
+                    }}
+                    className={`cursor-pointer flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs transition ${
+                      isSelected
+                        ? "border-[#9e2727] bg-[#9e2727] text-white hover:bg-[#8d2323]"
+                        : "border-slate-600 bg-slate-700/40 text-slate-300 hover:bg-slate-700"
+                    }`}
+                  >
+                    {isSelected ? (
+                      <>
+                        <Check size={13} />
+                        Quitar
+                      </>
+                    ) : (
+                      <>
+                        <Plus size={13} />
+                        Añadir
+                      </>
+                    )}
+                  </button>
+                </div>
               </motion.article>
             );
           })
@@ -200,7 +244,7 @@ export default function ResourceSelector({
             type="button"
             disabled={!canGoPrevious || isLoading}
             onClick={() => goToPage(page - 1)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-600/70 bg-slate-800/60 text-slate-300 transition hover:border-slate-500 hover:bg-slate-700/70 disabled:cursor-not-allowed disabled:opacity-40"
+            className="cursor-pointer inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-600/70 bg-slate-800/60 text-slate-300 transition hover:border-slate-500 hover:bg-slate-700/70 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <ChevronLeft size={15} />
           </button>
@@ -209,7 +253,7 @@ export default function ResourceSelector({
             type="button"
             disabled={!canGoNext || isLoading}
             onClick={() => goToPage(page + 1)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-600/70 bg-slate-800/60 text-slate-300 transition hover:border-slate-500 hover:bg-slate-700/70 disabled:cursor-not-allowed disabled:opacity-40"
+            className="cursor-pointer inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-600/70 bg-slate-800/60 text-slate-300 transition hover:border-slate-500 hover:bg-slate-700/70 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <ChevronRight size={15} />
           </button>
@@ -224,10 +268,15 @@ export default function ResourceSelector({
 
           <button
             type="button"
-            onClick={onClose}
-            className="cursor-pointer rounded-xl border border-[#9e2727]/70 bg-[#9e2727] px-4 py-2 text-sm text-white transition hover:bg-[#8d2323]"
+            disabled={selectedResources.length === 0}
+            onClick={() => {
+              onCreateBlocks(selectedResources);
+              setSelectedResources([]);
+              onClose();
+            }}
+            className="cursor-pointer rounded-xl border border-[#9e2727]/70 bg-[#9e2727] px-4 py-2 text-sm text-white transition hover:bg-[#8d2323] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Guardar
+            Crear {selectedResources.length} bloques
           </button>
         </div>
       </div>

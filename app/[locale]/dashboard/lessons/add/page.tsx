@@ -19,7 +19,7 @@ export default async function AddLessonPage({
         <h1 className="text-2xl">Agregar Lección</h1>
       </div>
       <div className="w-full flex-col items-center">
-        <AddLessonWizard />
+        <AddLessonWizard locale={locale} />
       </div>
     </div>
   );

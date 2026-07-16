@@ -4,8 +4,24 @@ import FirstStepAddLesson from "@/components/dashboard/lessons/add/FirstStepAddL
 import SecondStepAddLesson from "@/components/dashboard/lessons/add/SecondStepAddLesson";
 import ThirdStepAddLesson from "@/components/dashboard/lessons/add/ThirdStepAddLesson";
 import { useState } from "react";
-import { FormProvider, useForm } from "react-hook-form";
+import { FormProvider, useFieldArray, useForm } from "react-hook-form";
 import LessonToolBox from "../../../../../components/dashboard/lessons/add/LessonToolBox";
+import { ResourceListItemDTO } from "@/lib/dto/resource.dto";
+import { useRouter } from "next/navigation";
+
+function getBlockTypeFromResource(
+  resource: ResourceListItemDTO,
+): AddLessonFormValues["blocks"][number]["type"] {
+  if (resource.skills?.includes("speaking")) return "speaking";
+  if (resource.skills?.includes("listening")) return "listening";
+  if (resource.skills?.includes("reading")) return "reading";
+  if (resource.skills?.includes("writing")) return "writing";
+  if (resource.skills?.includes("grammar")) return "grammar";
+  if (resource.skills?.includes("vocabulary")) return "vocabulary";
+  if (resource.skills?.includes("pronunciation")) return "pronunciation";
+
+  return "custom";
+}
 
 export type AddLessonFormValues = {
   title: string;
@@ -72,10 +88,17 @@ const defaultValues: AddLessonFormValues = {
   syncGoogleCalendar: false,
 };
 
-export default function AddLessonWizard() {
+interface AddLessonWizardProps {
+  locale: string;
+}
+
+export default function AddLessonWizard({ locale }: AddLessonWizardProps) {
   const [currentStep, setCurrentStep] = useState(0);
+  const router = useRouter();
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const form = useForm<AddLessonFormValues>({ defaultValues, mode: "onBlur" });
+  const isSubmitting = form.formState.isSubmitting;
 
   const handleNext = async () => {
     const isValid = await form.trigger([
@@ -96,16 +119,69 @@ export default function AddLessonWizard() {
     setCurrentStep((step) => Math.max(step - 1, 0));
   };
 
-  const onSubmit = async (values: AddLessonFormValues) => {
-    console.log("Lesson form values: ", values);
-    ////nota: Later:
-    // await fetch("/api/lessons", {
-    //   method: "POST",
-    //   headers: { "Content-Type": "application/json" },
-    //   body: JSON.stringify(values),
-    // });
-  };
+  const {
+    fields: blockFields,
+    append: appendBlock,
+    remove: removeBlocks,
+  } = useFieldArray({ control: form.control, name: "blocks" });
 
+  function createBlockFromResource(resource: ResourceListItemDTO) {
+    appendBlock({
+      title: resource.title,
+      type: getBlockTypeFromResource(resource),
+      cefrLevels: resource.levels ?? [],
+      skills: resource.skills ?? [],
+      tags: resource.tags ?? [],
+      resources: [resource.id],
+      plannedContent:
+        resource.description || `Trabajar con el recurso: ${resource.title}`,
+      estimatedMinutes: resource.estimatedDurationMinutes ?? 10,
+      errorCategories: [],
+    });
+  }
+
+  function createBlocksFromResources(resources: ResourceListItemDTO[]) {
+    resources.forEach((resource) => {
+      appendBlock({
+        title: resource.title,
+        type: getBlockTypeFromResource(resource),
+        cefrLevels: resource.levels ?? [],
+        skills: resource.skills ?? [],
+        tags: resource.tags ?? [],
+        resources: [resource.id],
+        plannedContent:
+          resource.description || `Trabajar con el recurso: ${resource.title}`,
+        estimatedMinutes: resource.estimatedDurationMinutes ?? 10,
+        errorCategories: [],
+      });
+    });
+  }
+
+  const onSubmit = async (values: AddLessonFormValues) => {
+    try {
+      setSubmitError(null);
+
+      const response = await fetch("/api/lessons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Error al crear la lección");
+      }
+
+      router.push(`/${locale}/dashboard/lessons`);
+      router.refresh();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Error desconocido";
+
+      setSubmitError(message);
+    }
+  };
   return (
     <FormProvider {...form}>
       <div className="items-center justify-center gap-2 grid grid-cols-12">
@@ -127,13 +203,19 @@ export default function AddLessonWizard() {
           </p>
           {currentStep === 0 && <FirstStepAddLesson />}
 
-          {currentStep === 1 && <SecondStepAddLesson />}
+          {currentStep === 1 && (
+            <SecondStepAddLesson
+              blockFields={blockFields}
+              appendBlock={appendBlock}
+              removeBlock={removeBlocks}
+            />
+          )}
           {currentStep === 2 && <ThirdStepAddLesson />}
           <div className="mt-8 flex items-center justify-between border-t border-gray-100 pt-5">
             <button
               type="button"
               onClick={handlePrevious}
-              disabled={currentStep === 0}
+              disabled={currentStep === 0 || isSubmitting}
               className="cursor-pointer rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Anterior
@@ -142,23 +224,33 @@ export default function AddLessonWizard() {
               <button
                 type="button"
                 onClick={handleNext}
-                className="cursor-pointer rounded-xl bg-[#9e2727] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#8d2323]"
+                disabled={isSubmitting}
+                className="cursor-pointer rounded-xl bg-[#9e2727] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#8d2323] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Siguiente
               </button>
             ) : (
               <button
                 type="submit"
-                className="cursor-pointer  rounded-xl bg-[#9e2727] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#8d2323]"
+                disabled={isSubmitting}
+                className="cursor-pointer rounded-xl bg-[#9e2727] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#8d2323] disabled:cursor-not-allowed disabled:opacity-40"
               >
-                Guardar lección
+                {isSubmitting ? "Guardando..." : "Guardar lección"}
               </button>
+            )}
+            {submitError && (
+              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {submitError}
+              </div>
             )}
           </div>
         </form>
         {currentStep === 1 ? (
           <div className="col-span-1 flex items-center justify-center h-full  transition-all duration-150 ease-in-out">
-            <LessonToolBox />
+            <LessonToolBox
+              locale={locale}
+              onCreateBlocksFromResources={createBlocksFromResources}
+            />
           </div>
         ) : (
           ""

@@ -3,12 +3,19 @@
 import { BookMarked, Route, ToolCase } from "lucide-react";
 import CustomModal from "../../../ui/CustomModal";
 import { useState } from "react";
-import { useResources } from "@/lib/hooks/useResources";
 import ResourceSelector from "./ResourceSelector";
+import { ResourceListItemDTO } from "@/lib/dto/resource.dto";
 
-export default function LessonToolBox() {
+interface LessonToolBoxProps {
+  locale: string;
+  onCreateBlocksFromResources: (resources: ResourceListItemDTO[]) => void;
+}
+
+export default function LessonToolBox({
+  locale,
+  onCreateBlocksFromResources,
+}: LessonToolBoxProps) {
   const [isResourcesModalOpen, setIsResourcesModalOpen] = useState(false);
-
   return (
     <div className="w-full flex flex-col items-center justify-start rounded-xl py-6 px-1 border border-gray-200 shadow-sm gap-2">
       <button
@@ -30,7 +37,11 @@ export default function LessonToolBox() {
         maxWidth="5xl"
       >
         <div className="p-4">
-          <ResourceSelector onClose={() => setIsResourcesModalOpen(false)} />
+          <ResourceSelector
+            locale={locale}
+            onCreateBlocks={onCreateBlocksFromResources}
+            onClose={() => setIsResourcesModalOpen(false)}
+          />
         </div>
       </CustomModal>
     </div>
