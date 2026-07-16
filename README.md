@@ -1,4 +1,3 @@
-````markdown
 # CostaSpanish Academy LMS
 
 A full-stack Learning Management System designed for independent language teachers, combining student management, course and lesson planning, scheduling, resource distribution, and credit-based billing in a single platform.
@@ -106,7 +105,6 @@ The application follows a modular, domain-oriented structure inspired by Domain-
 │
 └── ⚙️ middleware.ts        # Route protection and authentication redirects
 ```
-````
 
 </details>
 
@@ -180,7 +178,3 @@ The project focuses on domain modelling, reusable educational content, external 
 
 - [LinkedIn](https://www.linkedin.com/in/michaelrodrigueziranzo)
 - [Portfolio](https://www.michael-rodriguez.dev/)
-
-```
-
-```
