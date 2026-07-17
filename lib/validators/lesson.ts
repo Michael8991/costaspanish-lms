@@ -6,19 +6,65 @@ import {
   LESSON_CLASS_TYPES,
   LESSON_CREATION_SOURCES,
   LESSON_ERROR_CATEGORIES,
+  LESSON_PREPARATION_STATUSES,
   LESSON_SKILLS,
   LESSON_STATUSES,
 } from "@/lib/constants/lesson.constants";
+import { Types } from "mongoose";
 
-const objectIdSchema = z.string().regex(/^[a-f\d]{24}$/i, "Invalid ObjectId");
 
-export const lessonAttendeeSchema = z.object({
-  studentId: objectIdSchema,
-  voucherId: objectIdSchema.optional(),
-  attendanceStatus: z.enum(LESSON_ATTENDANCE_STATUSES).default("pending"),
-  creditsToConsume: z.coerce.number().min(0).optional(),
-});
+const objectIdSchema = z
+  .string()
+  .min(1)
+  .refine((value) => Types.ObjectId.isValid(value), {
+    message: "Invalid ObjectId",
+  });
 
+const optionalObjectIdSchema = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  objectIdSchema.optional(),
+);
+
+const lessonAttendeeSchema = z
+  .object({
+    studentId: objectIdSchema,
+    voucherId: optionalObjectIdSchema,
+    attendanceStatus: z.enum(LESSON_ATTENDANCE_STATUSES).default("pending"),
+    creditsToConsume: z.coerce.number().min(0).default(1),
+    isTrial: z.boolean().default(false),
+  })
+  .superRefine((attendee, ctx) => {
+    if (attendee.isTrial) {
+      return;
+    }
+
+    if (!attendee.voucherId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["voucherId"],
+        message: "voucherId is required when attendee is not trial",
+      });
+    }
+
+    if (attendee.creditsToConsume <= 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["creditsToConsume"],
+        message: "creditsToConsume must be greater than 0 when attendee is not trial",
+      });
+    }
+  })
+  .transform((attendee) => {
+    if (!attendee.isTrial) {
+      return attendee;
+    }
+
+    return {
+      ...attendee,
+      voucherId: undefined,
+      creditsToConsume: 0,
+    };
+  });
 export const lessonBlockSchema = z.object({
   title: z.string().trim().min(1),
   type: z.enum(LESSON_BLOCK_TYPES),
@@ -53,6 +99,9 @@ const lessonBaseSchema = z.object({
 
   title: z.string().trim().min(1),
   status: z.enum(LESSON_STATUSES).default("scheduled"),
+  preparationStatus: z
+  .enum(LESSON_PREPARATION_STATUSES)
+  .default("needs_preparation"),
 
   scheduledStart: z.coerce.date(),
   scheduledEnd: z.coerce.date(),
@@ -88,7 +137,40 @@ export const createLessonSchema = lessonBaseSchema.refine(
   },
 );
 
-export const updateLessonSchema = lessonBaseSchema.partial().refine(
+const updateLessonBaseSchema = z.object({
+  courseId: objectIdSchema.optional(),
+
+  title: z.string().trim().min(1).optional(),
+  status: z.enum(LESSON_STATUSES).optional(),
+  preparationStatus: z.enum(LESSON_PREPARATION_STATUSES).optional(),
+
+  scheduledStart: z.coerce.date().optional(),
+  scheduledEnd: z.coerce.date().optional(),
+  timezone: z.string().trim().optional(),
+
+  classType: z.enum(LESSON_CLASS_TYPES).optional(),
+  isTrial: z.boolean().optional(),
+
+  attendees: z.array(lessonAttendeeSchema).optional(),
+  blocks: z.array(lessonBlockSchema).optional(),
+
+  preparationNotes: z.string().trim().optional(),
+  teacherNotes: z.string().trim().optional(),
+  homeworkAssigned: z.string().trim().optional(),
+  nextLessonFocus: z.string().trim().optional(),
+
+  creationSource: z.enum(LESSON_CREATION_SOURCES).optional(),
+
+  integration: z
+    .object({
+      provider: z.enum(["google_calendar", "preply", "italki", "manual"]),
+      externalId: z.string().trim().optional(),
+      meetUrl: z.string().trim().url().optional(),
+    })
+    .optional(),
+});
+
+export const updateLessonSchema = updateLessonBaseSchema.refine(
   (data) => {
     if (data.scheduledStart && data.scheduledEnd) {
       return data.scheduledEnd > data.scheduledStart;
@@ -101,7 +183,6 @@ export const updateLessonSchema = lessonBaseSchema.partial().refine(
     path: ["scheduledEnd"],
   },
 );
-
 export type CreateLessonInput = z.infer<typeof createLessonSchema>;
 export type UpdateLessonInput = z.infer<typeof updateLessonSchema>;
 export type LessonBlockInput = z.infer<typeof lessonBlockSchema>;

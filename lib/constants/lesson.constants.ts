@@ -6,6 +6,11 @@ export const LESSON_STATUSES = [
   "voided",
 ] as const;
 
+export const LESSON_PREPARATION_STATUSES = [
+  "needs_preparation",
+  "prepared",
+] as const;
+
 export const LESSON_ATTENDANCE_STATUSES = [
   "pending",
   "attended",

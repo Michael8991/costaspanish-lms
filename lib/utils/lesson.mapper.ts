@@ -14,6 +14,7 @@ import {
   LessonSkill,
   LessonStatus,
   CefrLevel,
+  LessonPreparationStatus,
 } from "@/lib/types/lesson";
 
 interface RawLessonAttendee {
@@ -21,6 +22,7 @@ interface RawLessonAttendee {
   voucherId?: Types.ObjectId;
   attendanceStatus: LessonAttendanceStatus;
   creditsToConsume?: number;
+  isTrial?: boolean;
 }
 
 interface RawLessonBlock {
@@ -68,13 +70,13 @@ interface RawMongoLesson {
 
   title: string;
   status: LessonStatus;
-
+  preparationStatus?: LessonPreparationStatus;
   scheduledStart: Date;
   scheduledEnd: Date;
   timezone: string;
 
   classType: LessonClassType;
-  isTrial: boolean;
+  isTrial?: boolean;
 
   attendees?: RawLessonAttendee[];
   blocks?: RawLessonBlock[];
@@ -106,11 +108,12 @@ export function toLessonListDTO(lesson: RawMongoLesson): LessonListDTO {
     id: String(lesson._id),
     title: lesson.title,
     status: lesson.status,
+    preparationStatus: lesson.preparationStatus ?? "needs_preparation",
     scheduledStart: toISOString(lesson.scheduledStart),
     scheduledEnd: toISOString(lesson.scheduledEnd),
+    isTrial: lesson.isTrial ?? false,
     timezone: lesson.timezone,
     classType: lesson.classType,
-    isTrial: Boolean(lesson.isTrial),
     attendeesCount: lesson.attendees?.length ?? 0,
     blocksCount: lesson.blocks?.length ?? 0,
   };
@@ -119,10 +122,11 @@ export function toLessonListDTO(lesson: RawMongoLesson): LessonListDTO {
 export function toLessonDetailDTO(lesson: RawMongoLesson): LessonDetailDTO {
   const attendees: LessonAttendeeDTO[] = (lesson.attendees ?? []).map(
     (attendee) => ({
-      studentId: String(attendee.studentId),
-      voucherId: toId(attendee.voucherId),
+      studentId: attendee.studentId.toString(),
+      voucherId: attendee.voucherId?.toString(),
       attendanceStatus: attendee.attendanceStatus,
       creditsToConsume: attendee.creditsToConsume,
+      isTrial: attendee.isTrial ?? false,
     }),
   );
 

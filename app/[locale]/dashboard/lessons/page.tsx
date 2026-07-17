@@ -23,7 +23,7 @@ export default async function LessonsPage({
         </div>
         <div className="flex flex-col">
           <LessonsHeader locale={locale} />
-          <LessonsTable />
+          <LessonsTable locale={locale} />
         </div>
       </div>
     </LessonProvider>

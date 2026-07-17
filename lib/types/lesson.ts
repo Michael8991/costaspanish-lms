@@ -1,5 +1,6 @@
 import { Types } from "mongoose";
 import { CEFR_LEVELS, LESSON_ATTENDANCE_STATUSES, LESSON_BLOCK_TYPES, LESSON_CLASS_TYPES, LESSON_CREATION_SOURCES, LESSON_ERROR_CATEGORIES, LESSON_SKILLS, LESSON_STATUSES } from "../constants/lesson.constants";
+import { LESSON_PREPARATION_STATUSES } from "@/lib/constants/lesson.constants";
 
 export type LessonStatus = (typeof LESSON_STATUSES)[number];
 
@@ -17,11 +18,15 @@ export type LessonErrorCategory = (typeof LESSON_ERROR_CATEGORIES)[number];
 
 export type LessonCreationSource = (typeof LESSON_CREATION_SOURCES)[number];
 
-export interface LessonAttendee{
-    studentId: Types.ObjectId;
-    voucherId: Types.ObjectId;
-    attendanceStatus: LessonAttendanceStatus;
-    creditsToConsume?: number;
+export type LessonPreparationStatus =
+  (typeof LESSON_PREPARATION_STATUSES)[number];
+
+export interface LessonAttendee {
+  studentId: Types.ObjectId;
+  voucherId?: Types.ObjectId;
+  attendanceStatus: LessonAttendanceStatus;
+  creditsToConsume?: number;
+  isTrial?: boolean;
 }
 
 export interface LessonBlock{
@@ -61,6 +66,7 @@ export interface Lesson{
 
     title: string;
     status: LessonStatus;
+    preparationStatus: LessonPreparationStatus;
 
     scheduledStart: Date;
     scheduledEnd: Date;

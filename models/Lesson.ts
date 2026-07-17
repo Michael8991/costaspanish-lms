@@ -6,6 +6,7 @@ import {
   LESSON_CLASS_TYPES,
   LESSON_CREATION_SOURCES,
   LESSON_ERROR_CATEGORIES,
+  LESSON_PREPARATION_STATUSES,
   LESSON_SKILLS,
   LESSON_STATUSES,
 } from "@/lib/constants/lesson.constants";
@@ -25,12 +26,15 @@ const LessonAttendeeSchema = new Schema(
       type: String,
       enum: LESSON_ATTENDANCE_STATUSES,
       default: "pending",
-      required: true,
     },
     creditsToConsume: {
       type: Number,
-      min: 0,
       default: 1,
+      min: 0,
+    },
+    isTrial: {
+      type: Boolean,
+      default: false,
     },
   },
   { _id: false },
@@ -163,6 +167,13 @@ const LessonSchema = new Schema(
       default: "scheduled",
       required: true,
       index: true,
+    },
+    
+    preparationStatus: {
+      type: String,
+      enum: LESSON_PREPARATION_STATUSES,
+      default: "needs_preparation",
+      required: true,
     },
 
     scheduledStart: {

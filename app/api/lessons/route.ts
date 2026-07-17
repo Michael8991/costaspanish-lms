@@ -71,39 +71,74 @@ export async function GET(req: NextRequest) {
 
 
 export async function POST(req: NextRequest) {
-    try { 
-        const user = await requireAuth(req);
-        if (!user) {
-            return NextResponse.json({ok: false, error: "Unauthorized"}, {status: 401})
-        }
-        if (!requireRole(user, ["teacher", "admin"])) {
-            return NextResponse.json({ok: false, error: "Forbidden"}, {status: 403})
-        }
+  try {
+    const user = await requireAuth(req);
 
-        const body = await req.json();
+    if (!user) {
+      return NextResponse.json(
+        { ok: false, error: "Unauthorized" },
+        { status: 401 },
+      );
+    }
 
-        const parsed = createLessonSchema.safeParse(body);
-        if (!parsed.success) {
-            return NextResponse.json({ok: false, error:"Invalid lesson payload", issues: z.flattenError(parsed.error)},{status:400})
-        }
-        
-        await dbConnect();
+    if (!requireRole(user, ["teacher", "admin"])) {
+      return NextResponse.json(
+        { ok: false, error: "Forbidden" },
+        { status: 403 },
+      );
+    }
 
-        const currentUserObjectId = getCurrentUserId(user);
+    const body = await req.json();
 
-        if (!currentUserObjectId) {
-           return NextResponse.json(
+    const parsed = createLessonSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Invalid lesson payload",
+          issues: z.flattenError(parsed.error),
+        },
+        { status: 400 },
+      );
+    }
+
+    await dbConnect();
+
+    const currentUserObjectId = getCurrentUserId(user);
+
+    if (!currentUserObjectId) {
+      return NextResponse.json(
         { ok: false, error: "Invalid user id" },
         { status: 500 },
-            );
-        }
-        
-        const lesson = await Lesson.create({ ...parsed.data, teacherId: currentUserObjectId });
-
-        return NextResponse.json({ ok: true, item: toLessonDetailDTO(lesson)}, {status: 201})
-    } catch (error) {
-        console.error("Error en POST /api/lessons: ", error);
-
-        return NextResponse.json({ ok: false, error: "Internal Server Error" }, { status: 500})
+      );
     }
+
+    const payload = parsed.data;
+
+    const isWholeLessonTrial =
+      payload.attendees.length > 0 &&
+      payload.attendees.every((attendee) => attendee.isTrial);
+
+    const lesson = await Lesson.create({
+      ...payload,
+      teacherId: currentUserObjectId,
+      isTrial: isWholeLessonTrial,
+    });
+
+    return NextResponse.json(
+      {
+        ok: true,
+        item: toLessonDetailDTO(lesson.toObject()),
+      },
+      { status: 201 },
+    );
+  } catch (error) {
+    console.error("Error en POST /api/lessons: ", error);
+
+    return NextResponse.json(
+      { ok: false, error: "Internal Server Error" },
+      { status: 500 },
+    );
+  }
 }

@@ -9,11 +9,22 @@ import {
   LessonStatus,
 } from "@/lib/types/lesson";
 
+export interface LessonBlockResourceDTO{
+  id: string;
+  title: string;
+  format: string;
+  url?: string;
+  thumbnailUrl?: string;
+}
+
+export type LessonPreparationStatus = "needs_preparation" | "prepared";
+
 export interface LessonAttendeeDTO {
   studentId: string;
   voucherId?: string;
   attendanceStatus: LessonAttendanceStatus;
   creditsToConsume?: number;
+  isTrial?: boolean;
 }
 
 export interface LessonBlockDTO {
@@ -26,6 +37,7 @@ export interface LessonBlockDTO {
   skills: LessonSkill[];
   tags: string[];
   resources: string[];
+  resourceItems?: LessonBlockResourceDTO[];
 
   plannedContent: string;
   actualContent?: string;
@@ -51,6 +63,7 @@ export interface LessonListDTO {
   id: string;
   title: string;
   status: LessonStatus;
+  preparationStatus: LessonPreparationStatus;
   scheduledStart: string;
   scheduledEnd: string;
   timezone: string;
@@ -71,6 +84,7 @@ export interface LessonDetailDTO extends LessonListDTO {
   teacherNotes?: string;
   homeworkAssigned?: string;
   nextLessonFocus?: string;
+  preparationStatus: LessonPreparationStatus;
 
   creationSource: LessonCreationSource;
 
@@ -83,3 +97,4 @@ export interface LessonDetailDTO extends LessonListDTO {
   createdAt: string;
   updatedAt: string;
 }
+

@@ -125,21 +125,6 @@ export default function AddLessonWizard({ locale }: AddLessonWizardProps) {
     remove: removeBlocks,
   } = useFieldArray({ control: form.control, name: "blocks" });
 
-  function createBlockFromResource(resource: ResourceListItemDTO) {
-    appendBlock({
-      title: resource.title,
-      type: getBlockTypeFromResource(resource),
-      cefrLevels: resource.levels ?? [],
-      skills: resource.skills ?? [],
-      tags: resource.tags ?? [],
-      resources: [resource.id],
-      plannedContent:
-        resource.description || `Trabajar con el recurso: ${resource.title}`,
-      estimatedMinutes: resource.estimatedDurationMinutes ?? 10,
-      errorCategories: [],
-    });
-  }
-
   function createBlocksFromResources(resources: ResourceListItemDTO[]) {
     resources.forEach((resource) => {
       appendBlock({
@@ -161,16 +146,38 @@ export default function AddLessonWizard({ locale }: AddLessonWizardProps) {
     try {
       setSubmitError(null);
 
+      const payload = {
+        ...values,
+        attendees: values.attendees.map((attendee) => ({
+          ...attendee,
+          voucherId: attendee.isTrial
+            ? undefined
+            : attendee.voucherId || undefined,
+          creditsToConsume: attendee.isTrial ? 0 : attendee.creditsToConsume,
+        })),
+      };
+
+      console.log("Lesson payload before POST:", payload);
+
       const response = await fetch("/api/lessons", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json().catch(() => null);
 
       if (!response.ok) {
-        throw new Error(data?.error ?? "Error al crear la lección");
+        console.log("Create lesson error response:", data);
+
+        const details =
+          data?.details
+            ?.map((detail: { path?: string; message?: string }) => {
+              return `${detail.path ?? "field"}: ${detail.message}`;
+            })
+            .join("\n") ?? null;
+
+        throw new Error(details ?? data?.error ?? "Error al crear la lección");
       }
 
       router.push(`/${locale}/dashboard/lessons`);
