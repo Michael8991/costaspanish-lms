@@ -101,7 +101,7 @@ export default function SecondStepAddLesson({
         onClick={() =>
           appendBlock({
             title: "",
-            type: "warm_up",
+            type: "custom",
             cefrLevels: [],
             skills: [],
             tags: [],
@@ -109,6 +109,8 @@ export default function SecondStepAddLesson({
             plannedContent: "",
             estimatedMinutes: 10,
             errorCategories: [],
+            completionStatus: "not_completed",
+            carryOverToNextLesson: false,
           })
         }
         className="cursor-pointer flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-3 text-sm font-medium text-gray-600 transition hover:border-[#9e2727] hover:text-[#9e2727]"
