@@ -5,12 +5,31 @@ import { requireAuth, requireRole } from "@/lib/auth/apiAuth";
 import { toLessonDetailDTO } from "@/lib/utils/lesson.mapper";
 import Lesson from "@/models/Lesson";
 import { Resource } from "@/models/ResourceProfile";
-import { LessonBlock } from "@/lib/types/lesson";
 import { z } from "zod";
 
 
 import { updateLessonSchema } from "@/lib/validators/lesson";
 import { getCurrentUserObjectId } from "@/lib/auth/getCurrentUserObjectId";
+import {  StudentProfile } from "@/models/StudentProfile";
+
+type ProjectedStudent = {
+  _id: Types.ObjectId;
+  fullName?: string;
+  firstName?: string;
+  lastName?: string;
+  name?: string;
+  contactName?: string;
+  contactEmail?: string;
+  email?: string;
+};
+
+type RawLessonAttendeeForGet = {
+  studentId?: Types.ObjectId | string;
+};
+
+type RawLessonBlockForGet = {
+  resources?: Array<Types.ObjectId | string>;
+};
 
 export async function GET(
   req: NextRequest,
@@ -45,74 +64,137 @@ export async function GET(
         { error: "Lesson not found" },
         { status: 404 },
       );
-      }
-      
-      const resourceIds = Array.from(
-  new Set(
-    (lesson.blocks ?? [])
-      .flatMap((block: LessonBlock) => block.resources ?? [])
-      .map((resourceId:string) => resourceId.toString()),
-  ),
-);
+    }
 
-const resources = await Resource.find(
-  {
-    _id: { $in: resourceIds },
-    status: { $ne: "deleted" },
-  },
-  {
-    title: 1,
-    format: 1,
-    fileUrl: 1,
-    externalUrl: 1,
-    thumbnailUrl: 1,
-  },
-).lean();
+    const studentIds = Array.from(
+      new Set(
+        ((lesson.attendees ?? []) as RawLessonAttendeeForGet[])
+          .map((attendee) => attendee.studentId?.toString())
+          .filter((studentId): studentId is string => Boolean(studentId)),
+      ),
+    );
 
-const resourceMap = new Map(
-  resources.map((resource) => {
-    const id = resource._id.toString();
-
-    const url =
-      resource.format === "external_link"
-        ? resource.externalUrl
-        : resource.fileUrl;
-
-    return [
-      id,
+    const students = await StudentProfile.find(
       {
-        id,
-        title: resource.title,
-        format: resource.format,
-        url,
-        thumbnailUrl: resource.thumbnailUrl,
+        _id: { $in: studentIds },
       },
-    ];
-  }),
+      {
+        firstName: 1,
+        lastName: 1,
+        name: 1,
+        fullName: 1,
+        contactName: 1,
+        contactEmail: 1,
+        email: 1,
+      },
+    ).lean<ProjectedStudent[]>();
+
+    function getStudentDisplayName(student: ProjectedStudent) {
+      const firstAndLast = [student.firstName, student.lastName]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+
+      return (
+        student.fullName ||
+        student.name ||
+        student.contactName ||
+        firstAndLast ||
+        student.contactEmail ||
+        student.email ||
+        "Alumno sin nombre"
       );
-      const lessonDTO = toLessonDetailDTO(lesson);
+    }
 
-const lessonWithResources = {
-  ...lessonDTO,
-  blocks: lessonDTO.blocks.map((block) => ({
-    ...block,
-    resourceItems: block.resources
-      .map((resourceId) => resourceMap.get(resourceId))
-      .filter(Boolean),
-  })),
-};
+    const studentMap = new Map(
+      students.map((student) => {
+        const studentId = student._id.toString();
 
-return NextResponse.json(
-  {
-    item: lessonWithResources,
-  },
-  { status: 200 },
-);
+        return [
+          studentId,
+          {
+            name: getStudentDisplayName(student),
+            email: student.contactEmail || student.email,
+          },
+        ];
+      }),
+    );
 
-   
+    const resourceIds = Array.from(
+      new Set(
+        ((lesson.blocks ?? []) as RawLessonBlockForGet[])
+          .flatMap((block) => block.resources ?? [])
+          .map((resourceId) => resourceId.toString()),
+      ),
+    );
+
+    const resources = await Resource.find(
+      {
+        _id: { $in: resourceIds },
+        status: { $ne: "deleted" },
+      },
+      {
+        title: 1,
+        format: 1,
+        fileUrl: 1,
+        externalUrl: 1,
+        thumbnailUrl: 1,
+      },
+    ).lean();
+
+    const resourceMap = new Map(
+      resources.map((resource) => {
+        const resourceId = resource._id.toString();
+
+        const url =
+          resource.format === "external_link"
+            ? resource.externalUrl
+            : resource.fileUrl;
+
+        return [
+          resourceId,
+          {
+            id: resourceId,
+            title: resource.title,
+            format: resource.format,
+            url,
+            thumbnailUrl: resource.thumbnailUrl,
+          },
+        ];
+      }),
+    );
+
+    const lessonDTO = toLessonDetailDTO(lesson);
+
+    const lessonWithResources = {
+      ...lessonDTO,
+
+      attendees: lessonDTO.attendees.map((attendee) => {
+        const student = studentMap.get(attendee.studentId);
+
+        return {
+          ...attendee,
+          studentName: student?.name ?? "Alumno sin nombre",
+          studentEmail: student?.email,
+        };
+      }),
+
+      blocks: lessonDTO.blocks.map((block) => ({
+        ...block,
+        resourceItems: block.resources
+          .map((resourceId) => resourceMap.get(resourceId))
+          .filter((resource) => resource !== undefined),
+      })),
+    };
+
+    return NextResponse.json(
+      {
+        item: lessonWithResources,
+      },
+      { status: 200 },
+    );
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unknown error";
+    const message = error instanceof Error ? error.message : "Unknown error";
 
     console.error("Error en GET /api/lessons/[id]:", message);
 

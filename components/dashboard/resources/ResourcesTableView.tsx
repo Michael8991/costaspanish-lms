@@ -26,9 +26,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import CustomModal from "@/components/ui/CustomModal";
-import ArchiveResourceForm, {
-  ArchiveResourceFormData,
-} from "./ArchiveResourceForm";
+import ArchiveResourceForm from "./ArchiveResourceForm";
 import DeleteResourceForm from "./DeleteResourceForm";
 import AddResourceToLessonForm from "./AddResourceToLessonForm";
 import { MOCK_UPCOMING_CLASSES } from "@/lib/mocks/lessons.mock";
@@ -283,10 +281,7 @@ export default function ResourceTableView({
   };
 
   // ── Handlers idénticos al grid ──
-  const handleArchiveResource = async (
-    resourceId: string | null,
-    formData: ArchiveResourceFormData,
-  ) => {
+  const handleArchiveResource = async (resourceId: string | null) => {
     setIsSubmittingArchive(true);
     try {
       const res = await fetch(`/api/resources/${resourceId}`, {
@@ -450,7 +445,7 @@ export default function ResourceTableView({
                   variants={listRowVariants}
                   className={`group transition-colors ${
                     isArchived
-                      ? "bg-slate-50/80 opacity-70 grayscale-[20%]"
+                      ? "bg-slate-50/80 opacity-70 grayscale-20"
                       : "hover:bg-slate-50/70"
                   }`}
                 >
@@ -589,7 +584,7 @@ export default function ResourceTableView({
         menuPosition &&
         createPortal(
           <div
-            className="menu-dropdown fixed z-[9999] py-3 px-2 min-w-[220px] flex flex-col rounded-xl bg-[#9e2727] gap-1 shadow-2xl"
+            className="menu-dropdown fixed z-9999 py-3 px-2 min-w-55 flex flex-col rounded-xl bg-[#9e2727] gap-1 shadow-2xl"
             style={{ top: menuPosition.top, left: menuPosition.left }}
           >
             {quickOptionsMenu.map((option, index) => {

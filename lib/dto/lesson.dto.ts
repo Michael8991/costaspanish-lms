@@ -22,6 +22,7 @@ export type LessonPreparationStatus = "needs_preparation" | "prepared";
 export interface LessonAttendeeDTO {
   studentId: string;
   voucherId?: string;
+  studentName?: string;
   attendanceStatus: LessonAttendanceStatus;
   creditsToConsume?: number;
   isTrial?: boolean;

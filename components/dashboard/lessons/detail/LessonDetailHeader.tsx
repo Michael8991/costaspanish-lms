@@ -20,6 +20,7 @@ import CustomModal from "@/components/ui/CustomModal";
 import RescheduleLessonModalContent from "./RescheduleLessonModalContent";
 import DeleteLessonModalContent from "./DeleteLessonModalContent";
 import { LessonStatus } from "@/lib/types/lesson";
+import Link from "next/link";
 
 interface LessonDetailHeaderProps {
   lesson: LessonDetailDTO;
@@ -195,13 +196,14 @@ export default function LessonDetailHeader({
 
             <div className="mx-1 hidden h-7 w-px bg-gray-200 sm:block" />
 
-            <button
+            <Link
+              href={`/${locale}/dashboard/lessons/${lesson.id}/edit`}
               type="button"
               className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
             >
               <Edit3 size={15} />
               Editar
-            </button>
+            </Link>
 
             <button
               type="button"
