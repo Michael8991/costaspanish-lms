@@ -1,6 +1,11 @@
 import { Types } from "mongoose";
 import { CEFR_LEVELS, LESSON_ATTENDANCE_STATUSES, LESSON_BLOCK_TYPES, LESSON_CLASS_TYPES, LESSON_CREATION_SOURCES, LESSON_ERROR_CATEGORIES, LESSON_SKILLS, LESSON_STATUSES } from "../constants/lesson.constants";
 import { LESSON_PREPARATION_STATUSES } from "@/lib/constants/lesson.constants";
+import { LESSON_BLOCK_COMPLETION_STATUSES } from "@/lib/constants/lesson.constants";
+
+
+export type LessonBlockCompletionStatus =
+  (typeof LESSON_BLOCK_COMPLETION_STATUSES)[number];
 
 export type LessonStatus = (typeof LESSON_STATUSES)[number];
 
@@ -49,7 +54,9 @@ export interface LessonBlock{
 
     blockSuccessRating?: number;
     studentDifficultyLevel: number;
-    engagementLevel?: number;
+  engagementLevel?: number;
+  completionStatus?: LessonBlockCompletionStatus;
+carryOverToNextLesson?: boolean;
 
     errorCategories?: LessonErrorCategory[];
 

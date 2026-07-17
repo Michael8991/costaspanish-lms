@@ -19,6 +19,13 @@ export const LESSON_ATTENDANCE_STATUSES = [
   "canceled_late",
 ] as const;
 
+export const LESSON_BLOCK_COMPLETION_STATUSES = [
+  "completed",
+  "partially_completed",
+  "not_completed",
+  "skipped",
+] as const;
+
 export const LESSON_CLASS_TYPES = [
   "private",
   "pair",

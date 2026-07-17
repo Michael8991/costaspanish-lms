@@ -1,3 +1,4 @@
+import { AddLessonFormValues } from "@/app/[locale]/dashboard/lessons/add/AddLessonWizard";
 import {
   CefrLevel,
   LessonAttendanceStatus,
@@ -18,6 +19,11 @@ export interface LessonBlockResourceDTO{
 }
 
 export type LessonPreparationStatus = "needs_preparation" | "prepared";
+export type LessonBlockCompletionStatus =
+  | "completed"
+  | "partially_completed"
+  | "not_completed"
+  | "skipped";
 
 export interface LessonAttendeeDTO {
   studentId: string;
@@ -52,6 +58,8 @@ export interface LessonBlockDTO {
   blockSuccessRating?: number;
   studentDifficultyLevel?: number;
   engagementLevel?: number;
+  completionStatus: LessonBlockCompletionStatus;
+  carryOverToNextLesson?: boolean;
 
   errorCategories: LessonErrorCategory[];
 
@@ -99,3 +107,51 @@ export interface LessonDetailDTO extends LessonListDTO {
   updatedAt: string;
 }
 
+
+function toDatetimeLocalValue(value: string) {
+  const date = new Date(value);
+  const offset = date.getTimezoneOffset();
+  const localDate = new Date(date.getTime() - offset * 60 * 1000);
+
+  return localDate.toISOString().slice(0, 16);
+}
+
+export function mapLessonToFormValues(
+  lesson: LessonDetailDTO,
+): AddLessonFormValues {
+  return {
+    title: lesson.title,
+    classType: lesson.classType,
+    scheduledStart: toDatetimeLocalValue(lesson.scheduledStart),
+    scheduledEnd: toDatetimeLocalValue(lesson.scheduledEnd),
+    timezone: lesson.timezone,
+
+    attendees: lesson.attendees.map((attendee) => ({
+      studentId: attendee.studentId,
+      voucherId: attendee.voucherId ?? "",
+      attendanceStatus: "pending",
+      creditsToConsume: attendee.creditsToConsume ?? 1,
+      isTrial: attendee.isTrial ?? false,
+    })),
+
+    preparationNotes: lesson.preparationNotes ?? "",
+    homeworkAssigned: lesson.homeworkAssigned ?? "",
+    nextLessonFocus: lesson.nextLessonFocus ?? "",
+
+    blocks: lesson.blocks.map((block) => ({
+      title: block.title,
+      type: block.type,
+      cefrLevels: block.cefrLevels ?? [],
+      skills: block.skills ?? [],
+      tags: block.tags ?? [],
+      resources: block.resources ?? [],
+      plannedContent: block.plannedContent,
+      estimatedMinutes: block.estimatedMinutes,
+      errorCategories: block.errorCategories ?? [],
+      completionStatus: block.completionStatus ?? "not_completed",
+      carryOverToNextLesson: block.carryOverToNextLesson ?? false,
+    })),
+
+    syncGoogleCalendar: false,
+  };
+}

@@ -15,6 +15,8 @@ import {
   Layers3,
   UsersRound,
   BookOpen,
+  ClipboardCheck,
+  Clock3,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
@@ -275,6 +277,8 @@ function LessonRow({
               <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">
                 {getClassTypeLabel(lesson.classType)}
               </span>
+
+              <LessonPreparationBadge status={lesson.preparationStatus} />
             </div>
 
             <p className="flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
@@ -422,4 +426,27 @@ function getClassTypeLabel(classType: LessonListDTO["classType"]) {
   if (classType === "intensive") return "Intensiva";
 
   return classType;
+}
+
+function LessonPreparationBadge({
+  status,
+}: {
+  status: LessonListDTO["preparationStatus"];
+}) {
+  const isPrepared = status === "prepared";
+
+  const Icon = isPrepared ? ClipboardCheck : Clock3;
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${
+        isPrepared
+          ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
+          : "bg-amber-50 text-amber-700 ring-amber-100"
+      }`}
+    >
+      <Icon size={11} />
+      {isPrepared ? "Preparada" : "Por preparar"}
+    </span>
+  );
 }

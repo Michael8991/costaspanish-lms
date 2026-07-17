@@ -1,3 +1,4 @@
+import EditLessonClient from "@/components/dashboard/lessons/edit/EditLessonClient";
 import Breadcrumbs from "@/components/ui/Breadcrumbs";
 
 export default async function LessonDetailPage({
@@ -15,7 +16,7 @@ export default async function LessonDetailPage({
   return (
     <div className="container mx-auto max-w-6xl px-4 py-8 text-gray-800 md:px-8">
       <Breadcrumbs items={breadcrumbItems} locale={locale} />
-      editar
+      <EditLessonClient lessonId={id} locale={locale} />
     </div>
   );
 }

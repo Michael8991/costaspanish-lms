@@ -328,6 +328,9 @@ export async function PATCH(
     if (payload.integration !== undefined) {
       set.integration = payload.integration;
     }
+    if (payload.blocks !== undefined) {
+      set.blocks = payload.blocks;
+    }
 
     if (Object.keys(set).length === 0) {
       return NextResponse.json(

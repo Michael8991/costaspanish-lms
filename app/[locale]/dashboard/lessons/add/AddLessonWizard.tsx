@@ -3,7 +3,7 @@
 import FirstStepAddLesson from "@/components/dashboard/lessons/add/FirstStepAddLesson";
 import SecondStepAddLesson from "@/components/dashboard/lessons/add/SecondStepAddLesson";
 import ThirdStepAddLesson from "@/components/dashboard/lessons/add/ThirdStepAddLesson";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FormProvider, useFieldArray, useForm } from "react-hook-form";
 import LessonToolBox from "../../../../../components/dashboard/lessons/add/LessonToolBox";
 import { ResourceListItemDTO } from "@/lib/dto/resource.dto";
@@ -53,6 +53,12 @@ export type AddLessonFormValues = {
     plannedContent: string;
     estimatedMinutes?: number;
     errorCategories: string[];
+    completionStatus:
+      | "completed"
+      | "partially_completed"
+      | "not_completed"
+      | "skipped";
+    carryOverToNextLesson?: boolean;
   }[];
 
   preparationNotes?: string;
@@ -88,16 +94,28 @@ const defaultValues: AddLessonFormValues = {
   syncGoogleCalendar: false,
 };
 
-interface AddLessonWizardProps {
+interface LessonFormWizardProps {
   locale: string;
+  mode?: "create" | "edit";
+  lessonId?: string;
+  initialValues?: AddLessonFormValues;
 }
 
-export default function AddLessonWizard({ locale }: AddLessonWizardProps) {
+export default function AddLessonWizard({
+  locale,
+  mode,
+  lessonId,
+  initialValues,
+}: LessonFormWizardProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const router = useRouter();
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const form = useForm<AddLessonFormValues>({ defaultValues, mode: "onBlur" });
+  const form = useForm<AddLessonFormValues>({
+    defaultValues: initialValues ?? defaultValues,
+    mode: "onBlur",
+    shouldUnregister: false,
+  });
   const isSubmitting = form.formState.isSubmitting;
 
   const handleNext = async () => {
@@ -138,57 +156,71 @@ export default function AddLessonWizard({ locale }: AddLessonWizardProps) {
           resource.description || `Trabajar con el recurso: ${resource.title}`,
         estimatedMinutes: resource.estimatedDurationMinutes ?? 10,
         errorCategories: [],
+        completionStatus: "not_completed",
+        carryOverToNextLesson: false,
       });
     });
   }
 
   const onSubmit = async (values: AddLessonFormValues) => {
-    try {
-      setSubmitError(null);
+    const payload = {
+      title: values.title,
+      classType: values.classType,
+      scheduledStart: values.scheduledStart,
+      scheduledEnd: values.scheduledEnd,
+      timezone: values.timezone,
 
-      const payload = {
-        ...values,
-        attendees: values.attendees.map((attendee) => ({
-          ...attendee,
-          voucherId: attendee.isTrial
-            ? undefined
-            : attendee.voucherId || undefined,
-          creditsToConsume: attendee.isTrial ? 0 : attendee.creditsToConsume,
-        })),
-      };
+      attendees: values.attendees.map((attendee) => ({
+        ...attendee,
+        voucherId: attendee.isTrial
+          ? undefined
+          : attendee.voucherId || undefined,
+        creditsToConsume: attendee.isTrial ? 0 : attendee.creditsToConsume,
+      })),
 
-      console.log("Lesson payload before POST:", payload);
+      preparationNotes: values.preparationNotes,
+      homeworkAssigned: values.homeworkAssigned,
+      nextLessonFocus: values.nextLessonFocus,
 
-      const response = await fetch("/api/lessons", {
-        method: "POST",
+      blocks: values.blocks.map((block) => ({
+        title: block.title,
+        type: block.type,
+        cefrLevels: block.cefrLevels ?? [],
+        skills: block.skills ?? [],
+        tags: block.tags ?? [],
+        resources: block.resources ?? [],
+        plannedContent: block.plannedContent,
+        estimatedMinutes: block.estimatedMinutes,
+        errorCategories: block.errorCategories ?? [],
+        completionStatus: block.completionStatus ?? "not_completed",
+        carryOverToNextLesson: block.carryOverToNextLesson ?? false,
+      })),
+    };
+
+    const response = await fetch(
+      mode === "edit" && lessonId ? `/api/lessons/${lessonId}` : "/api/lessons",
+      {
+        method: mode === "edit" ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
-      });
+      },
+    );
 
-      const data = await response.json().catch(() => null);
+    const data = await response.json().catch(() => null);
 
-      if (!response.ok) {
-        console.log("Create lesson error response:", data);
-
-        const details =
-          data?.details
-            ?.map((detail: { path?: string; message?: string }) => {
-              return `${detail.path ?? "field"}: ${detail.message}`;
-            })
-            .join("\n") ?? null;
-
-        throw new Error(details ?? data?.error ?? "Error al crear la lección");
-      }
-
-      router.push(`/${locale}/dashboard/lessons`);
-      router.refresh();
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Error desconocido";
-
-      setSubmitError(message);
+    if (!response.ok) {
+      throw new Error(data?.error ?? "Error al guardar la clase");
     }
+
+    router.push(`/${locale}/dashboard/lessons/${data.item.id}`);
+    router.refresh();
   };
+
+  useEffect(() => {
+    if (mode === "edit" && initialValues) {
+      form.reset(initialValues);
+    }
+  }, [mode, initialValues, form]);
   return (
     <FormProvider {...form}>
       <div className="items-center justify-center gap-2 grid grid-cols-12">

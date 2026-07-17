@@ -2,6 +2,7 @@ import mongoose, { Schema } from "mongoose";
 import {
   CEFR_LEVELS,
   LESSON_ATTENDANCE_STATUSES,
+  LESSON_BLOCK_COMPLETION_STATUSES,
   LESSON_BLOCK_TYPES,
   LESSON_CLASS_TYPES,
   LESSON_CREATION_SOURCES,
@@ -116,6 +117,16 @@ const LessonBlockSchema = new Schema(
       type: Number,
       min: 1,
       max: 5,
+    },
+    completionStatus: {
+      type: String,
+      enum: LESSON_BLOCK_COMPLETION_STATUSES,
+      default: "not_completed",
+    },
+
+    carryOverToNextLesson: {
+      type: Boolean,
+      default: false,
     },
 
     errorCategories: {

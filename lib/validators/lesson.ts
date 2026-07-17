@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   CEFR_LEVELS,
   LESSON_ATTENDANCE_STATUSES,
+  LESSON_BLOCK_COMPLETION_STATUSES,
   LESSON_BLOCK_TYPES,
   LESSON_CLASS_TYPES,
   LESSON_CREATION_SOURCES,
@@ -86,6 +87,11 @@ export const lessonBlockSchema = z.object({
   blockSuccessRating: z.coerce.number().min(1).max(5).optional(),
   studentDifficultyLevel: z.coerce.number().min(1).max(5).optional(),
   engagementLevel: z.coerce.number().min(1).max(5).optional(),
+  completionStatus: z
+  .enum(LESSON_BLOCK_COMPLETION_STATUSES)
+  .default("not_completed"),
+
+  carryOverToNextLesson: z.boolean().default(false),
 
   errorCategories: z.array(z.enum(LESSON_ERROR_CATEGORIES)).default([]),
 

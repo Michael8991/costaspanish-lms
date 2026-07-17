@@ -2,29 +2,68 @@
 
 import { AddLessonFormValues } from "@/app/[locale]/dashboard/lessons/add/AddLessonWizard";
 import { useLessonStudents } from "@/lib/hooks/useLessonStudents";
-import { useFieldArray, useFormContext } from "react-hook-form";
+import { ChangeEvent, useMemo } from "react";
+import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
+
+type LessonStudentPlanOption = {
+  _id: string;
+  classType: string;
+  status: string;
+  creditsRemaining: number;
+  creditsTotal?: number;
+  validUntil?: string | Date | null;
+};
+
+type LessonStudentOption = {
+  _id: string;
+  fullName?: string;
+  contactEmail?: string;
+  activePlans?: LessonStudentPlanOption[];
+};
+
+function isNonEmptyString(value: string | undefined | null): value is string {
+  return typeof value === "string" && value.length > 0;
+}
+
+function isUsablePlan(plan: LessonStudentPlanOption) {
+  const isActive = plan.status === "active";
+  const hasCredits = plan.creditsRemaining > 0;
+  const isNotExpired =
+    !plan.validUntil || new Date(plan.validUntil) >= new Date();
+
+  return isActive && hasCredits && isNotExpired;
+}
 
 export default function FirstStepAddLesson() {
   const {
     control,
     register,
-    watch,
     setValue,
     formState: { errors },
   } = useFormContext<AddLessonFormValues>();
 
-  const { students, isLoading, error } = useLessonStudents();
+  const { students, isLoading, error } = useLessonStudents() as {
+    students: LessonStudentOption[];
+    isLoading: boolean;
+    error: string | null;
+  };
 
   const { fields, append, remove } = useFieldArray({
     control,
     name: "attendees",
   });
 
-  const attendees = watch("attendees");
-  const selectedStudentIds = attendees
-    .map((attendee) => attendee.studentId)
-    .filter(Boolean);
+  const attendees =
+    useWatch({
+      control,
+      name: "attendees",
+    }) ?? [];
 
+  const selectedStudentIds = useMemo(() => {
+    return new Set(
+      attendees.map((attendee) => attendee?.studentId).filter(isNonEmptyString),
+    );
+  }, [attendees]);
   return (
     <section className="space-y-5">
       <div>
@@ -56,20 +95,18 @@ export default function FirstStepAddLesson() {
         {/* Select alumnos */}
 
         {fields.map((field, index) => {
-          const selectedStudentId = watch(`attendees.${index}.studentId`);
+          const attendee = attendees[index];
+
+          const selectedStudentId = attendee?.studentId ?? "";
+          const selectedVoucherId = attendee?.voucherId ?? "";
+          const isTrial = attendee?.isTrial ?? false;
 
           const selectedStudent = students.find(
             (student) => student._id === selectedStudentId,
           );
 
           const activePlans = (selectedStudent?.activePlans ?? [])
-            .filter((plan) => {
-              const isActive = plan.status === "active";
-              const hasCredits = plan.creditsRemaining > 0;
-              const isNotExpired =
-                !plan.validUntil || new Date(plan.validUntil) >= new Date();
-              return isActive && hasCredits && isNotExpired;
-            })
+            .filter(isUsablePlan)
             .map((plan) => ({
               id: plan._id,
               classType: plan.classType,
@@ -109,17 +146,35 @@ export default function FirstStepAddLesson() {
                   <select
                     {...register(`attendees.${index}.studentId` as const, {
                       required: "Selecciona un alumno",
-                      onChange: () => {
-                        setValue(`attendees.${index}.voucherId`, "");
-                      },
                     })}
+                    value={selectedStudentId}
+                    disabled={isLoading}
+                    onChange={(event: ChangeEvent<HTMLSelectElement>) => {
+                      setValue(
+                        `attendees.${index}.studentId`,
+                        event.target.value,
+                        {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        },
+                      );
+
+                      setValue(`attendees.${index}.voucherId`, "", {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
+                    }}
                     className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none transition focus:border-[#9e2727] focus:ring-2 focus:ring-[#9e2727]/10"
                   >
-                    <option value="">Selecciona un alumno</option>
+                    <option value="">
+                      {isLoading
+                        ? "Cargando alumnos..."
+                        : "Selecciona un alumno"}
+                    </option>
 
                     {students.map((student) => {
                       const isAlreadySelected =
-                        selectedStudentIds.includes(student._id) &&
+                        selectedStudentIds.has(student._id) &&
                         student._id !== selectedStudentId;
 
                       return (
@@ -128,7 +183,9 @@ export default function FirstStepAddLesson() {
                           value={student._id}
                           disabled={isAlreadySelected}
                         >
-                          {student.fullName}
+                          {student.fullName ||
+                            student.contactEmail ||
+                            "Alumno sin nombre"}
                           {isAlreadySelected ? " · ya seleccionado" : ""}
                         </option>
                       );
@@ -148,18 +205,25 @@ export default function FirstStepAddLesson() {
                   </label>
 
                   <select
-                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none transition focus:border-[#9e2727] focus:ring-2 focus:ring-[#9e2727]/10"
                     {...register(`attendees.${index}.voucherId` as const, {
-                      required: watch(`attendees.${index}.isTrial`)
-                        ? false
-                        : "Selecciona un bono",
+                      required: isTrial ? false : "Selecciona un bono",
                     })}
-                    disabled={
-                      !selectedStudentId || watch(`attendees.${index}.isTrial`)
-                    }
+                    value={selectedVoucherId}
+                    disabled={!selectedStudentId || isTrial}
+                    onChange={(event: ChangeEvent<HTMLSelectElement>) => {
+                      setValue(
+                        `attendees.${index}.voucherId`,
+                        event.target.value,
+                        {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        },
+                      );
+                    }}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none transition disabled:bg-gray-50 disabled:text-gray-400 focus:border-[#9e2727] focus:ring-2 focus:ring-[#9e2727]/10"
                   >
                     <option value="">
-                      {watch(`attendees.${index}.isTrial`)
+                      {isTrial
                         ? "Trial: no consume bono"
                         : "Selecciona un bono"}
                     </option>
@@ -180,18 +244,31 @@ export default function FirstStepAddLesson() {
                 <label className="flex items-center gap-2 text-sm text-gray-700">
                   <input
                     type="checkbox"
-                    {...register(`attendees.${index}.isTrial` as const, {
-                      onChange: (event) => {
-                        const checked = event.target.checked;
+                    checked={isTrial}
+                    onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                      const checked = event.target.checked;
 
-                        if (checked) {
-                          setValue(`attendees.${index}.voucherId`, "");
-                          setValue(`attendees.${index}.creditsToConsume`, 0);
-                        } else {
-                          setValue(`attendees.${index}.creditsToConsume`, 1);
-                        }
-                      },
-                    })}
+                      setValue(`attendees.${index}.isTrial`, checked, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
+
+                      setValue(
+                        `attendees.${index}.creditsToConsume`,
+                        checked ? 0 : 1,
+                        {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        },
+                      );
+
+                      if (checked) {
+                        setValue(`attendees.${index}.voucherId`, "", {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        });
+                      }
+                    }}
                   />
                   Clase de prueba para este alumno
                 </label>

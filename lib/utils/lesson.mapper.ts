@@ -15,6 +15,7 @@ import {
   LessonStatus,
   CefrLevel,
   LessonPreparationStatus,
+  LessonBlockCompletionStatus,
 } from "@/lib/types/lesson";
 
 interface RawLessonAttendee {
@@ -48,6 +49,8 @@ interface RawLessonBlock {
   blockSuccessRating?: number;
   studentDifficultyLevel?: number;
   engagementLevel?: number;
+  completionStatus?: LessonBlockCompletionStatus;
+  carryOverToNextLesson?: boolean;
 
   errorCategories?: LessonErrorCategory[];
 
@@ -153,6 +156,8 @@ export function toLessonDetailDTO(lesson: RawMongoLesson): LessonDetailDTO {
     blockSuccessRating: block.blockSuccessRating,
     studentDifficultyLevel: block.studentDifficultyLevel,
     engagementLevel: block.engagementLevel,
+    completionStatus: block.completionStatus ?? "not_completed",
+    carryOverToNextLesson: block.carryOverToNextLesson ?? false,
 
     errorCategories: block.errorCategories ?? [],
 

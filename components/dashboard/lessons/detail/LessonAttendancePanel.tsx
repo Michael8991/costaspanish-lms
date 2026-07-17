@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LessonDetailDTO } from "@/lib/dto/lesson.dto";
 import { formatLabel } from "@/lib/utils/lessonDetail-helpers";
 import {
@@ -19,6 +19,8 @@ interface LessonAttendancePanelProps {
 
 type AttendanceStatus =
   LessonDetailDTO["attendees"][number]["attendanceStatus"];
+type LessonAttendeeItem = LessonDetailDTO["attendees"][number];
+type LocalLessonStatus = LessonDetailDTO["status"];
 
 const attendanceActions: {
   status: AttendanceStatus;
@@ -65,17 +67,29 @@ export default function LessonAttendancePanel({
   const [updatingStudentId, setUpdatingStudentId] = useState<string | null>(
     null,
   );
+  const [attendees, setAttendees] = useState<LessonAttendeeItem[]>(
+    () => lesson.attendees,
+  );
+
+  const [localLessonStatus, setLocalLessonStatus] = useState<LocalLessonStatus>(
+    lesson.status,
+  );
+
+  useEffect(() => {
+    setAttendees(lesson.attendees);
+    setLocalLessonStatus(lesson.status);
+  }, [lesson.attendees, lesson.status]);
   const [error, setError] = useState<string | null>(null);
   const [isCompletingLesson, setIsCompletingLesson] = useState(false);
 
-  const hasPendingAttendance = lesson.attendees.some(
+  const hasPendingAttendance = attendees.some(
     (attendee) => attendee.attendanceStatus === "pending",
   );
 
-  const isCompleted = lesson.status === "completed";
+  const isCompleted = localLessonStatus === "completed";
 
   const canCompleteLesson =
-    !isCompleted && !hasPendingAttendance && lesson.attendees.length > 0;
+    !isCompleted && !hasPendingAttendance && attendees.length > 0;
 
   const handleCompleteLesson = async () => {
     try {
@@ -92,7 +106,11 @@ export default function LessonAttendancePanel({
         throw new Error(data?.error ?? "Error al completar la clase");
       }
 
-      window.location.reload();
+      setLocalLessonStatus("completed");
+
+      if (data?.item?.attendees) {
+        setAttendees(data.item.attendees);
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : "Error desconocido");
     } finally {
@@ -104,43 +122,48 @@ export default function LessonAttendancePanel({
     studentId: string,
     attendanceStatus: AttendanceStatus,
   ) => {
+    const previousAttendees = attendees;
+
+    const nextAttendees = attendees.map((attendee) => ({
+      ...attendee,
+      attendanceStatus:
+        attendee.studentId === studentId
+          ? attendanceStatus
+          : attendee.attendanceStatus,
+    }));
+
     try {
       setUpdatingStudentId(studentId);
       setError(null);
 
-      const nextAttendees = lesson.attendees.map((attendee) => ({
-        studentId: attendee.studentId,
-        voucherId: attendee.voucherId,
-        attendanceStatus:
-          attendee.studentId === studentId
-            ? attendanceStatus
-            : attendee.attendanceStatus,
-        creditsToConsume: attendee.creditsToConsume ?? 1,
-        isTrial: attendee.isTrial ?? false,
-      }));
+      setAttendees(nextAttendees);
 
       const response = await fetch(`/api/lessons/${lesson.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          attendees: nextAttendees,
+          attendees: nextAttendees.map((attendee) => ({
+            studentId: attendee.studentId,
+            voucherId: attendee.voucherId,
+            attendanceStatus: attendee.attendanceStatus,
+            creditsToConsume: attendee.creditsToConsume ?? 1,
+            isTrial: attendee.isTrial ?? false,
+          })),
         }),
       });
 
       const data = await response.json().catch(() => null);
 
       if (!response.ok) {
+        setAttendees(previousAttendees);
         throw new Error(data?.error ?? "Error al actualizar asistencia");
       }
-
-      window.location.reload();
     } catch (error) {
       setError(error instanceof Error ? error.message : "Error desconocido");
     } finally {
       setUpdatingStudentId(null);
     }
   };
-
   return (
     <aside className="space-y-4">
       <section className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -150,8 +173,8 @@ export default function LessonAttendancePanel({
               Asistencia
             </h2>
             <p className="mt-1 text-sm text-gray-500">
-              {lesson.attendees.length} alumno
-              {lesson.attendees.length === 1 ? "" : "s"} en esta clase.
+              {attendees.length} alumno
+              {attendees.length === 1 ? "" : "s"} en esta clase.
             </p>
           </div>
 
@@ -165,7 +188,7 @@ export default function LessonAttendancePanel({
         )}
 
         <div className="space-y-2">
-          {lesson.attendees.map((attendee, index) => {
+          {attendees.map((attendee, index) => {
             const isUpdating = updatingStudentId === attendee.studentId;
 
             return (
