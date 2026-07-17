@@ -38,6 +38,9 @@ type CourseTemplateFormProps = {
   initialData?: CourseTemplateDetailDTO | null;
   submitLabel?: string;
   endpoint?: string;
+  method?: "POST" | "PATCH";
+  redirectTo?: string;
+  cancleHref?: string;
 };
 
 export type CourseTemplateFormValues = z.input<

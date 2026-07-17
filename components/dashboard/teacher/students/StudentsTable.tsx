@@ -37,7 +37,7 @@ const quickOptionsMenu: QuickOptionsMenu[] = [
   },
   {
     label: "New Lesson",
-    href: (id) => `/dashboard/students/${id}/lessons/newLesson`,
+    href: (id) => `/dashboard/lessons/add`,
     icon: CalendarPlus,
   },
   {
@@ -320,12 +320,12 @@ export default function StudentsTable({ locale }: { locale: string }) {
                             </span>
                           </div>
 
-                          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 w-75">
                             <div className="flex items-center justify-between gap-2 mb-2">
                               <p className="text-sm font-medium text-gray-800 truncate">
                                 {student.highlightedPlanName}
                               </p>
-                              <span className="text-xs text-gray-500 whitespace-nowrap">
+                              <span className="text-xs truncate text-gray-500 whitespace-nowrap">
                                 {student.highlightedPlanCreditsRemaining}/
                                 {student.highlightedPlanCreditsTotal}
                               </span>
@@ -365,7 +365,7 @@ export default function StudentsTable({ locale }: { locale: string }) {
 
       {isOpenQO && menuPosition && (
         <div
-          className="menu-dropdown fixed z-[9999] py-4 px-4 min-w-[220px] flex flex-col rounded-lg bg-[#9e2727] gap-3 shadow-xl"
+          className="menu-dropdown fixed z-9999 py-4 px-4 min-w-55 flex flex-col rounded-lg bg-[#9e2727] gap-3 shadow-xl"
           style={{ top: menuPosition.top, left: menuPosition.left }}
         >
           {quickOptionsMenu.map((object, index) => {

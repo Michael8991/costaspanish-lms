@@ -46,6 +46,12 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Token exchange failed", details: tokenJson }, { status: 502 });
   }
 
+    const profileRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+    headers: { Authorization: `Bearer ${tokenJson.access_token}` }
+  });
+
+  const profileJson = await profileRes.json().catch(() => null);
+
   const expiresAt = Date.now() + tokenJson.expires_in * 1000;
 
   const update: Record<string, unknown> = {
@@ -54,7 +60,12 @@ export async function GET(req: Request) {
     "google.accessToken": tokenJson.access_token,
     "google.expiresAt": expiresAt,
     "google.updatedAt": new Date(),
+    "google.calendarId":"primary"
   };
+  if (profileJson?.email) {
+  update["google.email"] = profileJson.email;
+  }
+  
 
   if (tokenJson.refresh_token) update["google.refreshToken"] = tokenJson.refresh_token;
 

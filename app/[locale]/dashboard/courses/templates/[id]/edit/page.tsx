@@ -1,14 +1,14 @@
+import CourseTemplateForm from "@/components/dashboard/courseTemplate/CourseTemplateForm";
 import Breadcrumbs from "@/components/ui/Breadcrumbs";
+import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/mongo";
+import { toCourseTemplateDetailDTO } from "@/lib/utils/course-template.mapper";
 import { CourseTemplate } from "@/models/CourseTemplate";
 import { Types } from "mongoose";
-import { notFound, redirect } from "next/navigation";
-import { toCourseTemplateDetailDTO } from "@/lib/utils/course-template.mapper";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import CourseTemplateDetailView from "@/components/dashboard/courseTemplate/CourseTemplateDetailView";
+import { notFound, redirect } from "next/navigation";
 
-export default async function CourseTemplateDetailsPage({
+export default async function EditCourseTemplatePage({
   params,
 }: {
   params: Promise<{ locale: string; id: string }>;
@@ -37,17 +37,18 @@ export default async function CourseTemplateDetailsPage({
 
   const breadcrumbItems = [
     { label: "Courses", href: `/${locale}/dashboard/courses` },
-    { label: `Details Course Template ${courseTemplate.code}` },
+    {
+      label: "`Details Course",
+      href: `/${locale}/dashboard/courses/templates/${courseTemplate.id}`,
+    },
+    { label: `Edit ${courseTemplate.code}` },
   ];
   return (
     <div className="container mx-auto py-8 px-4 md:px-8 text-gray-800 max-w-6xl">
       <Breadcrumbs items={breadcrumbItems} locale={locale} />
       <h1 className="text-2xl">Detalles de plantilla de curso</h1>
       <div className="flex flex-col">
-        <CourseTemplateDetailView
-          courseTemplate={courseTemplate}
-          locale={locale}
-        />
+        <CourseTemplateForm locale={locale} />
       </div>
     </div>
   );

@@ -26,9 +26,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import CustomModal from "@/components/ui/CustomModal";
-import ArchiveResourceForm, {
-  ArchiveResourceFormData,
-} from "./ArchiveResourceForm";
+import ArchiveResourceForm from "./ArchiveResourceForm";
 import DeleteResourceForm from "./DeleteResourceForm";
 import AddResourceToLessonForm from "./AddResourceToLessonForm";
 import { MOCK_UPCOMING_CLASSES } from "@/lib/mocks/lessons.mock";
@@ -88,7 +86,7 @@ export const listRowVariants: Variants = {
   },
 };
 
-const toDisplayLabel = (value: string) => {
+export const toDisplayLabel = (value: string) => {
   if (!value) return "";
   return value
     .replace(/[_-]/g, " ")
@@ -97,7 +95,7 @@ const toDisplayLabel = (value: string) => {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
-const formatDuration = (seconds?: number) => {
+export const formatDuration = (seconds?: number) => {
   if (!seconds || seconds <= 0) return null;
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
@@ -147,7 +145,7 @@ export const getFileTypeBadge = (format: FormatType | string) => {
   );
 };
 
-const getPedagogicalTypeLabel = (value: string) => {
+export const getPedagogicalTypeLabel = (value: string) => {
   const map: Record<string, string> = {
     worksheet: "Worksheet",
     audio: "Audio Activity",
@@ -168,7 +166,7 @@ const getPedagogicalTypeLabel = (value: string) => {
   return map[value] || toDisplayLabel(value);
 };
 
-const getSkillLabel = (skill: string) => {
+export const getSkillLabel = (skill: string) => {
   const map: Record<string, string> = {
     speaking: "Speaking",
     listening: "Listening",
@@ -182,7 +180,7 @@ const getSkillLabel = (skill: string) => {
   return map[skill] || toDisplayLabel(skill);
 };
 
-const getVisibilityMeta = (visibility: ResourceVisibility | string) => {
+export const getVisibilityMeta = (visibility: ResourceVisibility | string) => {
   const isShared = visibility === "shared";
   return {
     icon: isShared ? Eye : EyeOff,
@@ -193,7 +191,7 @@ const getVisibilityMeta = (visibility: ResourceVisibility | string) => {
   };
 };
 
-const getStatusBadge = (rawStatus: string) => {
+export const getStatusBadge = (rawStatus: string) => {
   const status = (rawStatus || "").trim().toLowerCase();
   if (status === "draft")
     return "bg-amber-50 border border-amber-200/90 text-amber-700";
@@ -204,7 +202,7 @@ const getStatusBadge = (rawStatus: string) => {
   return "bg-slate-50 border border-dashed border-slate-200 text-slate-500";
 };
 
-const getLevelBadge = (level: string) => {
+export const getLevelBadge = (level: string) => {
   if (["A1", "A2"].includes(level))
     return "bg-emerald-50 text-emerald-700 border-emerald-200/90";
   if (["B1", "B2"].includes(level))
@@ -212,7 +210,7 @@ const getLevelBadge = (level: string) => {
   return "bg-violet-50 text-violet-700 border-violet-200/90";
 };
 
-const getSkillBadge = () =>
+export const getSkillBadge = () =>
   "bg-slate-50 text-slate-700 border border-slate-200/80";
 
 export default function ResourceTableView({
@@ -283,10 +281,7 @@ export default function ResourceTableView({
   };
 
   // ── Handlers idénticos al grid ──
-  const handleArchiveResource = async (
-    resourceId: string | null,
-    formData: ArchiveResourceFormData,
-  ) => {
+  const handleArchiveResource = async (resourceId: string | null) => {
     setIsSubmittingArchive(true);
     try {
       const res = await fetch(`/api/resources/${resourceId}`, {
@@ -450,7 +445,7 @@ export default function ResourceTableView({
                   variants={listRowVariants}
                   className={`group transition-colors ${
                     isArchived
-                      ? "bg-slate-50/80 opacity-70 grayscale-[20%]"
+                      ? "bg-slate-50/80 opacity-70 grayscale-20"
                       : "hover:bg-slate-50/70"
                   }`}
                 >
@@ -589,7 +584,7 @@ export default function ResourceTableView({
         menuPosition &&
         createPortal(
           <div
-            className="menu-dropdown fixed z-[9999] py-3 px-2 min-w-[220px] flex flex-col rounded-xl bg-[#9e2727] gap-1 shadow-2xl"
+            className="menu-dropdown fixed z-9999 py-3 px-2 min-w-55 flex flex-col rounded-xl bg-[#9e2727] gap-1 shadow-2xl"
             style={{ top: menuPosition.top, left: menuPosition.left }}
           >
             {quickOptionsMenu.map((option, index) => {

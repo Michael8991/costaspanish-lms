@@ -10,6 +10,7 @@ import {  createCourseTemplateSchema,} from "@/lib/validators/courseTemplate.val
 
 import { buildCourseTemplateListQuery, parseCourseTemplateSort, parsePagination } from "@/lib/server/course-template.query";
 import { formatZodError, toCourseTemplatePersistenceInput } from "@/lib/server/course-template.api";
+import z from "zod";
 
 function getSessionUserId(session: unknown): string | null {
   const user = (session as { user?: { id?: string; _id?: string } })?.user;
@@ -85,7 +86,7 @@ export async function POST(request: NextRequest) {
     const parsed = createCourseTemplateSchema.safeParse(body);
 
     if (!parsed.success) {
-      console.log("2. ZOD ERROR", parsed.error.flatten());
+      console.log("2. ZOD ERROR", z.flattenError(parsed.error));
 
       return NextResponse.json(
         {
