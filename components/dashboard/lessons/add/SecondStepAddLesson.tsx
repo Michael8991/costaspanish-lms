@@ -5,7 +5,6 @@ import { AddLessonFormValues } from "@/app/[locale]/dashboard/lessons/add/AddLes
 import { Plus } from "lucide-react";
 import {
   FieldArrayWithId,
-  useFieldArray,
   UseFieldArrayAppend,
   UseFieldArrayRemove,
   useFormContext,
@@ -22,7 +21,13 @@ export default function SecondStepAddLesson({
   appendBlock,
   removeBlock,
 }: SecondStepAddLessonProps) {
-  const { register } = useFormContext<AddLessonFormValues>();
+  const {
+    register,
+    watch,
+    formState: { errors },
+  } = useFormContext<AddLessonFormValues>();
+
+  const blocks = watch("blocks") ?? [];
 
   return (
     <section className="space-y-6">
@@ -37,63 +42,99 @@ export default function SecondStepAddLesson({
       </div>
 
       <div className="space-y-4">
-        {blockFields.map((field, index) => (
-          <div
-            key={field.id}
-            className="rounded-2xl border border-slate-200 bg-white p-4"
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <span className="text-sm text-slate-500">Bloque {index + 1}</span>
+        {blockFields.map((field, index) => {
+          const blockErrors = errors.blocks?.[index];
 
-              <button
-                type="button"
-                onClick={() => removeBlock(index)}
-                className="text-sm text-red-600"
-              >
-                Eliminar
-              </button>
-            </div>
-
-            <input
-              {...register(`blocks.${index}.title` as const)}
-              className="mb-3 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-              placeholder="Título del bloque"
-            />
-
-            <select
-              {...register(`blocks.${index}.type` as const)}
-              className="mb-3 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+          return (
+            <div
+              key={field.id}
+              className="rounded-2xl border border-slate-200 bg-white p-4"
             >
-              <option value="custom">Custom</option>
-              <option value="grammar">Grammar</option>
-              <option value="vocabulary">Vocabulary</option>
-              <option value="speaking">Speaking</option>
-              <option value="listening">Listening</option>
-              <option value="reading">Reading</option>
-              <option value="writing">Writing</option>
-              <option value="pronunciation">Pronunciation</option>
-            </select>
+              <div className="mb-4 flex items-center justify-between">
+                <span className="text-sm text-slate-500">
+                  Bloque {index + 1}
+                </span>
 
-            <textarea
-              {...register(`blocks.${index}.plannedContent` as const)}
-              className="min-h-24 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-              placeholder="Contenido planificado"
-            />
+                <button
+                  type="button"
+                  onClick={() => removeBlock(index)}
+                  className="text-sm text-red-600"
+                >
+                  Eliminar
+                </button>
+              </div>
 
-            <input
-              type="number"
-              {...register(`blocks.${index}.estimatedMinutes` as const, {
-                valueAsNumber: true,
-              })}
-              className="mt-3 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-              placeholder="Minutos estimados"
-            />
+              <input
+                {...register(`blocks.${index}.title` as const, {
+                  required: "El título del bloque es obligatorio",
+                })}
+                className={inputClass(Boolean(blockErrors?.title))}
+                placeholder="Título del bloque"
+              />
+              {blockErrors?.title && (
+                <p className="mt-1 text-xs text-red-600">
+                  {blockErrors.title.message}
+                </p>
+              )}
 
-            <div className="mt-3 text-xs text-slate-500">
-              Recursos asociados: {field.resources?.length ?? 0}
+              <select
+                {...register(`blocks.${index}.type` as const, {
+                  required: "Selecciona el tipo de bloque",
+                })}
+                className={`${inputClass(Boolean(blockErrors?.type))} mt-3`}
+              >
+                <option value="custom">Custom</option>
+                <option value="grammar">Grammar</option>
+                <option value="vocabulary">Vocabulary</option>
+                <option value="speaking">Speaking</option>
+                <option value="listening">Listening</option>
+                <option value="reading">Reading</option>
+                <option value="writing">Writing</option>
+                <option value="pronunciation">Pronunciation</option>
+              </select>
+              {blockErrors?.type && (
+                <p className="mt-1 text-xs text-red-600">
+                  {blockErrors.type.message}
+                </p>
+              )}
+
+              <textarea
+                {...register(`blocks.${index}.plannedContent` as const, {
+                  required: "El contenido planificado es obligatorio",
+                })}
+                className={`${inputClass(Boolean(blockErrors?.plannedContent))} mt-3 min-h-24`}
+                placeholder="Contenido planificado"
+              />
+              {blockErrors?.plannedContent && (
+                <p className="mt-1 text-xs text-red-600">
+                  {blockErrors.plannedContent.message}
+                </p>
+              )}
+
+              <input
+                type="number"
+                {...register(`blocks.${index}.estimatedMinutes` as const, {
+                  valueAsNumber: true,
+                  min: {
+                    value: 0,
+                    message: "Los minutos no pueden ser negativos",
+                  },
+                })}
+                className={`${inputClass(Boolean(blockErrors?.estimatedMinutes))} mt-3`}
+                placeholder="Minutos estimados"
+              />
+              {blockErrors?.estimatedMinutes && (
+                <p className="mt-1 text-xs text-red-600">
+                  {blockErrors.estimatedMinutes.message}
+                </p>
+              )}
+
+              <div className="mt-3 text-xs text-slate-500">
+                Recursos asociados: {blocks[index]?.resources?.length ?? 0}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <button
@@ -122,9 +163,10 @@ export default function SecondStepAddLesson({
   );
 }
 
-function formatLabel(value: string) {
-  return value
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+function inputClass(hasError = false) {
+  return `w-full rounded-xl border px-3 py-2 text-sm outline-none transition ${
+    hasError
+      ? "border-red-300 ring-2 ring-red-100"
+      : "border-slate-200 focus:border-[#9e2727] focus:ring-2 focus:ring-[#9e2727]/10"
+  }`;
 }
