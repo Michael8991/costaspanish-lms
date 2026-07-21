@@ -16,6 +16,7 @@ import LessonToolBox from "../../../../../components/dashboard/lessons/add/Lesso
 import { ResourceListItemDTO } from "@/lib/dto/resource.dto";
 import { useRouter } from "next/navigation";
 import { zonedDateTimeToISOString } from "@/lib/utils/time-zone";
+import { createClientId } from "@/components/dashboard/lessons/add/createClientId";
 
 function getBlockTypeFromResource(
   resource: ResourceListItemDTO,
@@ -42,6 +43,7 @@ export type AddLessonFormValues = {
   scheduledStart: string;
   scheduledEnd: string;
   timezone: string;
+  courseId?: string;
 
   attendees: {
     studentId: string;
@@ -52,6 +54,7 @@ export type AddLessonFormValues = {
   }[];
 
   blocks: {
+    lineageId?: string;
     title: string;
     type: string;
     cefrLevels: string[];
@@ -59,14 +62,33 @@ export type AddLessonFormValues = {
     tags: string[];
     resources: string[];
     plannedContent: string;
+    actualContent?: string;
+    plannedObjectives?: string[];
+    achievedObjectives?: string[];
     estimatedMinutes?: number;
+    actualMinutes?: number;
+    blockSuccessRating?: number;
+    studentDifficultyLevel?: number;
+    engagementLevel?: number;
     errorCategories: string[];
+    studentDifficultiesText?: string;
+    teacherReflection?: string;
+    nextStepSuggestion?: string;
     completionStatus:
       | "completed"
       | "partially_completed"
       | "not_completed"
       | "skipped";
     carryOverToNextLesson?: boolean;
+    origin?: {
+      sourceLessonId: string;
+      sourceBlockId?: string;
+      sourceCourseId?: string;
+      sourceStudentIds: string[];
+      sourceLessonTitle?: string;
+      sourceLessonDate?: string;
+      sourceBlockTitle?: string;
+    };
   }[];
 
   preparationNotes?: string;
@@ -181,6 +203,7 @@ export default function AddLessonWizard({
   function createBlocksFromResources(resources: ResourceListItemDTO[]) {
     resources.forEach((resource) => {
       appendBlock({
+        lineageId: createClientId(),
         title: resource.title,
         type: getBlockTypeFromResource(resource),
         cefrLevels: resource.levels ?? [],
@@ -207,6 +230,7 @@ export default function AddLessonWizard({
 
     try {
       const payload = {
+        courseId: values.courseId,
         title: values.title,
         classType: values.classType,
         scheduledStart: zonedDateTimeToISOString(
@@ -232,6 +256,7 @@ export default function AddLessonWizard({
         nextLessonFocus: values.nextLessonFocus,
 
         blocks: values.blocks.map((block) => ({
+          lineageId: block.lineageId,
           title: block.title,
           type: block.type,
           cefrLevels: block.cefrLevels ?? [],
@@ -239,10 +264,31 @@ export default function AddLessonWizard({
           tags: block.tags ?? [],
           resources: block.resources ?? [],
           plannedContent: block.plannedContent,
+          actualContent: block.actualContent,
+          plannedObjectives: block.plannedObjectives ?? [],
+          achievedObjectives: block.achievedObjectives ?? [],
           estimatedMinutes: block.estimatedMinutes,
+          actualMinutes: block.actualMinutes,
+          blockSuccessRating: block.blockSuccessRating,
+          studentDifficultyLevel: block.studentDifficultyLevel,
+          engagementLevel: block.engagementLevel,
           errorCategories: block.errorCategories ?? [],
+          studentDifficultiesText: block.studentDifficultiesText,
+          teacherReflection: block.teacherReflection,
+          nextStepSuggestion: block.nextStepSuggestion,
           completionStatus: block.completionStatus ?? "not_completed",
           carryOverToNextLesson: block.carryOverToNextLesson ?? false,
+          origin: block.origin?.sourceLessonId
+            ? {
+                sourceLessonId: block.origin.sourceLessonId,
+                sourceBlockId: block.origin.sourceBlockId,
+                sourceCourseId: block.origin.sourceCourseId,
+                sourceStudentIds: block.origin.sourceStudentIds ?? [],
+                sourceLessonTitle: block.origin.sourceLessonTitle,
+                sourceLessonDate: block.origin.sourceLessonDate,
+                sourceBlockTitle: block.origin.sourceBlockTitle,
+              }
+            : undefined,
         })),
       };
 
@@ -331,6 +377,7 @@ export default function AddLessonWizard({
               blockFields={blockFields}
               appendBlock={appendBlock}
               removeBlock={removeBlocks}
+              lessonId={lessonId}
             />
           )}
           {currentStep === 2 && <ThirdStepAddLesson />}

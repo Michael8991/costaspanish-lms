@@ -28,6 +28,7 @@ interface RawLessonAttendee {
 
 interface RawLessonBlock {
   _id?: Types.ObjectId;
+  lineageId?: string;
 
   title: string;
   type: LessonBlockType;
@@ -57,6 +58,15 @@ interface RawLessonBlock {
   studentDifficultiesText?: string;
   teacherReflection?: string;
   nextStepSuggestion?: string;
+  origin?: {
+    sourceLessonId?: Types.ObjectId | string;
+    sourceBlockId?: Types.ObjectId | string;
+    sourceCourseId?: Types.ObjectId | string;
+    sourceStudentIds?: Array<Types.ObjectId | string>;
+    sourceLessonTitle?: string;
+    sourceLessonDate?: Date | string;
+    sourceBlockTitle?: string;
+  };
 }
 
 interface IntegrationDetail {
@@ -135,6 +145,7 @@ export function toLessonDetailDTO(lesson: RawMongoLesson): LessonDetailDTO {
 
   const blocks: LessonBlockDTO[] = (lesson.blocks ?? []).map((block) => ({
     id: toId(block._id),
+    lineageId: block.lineageId,
 
     title: block.title,
     type: block.type,
@@ -164,6 +175,19 @@ export function toLessonDetailDTO(lesson: RawMongoLesson): LessonDetailDTO {
     studentDifficultiesText: block.studentDifficultiesText,
     teacherReflection: block.teacherReflection,
     nextStepSuggestion: block.nextStepSuggestion,
+    origin: block.origin?.sourceLessonId
+      ? {
+          sourceLessonId: String(block.origin.sourceLessonId),
+          sourceBlockId: toId(block.origin.sourceBlockId),
+          sourceCourseId: toId(block.origin.sourceCourseId),
+          sourceStudentIds: (block.origin.sourceStudentIds ?? []).map(String),
+          sourceLessonTitle: block.origin.sourceLessonTitle,
+          sourceLessonDate: block.origin.sourceLessonDate
+            ? toISOString(block.origin.sourceLessonDate)
+            : undefined,
+          sourceBlockTitle: block.origin.sourceBlockTitle,
+        }
+      : undefined,
   }));
 
   return {

@@ -34,7 +34,18 @@ export interface LessonAttendee {
   isTrial?: boolean;
 }
 
+export interface LessonBlockOrigin {
+  sourceLessonId: Types.ObjectId;
+  sourceBlockId?: Types.ObjectId;
+  sourceCourseId?: Types.ObjectId;
+  sourceStudentIds: Types.ObjectId[];
+  sourceLessonTitle?: string;
+  sourceLessonDate?: Date;
+  sourceBlockTitle?: string;
+}
+
 export interface LessonBlock{
+    lineageId?: string;
     title: string;
     type: LessonBlockType;
 
@@ -63,6 +74,7 @@ carryOverToNextLesson?: boolean;
     studentDifficultiesText?: string;
     teacherReflection?: string;
     nextStepSuggestion?: string;
+    origin?: LessonBlockOrigin;
 }
 
 export interface Lesson{

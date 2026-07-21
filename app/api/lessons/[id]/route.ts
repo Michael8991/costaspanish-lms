@@ -271,6 +271,10 @@ export async function PATCH(
       set.title = payload.title;
     }
 
+    if (payload.courseId !== undefined) {
+      set.courseId = payload.courseId;
+    }
+
     if (payload.status !== undefined) {
       set.status = payload.status;
     }

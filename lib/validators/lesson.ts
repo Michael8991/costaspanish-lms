@@ -26,6 +26,16 @@ const optionalObjectIdSchema = z.preprocess(
   objectIdSchema.optional(),
 );
 
+const lessonBlockOriginSchema = z.object({
+  sourceLessonId: objectIdSchema,
+  sourceBlockId: objectIdSchema.optional(),
+  sourceCourseId: objectIdSchema.optional(),
+  sourceStudentIds: z.array(objectIdSchema).default([]),
+  sourceLessonTitle: z.string().trim().optional(),
+  sourceLessonDate: z.string().datetime().optional(),
+  sourceBlockTitle: z.string().trim().optional(),
+});
+
 const lessonAttendeeSchema = z
   .object({
     studentId: objectIdSchema,
@@ -67,6 +77,7 @@ const lessonAttendeeSchema = z
     };
   });
 export const lessonBlockSchema = z.object({
+  lineageId: z.string().trim().min(1).optional(),
   title: z.string().trim().min(1),
   type: z.enum(LESSON_BLOCK_TYPES),
 
@@ -98,6 +109,7 @@ export const lessonBlockSchema = z.object({
   studentDifficultiesText: z.string().trim().optional(),
   teacherReflection: z.string().trim().optional(),
   nextStepSuggestion: z.string().trim().optional(),
+  origin: lessonBlockOriginSchema.optional(),
 });
 
 const lessonBaseSchema = z.object({

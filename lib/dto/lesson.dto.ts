@@ -1,4 +1,4 @@
-import { AddLessonFormValues } from "@/app/[locale]/dashboard/lessons/add/AddLessonWizard";
+import type { AddLessonFormValues } from "@/app/[locale]/dashboard/lessons/add/AddLessonWizard";
 import {
   CefrLevel,
   LessonAttendanceStatus,
@@ -35,8 +35,19 @@ export interface LessonAttendeeDTO {
   isTrial?: boolean;
 }
 
+export interface LessonBlockOriginDTO {
+  sourceLessonId: string;
+  sourceBlockId?: string;
+  sourceCourseId?: string;
+  sourceStudentIds: string[];
+  sourceLessonTitle?: string;
+  sourceLessonDate?: string;
+  sourceBlockTitle?: string;
+}
+
 export interface LessonBlockDTO {
   _id?: string;
+  lineageId?: string;
 
   title: string;
   type: LessonBlockType;
@@ -67,6 +78,7 @@ export interface LessonBlockDTO {
   studentDifficultiesText?: string;
   teacherReflection?: string;
   nextStepSuggestion?: string;
+  origin?: LessonBlockOriginDTO;
 }
 
 export interface LessonListDTO {
@@ -113,6 +125,7 @@ export function mapLessonToFormValues(
   lesson: LessonDetailDTO,
 ): AddLessonFormValues {
   return {
+    courseId: lesson.courseId,
     title: lesson.title,
     classType: lesson.classType,
     scheduledStart: isoToDatetimeLocalValue(
@@ -138,6 +151,7 @@ export function mapLessonToFormValues(
     nextLessonFocus: lesson.nextLessonFocus ?? "",
 
     blocks: lesson.blocks.map((block) => ({
+      lineageId: block.lineageId,
       title: block.title,
       type: block.type,
       cefrLevels: block.cefrLevels ?? [],
@@ -145,10 +159,21 @@ export function mapLessonToFormValues(
       tags: block.tags ?? [],
       resources: block.resources ?? [],
       plannedContent: block.plannedContent,
+      actualContent: block.actualContent,
+      plannedObjectives: block.plannedObjectives ?? [],
+      achievedObjectives: block.achievedObjectives ?? [],
       estimatedMinutes: block.estimatedMinutes,
+      actualMinutes: block.actualMinutes,
+      blockSuccessRating: block.blockSuccessRating,
+      studentDifficultyLevel: block.studentDifficultyLevel,
+      engagementLevel: block.engagementLevel,
       errorCategories: block.errorCategories ?? [],
+      studentDifficultiesText: block.studentDifficultiesText,
+      teacherReflection: block.teacherReflection,
+      nextStepSuggestion: block.nextStepSuggestion,
       completionStatus: block.completionStatus ?? "not_completed",
       carryOverToNextLesson: block.carryOverToNextLesson ?? false,
+      origin: block.origin,
     })),
 
     syncGoogleCalendar: false,

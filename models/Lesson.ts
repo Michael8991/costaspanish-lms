@@ -41,8 +41,50 @@ const LessonAttendeeSchema = new Schema(
   { _id: false },
 );
 
+const LessonBlockOriginSchema = new Schema(
+  {
+    sourceLessonId: {
+      type: Schema.Types.ObjectId,
+      ref: "Lesson",
+      required: true,
+    },
+    sourceBlockId: {
+      type: Schema.Types.ObjectId,
+      required: false,
+    },
+    sourceCourseId: {
+      type: Schema.Types.ObjectId,
+      ref: "CourseProfile",
+      required: false,
+    },
+    sourceStudentIds: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "StudentProfile",
+      },
+    ],
+    sourceLessonTitle: {
+      type: String,
+      trim: true,
+    },
+    sourceLessonDate: {
+      type: Date,
+    },
+    sourceBlockTitle: {
+      type: String,
+      trim: true,
+    },
+  },
+  { _id: false },
+);
+
 const LessonBlockSchema = new Schema(
   {
+    lineageId: {
+      type: String,
+      required: false,
+      index: true,
+    },
     title: {
       type: String,
       required: true,
@@ -146,6 +188,10 @@ const LessonBlockSchema = new Schema(
     nextStepSuggestion: {
       type: String,
       trim: true,
+    },
+    origin: {
+      type: LessonBlockOriginSchema,
+      required: false,
     },
   },
   { timestamps: false },

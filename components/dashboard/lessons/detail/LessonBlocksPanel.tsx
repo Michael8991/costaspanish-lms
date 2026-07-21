@@ -40,6 +40,7 @@ type BlockCompletionStatus =
   | "skipped";
 
 type BlockPartialUpdate = Partial<{
+  lineageId: LessonBlockItem["lineageId"];
   title: LessonBlockItem["title"];
   type: LessonBlockItem["type"];
   cefrLevels: LessonBlockItem["cefrLevels"];
@@ -61,6 +62,7 @@ type BlockPartialUpdate = Partial<{
   studentDifficultiesText: LessonBlockItem["studentDifficultiesText"];
   teacherReflection: LessonBlockItem["teacherReflection"];
   nextStepSuggestion: LessonBlockItem["nextStepSuggestion"];
+  origin: LessonBlockItem["origin"];
 }>;
 
 const blockCompletionActions: {
@@ -111,6 +113,18 @@ function getBlockCompletionStatus(
   block: LessonBlockItem,
 ): BlockCompletionStatus {
   return block.completionStatus ?? "not_completed";
+}
+
+function formatOriginDate(value?: string) {
+  if (!value) return null;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  return new Intl.DateTimeFormat("es-ES", {
+    day: "numeric",
+    month: "short",
+  }).format(date);
 }
 
 function getCompletionStatusLabel(status: BlockCompletionStatus) {
@@ -353,6 +367,7 @@ function ActualMinutesEditor({
 
 function mapBlocksToPatchPayload(blocks: LessonBlockItem[]) {
   return blocks.map((block) => ({
+    lineageId: block.lineageId,
     title: block.title,
     type: block.type,
     cefrLevels: block.cefrLevels ?? [],
@@ -376,6 +391,17 @@ function mapBlocksToPatchPayload(blocks: LessonBlockItem[]) {
     studentDifficultiesText: block.studentDifficultiesText,
     teacherReflection: block.teacherReflection,
     nextStepSuggestion: block.nextStepSuggestion,
+    origin: block.origin?.sourceLessonId
+      ? {
+          sourceLessonId: block.origin.sourceLessonId,
+          sourceBlockId: block.origin.sourceBlockId,
+          sourceCourseId: block.origin.sourceCourseId,
+          sourceStudentIds: block.origin.sourceStudentIds ?? [],
+          sourceLessonTitle: block.origin.sourceLessonTitle,
+          sourceLessonDate: block.origin.sourceLessonDate,
+          sourceBlockTitle: block.origin.sourceBlockTitle,
+        }
+      : undefined,
   }));
 }
 
@@ -531,6 +557,7 @@ export default function LessonBlocksPanel({
             const isUpdating = updatingBlockKey === blockKey;
             const completionStatus = getBlockCompletionStatus(block);
             const carryOverToNextLesson = block.carryOverToNextLesson ?? false;
+            const originDate = formatOriginDate(block.origin?.sourceLessonDate);
 
             return (
               <article
@@ -669,6 +696,27 @@ export default function LessonBlocksPanel({
                   {isExpanded && (
                     <div className="rounded-2xl border border-gray-200 bg-white p-4">
                       <div className="space-y-4">
+                        {block.origin && (
+                          <div className="rounded-2xl bg-blue-50 px-3 py-2 text-xs text-blue-700 ring-1 ring-blue-100">
+                            <div className="flex items-center gap-1.5">
+                              <RotateCcw size={12} />
+                              <span>
+                                Viene de:{" "}
+                                {block.origin.sourceLessonTitle ??
+                                  "clase anterior"}
+                                {originDate ? ` · ${originDate}` : ""}
+                              </span>
+                            </div>
+
+                            {block.origin.sourceBlockTitle &&
+                              block.origin.sourceBlockTitle !== block.title && (
+                                <p className="mt-1 pl-[18px] text-blue-600">
+                                  Bloque original: {block.origin.sourceBlockTitle}
+                                </p>
+                              )}
+                          </div>
+                        )}
+
                         <div>
                           <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
                             Contenido planificado
