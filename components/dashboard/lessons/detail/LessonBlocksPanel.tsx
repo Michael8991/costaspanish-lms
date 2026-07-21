@@ -39,6 +39,30 @@ type BlockCompletionStatus =
   | "not_completed"
   | "skipped";
 
+type BlockPartialUpdate = Partial<{
+  title: LessonBlockItem["title"];
+  type: LessonBlockItem["type"];
+  cefrLevels: LessonBlockItem["cefrLevels"];
+  skills: LessonBlockItem["skills"];
+  tags: LessonBlockItem["tags"];
+  resources: LessonBlockItem["resources"];
+  plannedContent: LessonBlockItem["plannedContent"];
+  completionStatus: BlockCompletionStatus;
+  carryOverToNextLesson: LessonBlockItem["carryOverToNextLesson"];
+  actualContent: LessonBlockItem["actualContent"];
+  plannedObjectives: LessonBlockItem["plannedObjectives"];
+  achievedObjectives: LessonBlockItem["achievedObjectives"];
+  estimatedMinutes: LessonBlockItem["estimatedMinutes"];
+  actualMinutes: LessonBlockItem["actualMinutes"];
+  blockSuccessRating: LessonBlockItem["blockSuccessRating"];
+  studentDifficultyLevel: LessonBlockItem["studentDifficultyLevel"];
+  engagementLevel: LessonBlockItem["engagementLevel"];
+  errorCategories: LessonBlockItem["errorCategories"];
+  studentDifficultiesText: LessonBlockItem["studentDifficultiesText"];
+  teacherReflection: LessonBlockItem["teacherReflection"];
+  nextStepSuggestion: LessonBlockItem["nextStepSuggestion"];
+}>;
+
 const blockCompletionActions: {
   status: BlockCompletionStatus;
   label: string;
@@ -170,7 +194,6 @@ function mapBlocksToPatchPayload(blocks: LessonBlockItem[]) {
 
 export default function LessonBlocksPanel({
   lesson,
-  resourceIds,
 }: LessonBlocksPanelProps) {
   const [blocks, setBlocks] = useState<LessonBlockItem[]>(
     () => lesson.blocks as LessonBlockItem[],
@@ -206,11 +229,7 @@ export default function LessonBlocksPanel({
     });
   };
 
-  const patchBlocks = async (nextBlocks: LessonBlockItem[]) => {
-    const previousBlocks = blocks;
-
-    setBlocks(nextBlocks);
-
+  const saveBlocks = async (nextBlocks: LessonBlockItem[]) => {
     const response = await fetch(`/api/lessons/${lesson.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -219,11 +238,39 @@ export default function LessonBlocksPanel({
       }),
     });
 
-    const data = await response.json().catch(() => null);
+    const data = (await response.json().catch(() => null)) as {
+      error?: string;
+    } | null;
 
     if (!response.ok) {
-      setBlocks(previousBlocks);
       throw new Error(data?.error ?? "Error al actualizar los bloques");
+    }
+  };
+
+  const updateBlock = async (
+    blockKey: string,
+    partialUpdate: BlockPartialUpdate,
+  ) => {
+    const previousBlocks = blocks;
+    const nextBlocks = blocks.map((block, index) => {
+      if (getBlockKey(block, index) !== blockKey) {
+        return block;
+      }
+
+      return { ...block, ...partialUpdate };
+    });
+
+    setUpdatingBlockKey(blockKey);
+    setError(null);
+    setBlocks(nextBlocks);
+
+    try {
+      await saveBlocks(nextBlocks);
+    } catch (error) {
+      setBlocks(previousBlocks);
+      setError(error instanceof Error ? error.message : "Error desconocido");
+    } finally {
+      setUpdatingBlockKey(null);
     }
   };
 
@@ -231,58 +278,35 @@ export default function LessonBlocksPanel({
     blockKey: string,
     completionStatus: BlockCompletionStatus,
   ) => {
-    try {
-      setUpdatingBlockKey(blockKey);
-      setError(null);
+    const currentBlock = blocks.find(
+      (block, index) => getBlockKey(block, index) === blockKey,
+    );
 
-      const nextBlocks = blocks.map((block, index) => {
-        const currentBlockKey = getBlockKey(block, index);
-
-        if (currentBlockKey !== blockKey) {
-          return block;
-        }
-
-        return {
-          ...block,
-          completionStatus,
-          carryOverToNextLesson:
-            completionStatus === "completed"
-              ? false
-              : (block.carryOverToNextLesson ?? false),
-        };
-      });
-
-      await patchBlocks(nextBlocks);
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Error desconocido");
-    } finally {
-      setUpdatingBlockKey(null);
+    if (!currentBlock) {
+      return;
     }
+
+    await updateBlock(blockKey, {
+      completionStatus,
+      carryOverToNextLesson:
+        completionStatus === "completed"
+          ? false
+          : (currentBlock.carryOverToNextLesson ?? false),
+    });
   };
+
   const toggleCarryOverToNextLesson = async (blockKey: string) => {
-    try {
-      setUpdatingBlockKey(blockKey);
-      setError(null);
+    const currentBlock = blocks.find(
+      (block, index) => getBlockKey(block, index) === blockKey,
+    );
 
-      const nextBlocks = blocks.map((block, index) => {
-        const currentBlockKey = getBlockKey(block, index);
-
-        if (currentBlockKey !== blockKey) {
-          return block;
-        }
-
-        return {
-          ...block,
-          carryOverToNextLesson: !(block.carryOverToNextLesson ?? false),
-        };
-      });
-
-      await patchBlocks(nextBlocks);
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Error desconocido");
-    } finally {
-      setUpdatingBlockKey(null);
+    if (!currentBlock) {
+      return;
     }
+
+    await updateBlock(blockKey, {
+      carryOverToNextLesson: !(currentBlock.carryOverToNextLesson ?? false),
+    });
   };
 
   return (
