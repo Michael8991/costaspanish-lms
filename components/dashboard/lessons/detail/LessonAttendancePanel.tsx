@@ -64,6 +64,7 @@ function getAttendanceClassName(status: AttendanceStatus) {
 export default function LessonAttendancePanel({
   lesson,
 }: LessonAttendancePanelProps) {
+  const lessonNextLessonFocus = lesson.nextLessonFocus ?? "";
   const [updatingStudentId, setUpdatingStudentId] = useState<string | null>(
     null,
   );
@@ -74,13 +75,26 @@ export default function LessonAttendancePanel({
   const [localLessonStatus, setLocalLessonStatus] = useState<LocalLessonStatus>(
     lesson.status,
   );
+  const [nextLessonFocus, setNextLessonFocus] = useState(
+    lessonNextLessonFocus,
+  );
+  const [nextLessonFocusDraft, setNextLessonFocusDraft] = useState(
+    lessonNextLessonFocus,
+  );
 
   useEffect(() => {
     setAttendees(lesson.attendees);
     setLocalLessonStatus(lesson.status);
-  }, [lesson.attendees, lesson.status]);
+    setNextLessonFocus(lessonNextLessonFocus);
+    setNextLessonFocusDraft(lessonNextLessonFocus);
+  }, [lesson.attendees, lesson.status, lessonNextLessonFocus]);
   const [error, setError] = useState<string | null>(null);
   const [isCompletingLesson, setIsCompletingLesson] = useState(false);
+  const [isUpdatingNextLessonFocus, setIsUpdatingNextLessonFocus] =
+    useState(false);
+  const [nextLessonFocusError, setNextLessonFocusError] = useState<
+    string | null
+  >(null);
 
   const hasPendingAttendance = attendees.some(
     (attendee) => attendee.attendanceStatus === "pending",
@@ -90,6 +104,44 @@ export default function LessonAttendancePanel({
 
   const canCompleteLesson =
     !isCompleted && !hasPendingAttendance && attendees.length > 0;
+
+  const hasNextLessonFocusChanges =
+    nextLessonFocusDraft !== nextLessonFocus;
+
+  const updateNextLessonFocus = async () => {
+    const previousNextLessonFocus = nextLessonFocus;
+    const nextValue = nextLessonFocusDraft.trim();
+
+    setIsUpdatingNextLessonFocus(true);
+    setNextLessonFocusError(null);
+    setNextLessonFocus(nextValue);
+
+    try {
+      const response = await fetch(`/api/lessons/${lesson.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nextLessonFocus: nextValue }),
+      });
+      const data = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ?? "Error al actualizar el foco de la próxima clase",
+        );
+      }
+
+      setNextLessonFocusDraft(nextValue);
+    } catch (error) {
+      setNextLessonFocus(previousNextLessonFocus);
+      setNextLessonFocusError(
+        error instanceof Error ? error.message : "Error desconocido",
+      );
+    } finally {
+      setIsUpdatingNextLessonFocus(false);
+    }
+  };
 
   const handleCompleteLesson = async () => {
     try {
@@ -300,22 +352,38 @@ export default function LessonAttendancePanel({
             </div>
           )}
 
-          {lesson.nextLessonFocus && (
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
-                Próxima clase
-              </p>
-              <p className="mt-1 text-gray-600">{lesson.nextLessonFocus}</p>
-            </div>
-          )}
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
+            <label className="text-xs font-medium uppercase tracking-wide text-gray-400">
+              Foco de la próxima clase
+            </label>
 
-          {!lesson.preparationNotes &&
-            !lesson.homeworkAssigned &&
-            !lesson.nextLessonFocus && (
-              <p className="text-sm text-gray-500">
-                Todavía no hay notas rápidas para esta clase.
+            <textarea
+              value={nextLessonFocusDraft}
+              onChange={(event) => setNextLessonFocusDraft(event.target.value)}
+              rows={4}
+              placeholder="Ej: Reforzar pasados, terminar la actividad de conversación y preparar deberes de verbos irregulares..."
+              className="mt-2 w-full resize-none rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition placeholder:text-gray-400 focus:border-[#9e2727] focus:ring-2 focus:ring-[#9e2727]/10"
+            />
+
+            {nextLessonFocusError && (
+              <p className="mt-2 text-xs text-red-600">
+                {nextLessonFocusError}
               </p>
             )}
+
+            <div className="mt-2 flex justify-end">
+              <button
+                type="button"
+                disabled={
+                  !hasNextLessonFocusChanges || isUpdatingNextLessonFocus
+                }
+                onClick={updateNextLessonFocus}
+                className="inline-flex cursor-pointer items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {isUpdatingNextLessonFocus ? "Guardando..." : "Guardar foco"}
+              </button>
+            </div>
+          </div>
         </div>
       </section>
     </aside>
