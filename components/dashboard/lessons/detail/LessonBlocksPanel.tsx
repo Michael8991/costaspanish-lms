@@ -647,6 +647,20 @@ export default function LessonBlocksPanel({
                         />
 
                         <BlockTextareaEditor
+                          label="Dificultades observadas"
+                          placeholder="Ej: Le costó usar los verbos irregulares en pasado y necesitó más apoyo para responder de forma espontánea..."
+                          initialValue={block.studentDifficultiesText ?? ""}
+                          isUpdating={isUpdating}
+                          saveLabel="Guardar dificultades"
+                          onSave={(value) =>
+                            updateBlock(blockKey, {
+                              studentDifficultiesText:
+                                value.trim() || undefined,
+                            })
+                          }
+                        />
+
+                        <BlockTextareaEditor
                           label="Reflexión de la profesora"
                           placeholder="Ej: Funcionó bien, pero necesita más práctica oral antes de pasar al siguiente punto..."
                           initialValue={block.teacherReflection ?? ""}
