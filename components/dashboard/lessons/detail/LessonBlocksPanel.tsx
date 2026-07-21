@@ -164,6 +164,130 @@ function ResourcePill({ resource }: { resource: ResourceItem }) {
   );
 }
 
+interface ActualContentEditorProps {
+  initialValue: string;
+  isUpdating: boolean;
+  onSave: (value: string) => Promise<void> | void;
+}
+
+function ActualContentEditor({
+  initialValue,
+  isUpdating,
+  onSave,
+}: ActualContentEditorProps) {
+  const [draft, setDraft] = useState(initialValue);
+
+  useEffect(() => {
+    setDraft(initialValue);
+  }, [initialValue]);
+
+  const hasChanges = draft !== initialValue;
+
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
+      <label className="text-xs font-medium uppercase tracking-wide text-gray-400">
+        Qué se ha trabajado realmente
+      </label>
+
+      <textarea
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        rows={3}
+        placeholder="Ej: Se ha repasado el pretérito indefinido y solo dio tiempo a corregir la primera actividad..."
+        className="mt-2 w-full resize-none rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition placeholder:text-gray-400 focus:border-[#9e2727] focus:ring-2 focus:ring-[#9e2727]/10"
+      />
+
+      <div className="mt-2 flex justify-end">
+        <button
+          type="button"
+          disabled={!hasChanges || isUpdating}
+          onClick={() => onSave(draft)}
+          className="inline-flex cursor-pointer items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {isUpdating ? "Guardando..." : "Guardar realidad"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+interface ActualMinutesEditorProps {
+  estimatedMinutes?: number;
+  initialValue?: number;
+  isUpdating: boolean;
+  onSave: (value: number | undefined) => Promise<void> | void;
+}
+
+function ActualMinutesEditor({
+  estimatedMinutes,
+  initialValue,
+  isUpdating,
+  onSave,
+}: ActualMinutesEditorProps) {
+  const initialDraft = initialValue !== undefined ? String(initialValue) : "";
+  const [draft, setDraft] = useState(initialDraft);
+
+  useEffect(() => {
+    setDraft(initialDraft);
+  }, [initialDraft]);
+
+  const parsedValue = draft.trim() === "" ? undefined : Number(draft);
+  const hasInvalidValue =
+    parsedValue !== undefined &&
+    (!Number.isFinite(parsedValue) || parsedValue < 0);
+  const hasChanges = draft !== initialDraft;
+
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
+            Tiempo del bloque
+          </p>
+
+          <p className="mt-1 text-sm text-gray-600">
+            Previsto:{" "}
+            <span className="font-medium text-gray-900">
+              {estimatedMinutes ?? "—"} min
+            </span>{" "}
+            / Real:{" "}
+            <span className="font-medium text-gray-900">
+              {parsedValue ?? "—"} min
+            </span>
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            min={0}
+            step={1}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder="Min"
+            className="h-9 w-24 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none transition placeholder:text-gray-400 focus:border-[#9e2727] focus:ring-2 focus:ring-[#9e2727]/10"
+          />
+
+          <button
+            type="button"
+            disabled={!hasChanges || hasInvalidValue || isUpdating}
+            onClick={() => onSave(parsedValue)}
+            className="inline-flex h-9 cursor-pointer items-center rounded-xl border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {isUpdating ? "Guardando..." : "Guardar"}
+          </button>
+        </div>
+      </div>
+
+      {hasInvalidValue && (
+        <p className="mt-2 text-xs text-red-600">
+          Introduce un número válido de minutos.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function mapBlocksToPatchPayload(blocks: LessonBlockItem[]) {
   return blocks.map((block) => ({
     title: block.title,
@@ -492,6 +616,27 @@ export default function LessonBlocksPanel({
                           </p>
                         </div>
 
+                        <ActualContentEditor
+                          initialValue={block.actualContent ?? ""}
+                          isUpdating={isUpdating}
+                          onSave={(value) =>
+                            updateBlock(blockKey, {
+                              actualContent: value.trim() || undefined,
+                            })
+                          }
+                        />
+
+                        <ActualMinutesEditor
+                          estimatedMinutes={block.estimatedMinutes}
+                          initialValue={block.actualMinutes}
+                          isUpdating={isUpdating}
+                          onSave={(value) =>
+                            updateBlock(blockKey, {
+                              actualMinutes: value,
+                            })
+                          }
+                        />
+
                         {(block.cefrLevels.length > 0 ||
                           block.skills.length > 0) && (
                           <div className="flex flex-wrap gap-2">
@@ -534,21 +679,9 @@ export default function LessonBlocksPanel({
                           </div>
                         )}
 
-                        {(block.actualContent ||
-                          block.teacherReflection ||
+                        {(block.teacherReflection ||
                           block.nextStepSuggestion) && (
                           <div className="grid gap-3 md:grid-cols-3">
-                            {block.actualContent && (
-                              <div className="rounded-2xl bg-gray-50 p-3">
-                                <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
-                                  Realidad
-                                </p>
-                                <p className="mt-1 text-sm text-gray-600">
-                                  {block.actualContent}
-                                </p>
-                              </div>
-                            )}
-
                             {block.teacherReflection && (
                               <div className="rounded-2xl bg-gray-50 p-3">
                                 <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
