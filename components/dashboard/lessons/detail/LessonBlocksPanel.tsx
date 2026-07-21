@@ -73,6 +73,21 @@ const blockCompletionActions: {
   { status: "skipped", label: "Saltado" },
 ];
 
+const ERROR_CATEGORY_OPTIONS = [
+  { value: "grammar", label: "Gramática" },
+  { value: "vocabulary", label: "Vocabulario" },
+  { value: "pronunciation", label: "Pronunciación" },
+  { value: "fluency", label: "Fluidez" },
+  { value: "listening", label: "Comprensión oral" },
+  { value: "speaking", label: "Expresión oral" },
+  { value: "reading", label: "Lectura" },
+  { value: "writing", label: "Escritura" },
+  { value: "confidence", label: "Confianza" },
+  { value: "accuracy", label: "Precisión" },
+] as const;
+
+type ErrorCategoryValue = (typeof ERROR_CATEGORY_OPTIONS)[number]["value"];
+
 function openResources(resources: { url?: string }[]) {
   resources.forEach((resource) => {
     if (!resource.url) return;
@@ -212,6 +227,48 @@ function BlockTextareaEditor({
         >
           {isUpdating ? "Guardando..." : saveLabel}
         </button>
+      </div>
+    </div>
+  );
+}
+
+interface ErrorCategoriesEditorProps {
+  selectedCategories: string[];
+  isUpdating: boolean;
+  onToggleCategory: (category: ErrorCategoryValue) => Promise<void> | void;
+}
+
+function ErrorCategoriesEditor({
+  selectedCategories,
+  isUpdating,
+  onToggleCategory,
+}: ErrorCategoriesEditorProps) {
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
+        Errores detectados
+      </p>
+
+      <div className="mt-2 flex flex-wrap gap-2">
+        {ERROR_CATEGORY_OPTIONS.map((option) => {
+          const isSelected = selectedCategories.includes(option.value);
+
+          return (
+            <button
+              key={option.value}
+              type="button"
+              disabled={isUpdating}
+              onClick={() => onToggleCategory(option.value)}
+              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                isSelected
+                  ? "border-[#9e2727]/30 bg-[#9e2727]/10 text-[#9e2727]"
+                  : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              {option.label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -644,6 +701,26 @@ export default function LessonBlocksPanel({
                               actualMinutes: value,
                             })
                           }
+                        />
+
+                        <ErrorCategoriesEditor
+                          selectedCategories={block.errorCategories ?? []}
+                          isUpdating={isUpdating}
+                          onToggleCategory={(category) => {
+                            const currentCategories =
+                              block.errorCategories ?? [];
+                            const nextCategories = currentCategories.includes(
+                              category,
+                            )
+                              ? currentCategories.filter(
+                                  (item) => item !== category,
+                                )
+                              : [...currentCategories, category];
+
+                            return updateBlock(blockKey, {
+                              errorCategories: nextCategories,
+                            });
+                          }}
                         />
 
                         <BlockTextareaEditor

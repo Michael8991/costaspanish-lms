@@ -75,8 +75,12 @@ export const LESSON_ERROR_CATEGORIES = [
   "fluency",
   "vocabulary",
   "listening",
+  "speaking",
+  "reading",
   "comprehension",
   "writing",
+  "confidence",
+  "accuracy",
   "none",
 ] as const;
 
