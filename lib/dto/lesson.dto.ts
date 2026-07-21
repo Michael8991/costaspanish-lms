@@ -9,6 +9,7 @@ import {
   LessonSkill,
   LessonStatus,
 } from "@/lib/types/lesson";
+import { isoToDatetimeLocalValue } from "@/lib/utils/time-zone";
 
 export interface LessonBlockResourceDTO{
   id: string;
@@ -108,22 +109,20 @@ export interface LessonDetailDTO extends LessonListDTO {
 }
 
 
-function toDatetimeLocalValue(value: string) {
-  const date = new Date(value);
-  const offset = date.getTimezoneOffset();
-  const localDate = new Date(date.getTime() - offset * 60 * 1000);
-
-  return localDate.toISOString().slice(0, 16);
-}
-
 export function mapLessonToFormValues(
   lesson: LessonDetailDTO,
 ): AddLessonFormValues {
   return {
     title: lesson.title,
     classType: lesson.classType,
-    scheduledStart: toDatetimeLocalValue(lesson.scheduledStart),
-    scheduledEnd: toDatetimeLocalValue(lesson.scheduledEnd),
+    scheduledStart: isoToDatetimeLocalValue(
+      lesson.scheduledStart,
+      lesson.timezone,
+    ),
+    scheduledEnd: isoToDatetimeLocalValue(
+      lesson.scheduledEnd,
+      lesson.timezone,
+    ),
     timezone: lesson.timezone,
 
     attendees: lesson.attendees.map((attendee) => ({

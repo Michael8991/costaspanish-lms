@@ -15,6 +15,7 @@ import {
 import LessonToolBox from "../../../../../components/dashboard/lessons/add/LessonToolBox";
 import { ResourceListItemDTO } from "@/lib/dto/resource.dto";
 import { useRouter } from "next/navigation";
+import { zonedDateTimeToISOString } from "@/lib/utils/time-zone";
 
 function getBlockTypeFromResource(
   resource: ResourceListItemDTO,
@@ -204,41 +205,47 @@ export default function AddLessonWizard({
 
     setSubmitError(null);
 
-    const payload = {
-      title: values.title,
-      classType: values.classType,
-      scheduledStart: values.scheduledStart,
-      scheduledEnd: values.scheduledEnd,
-      timezone: values.timezone,
-
-      attendees: values.attendees.map((attendee) => ({
-        ...attendee,
-        voucherId: attendee.isTrial
-          ? undefined
-          : attendee.voucherId || undefined,
-        creditsToConsume: attendee.isTrial ? 0 : attendee.creditsToConsume,
-      })),
-
-      preparationNotes: values.preparationNotes,
-      homeworkAssigned: values.homeworkAssigned,
-      nextLessonFocus: values.nextLessonFocus,
-
-      blocks: values.blocks.map((block) => ({
-        title: block.title,
-        type: block.type,
-        cefrLevels: block.cefrLevels ?? [],
-        skills: block.skills ?? [],
-        tags: block.tags ?? [],
-        resources: block.resources ?? [],
-        plannedContent: block.plannedContent,
-        estimatedMinutes: block.estimatedMinutes,
-        errorCategories: block.errorCategories ?? [],
-        completionStatus: block.completionStatus ?? "not_completed",
-        carryOverToNextLesson: block.carryOverToNextLesson ?? false,
-      })),
-    };
-
     try {
+      const payload = {
+        title: values.title,
+        classType: values.classType,
+        scheduledStart: zonedDateTimeToISOString(
+          values.scheduledStart,
+          values.timezone,
+        ),
+        scheduledEnd: zonedDateTimeToISOString(
+          values.scheduledEnd,
+          values.timezone,
+        ),
+        timezone: values.timezone,
+
+        attendees: values.attendees.map((attendee) => ({
+          ...attendee,
+          voucherId: attendee.isTrial
+            ? undefined
+            : attendee.voucherId || undefined,
+          creditsToConsume: attendee.isTrial ? 0 : attendee.creditsToConsume,
+        })),
+
+        preparationNotes: values.preparationNotes,
+        homeworkAssigned: values.homeworkAssigned,
+        nextLessonFocus: values.nextLessonFocus,
+
+        blocks: values.blocks.map((block) => ({
+          title: block.title,
+          type: block.type,
+          cefrLevels: block.cefrLevels ?? [],
+          skills: block.skills ?? [],
+          tags: block.tags ?? [],
+          resources: block.resources ?? [],
+          plannedContent: block.plannedContent,
+          estimatedMinutes: block.estimatedMinutes,
+          errorCategories: block.errorCategories ?? [],
+          completionStatus: block.completionStatus ?? "not_completed",
+          carryOverToNextLesson: block.carryOverToNextLesson ?? false,
+        })),
+      };
+
       const isEditRequest = mode === "edit" && Boolean(lessonId);
       const response = await fetch(
         isEditRequest ? `/api/lessons/${lessonId}` : "/api/lessons",
