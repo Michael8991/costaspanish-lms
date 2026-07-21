@@ -164,17 +164,23 @@ function ResourcePill({ resource }: { resource: ResourceItem }) {
   );
 }
 
-interface ActualContentEditorProps {
+interface BlockTextareaEditorProps {
+  label: string;
+  placeholder: string;
   initialValue: string;
   isUpdating: boolean;
+  saveLabel: string;
   onSave: (value: string) => Promise<void> | void;
 }
 
-function ActualContentEditor({
+function BlockTextareaEditor({
+  label,
+  placeholder,
   initialValue,
   isUpdating,
+  saveLabel,
   onSave,
-}: ActualContentEditorProps) {
+}: BlockTextareaEditorProps) {
   const [draft, setDraft] = useState(initialValue);
 
   useEffect(() => {
@@ -186,14 +192,14 @@ function ActualContentEditor({
   return (
     <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
       <label className="text-xs font-medium uppercase tracking-wide text-gray-400">
-        Qué se ha trabajado realmente
+        {label}
       </label>
 
       <textarea
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
         rows={3}
-        placeholder="Ej: Se ha repasado el pretérito indefinido y solo dio tiempo a corregir la primera actividad..."
+        placeholder={placeholder}
         className="mt-2 w-full resize-none rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition placeholder:text-gray-400 focus:border-[#9e2727] focus:ring-2 focus:ring-[#9e2727]/10"
       />
 
@@ -204,7 +210,7 @@ function ActualContentEditor({
           onClick={() => onSave(draft)}
           className="inline-flex cursor-pointer items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {isUpdating ? "Guardando..." : "Guardar realidad"}
+          {isUpdating ? "Guardando..." : saveLabel}
         </button>
       </div>
     </div>
@@ -616,9 +622,12 @@ export default function LessonBlocksPanel({
                           </p>
                         </div>
 
-                        <ActualContentEditor
+                        <BlockTextareaEditor
+                          label="Qué se ha trabajado realmente"
+                          placeholder="Ej: Se ha repasado el pretérito indefinido y solo dio tiempo a corregir la primera actividad..."
                           initialValue={block.actualContent ?? ""}
                           isUpdating={isUpdating}
+                          saveLabel="Guardar realidad"
                           onSave={(value) =>
                             updateBlock(blockKey, {
                               actualContent: value.trim() || undefined,
@@ -633,6 +642,19 @@ export default function LessonBlocksPanel({
                           onSave={(value) =>
                             updateBlock(blockKey, {
                               actualMinutes: value,
+                            })
+                          }
+                        />
+
+                        <BlockTextareaEditor
+                          label="Reflexión de la profesora"
+                          placeholder="Ej: Funcionó bien, pero necesita más práctica oral antes de pasar al siguiente punto..."
+                          initialValue={block.teacherReflection ?? ""}
+                          isUpdating={isUpdating}
+                          saveLabel="Guardar reflexión"
+                          onSave={(value) =>
+                            updateBlock(blockKey, {
+                              teacherReflection: value.trim() || undefined,
                             })
                           }
                         />
@@ -679,30 +701,16 @@ export default function LessonBlocksPanel({
                           </div>
                         )}
 
-                        {(block.teacherReflection ||
-                          block.nextStepSuggestion) && (
+                        {block.nextStepSuggestion && (
                           <div className="grid gap-3 md:grid-cols-3">
-                            {block.teacherReflection && (
-                              <div className="rounded-2xl bg-gray-50 p-3">
-                                <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
-                                  Reflexión
-                                </p>
-                                <p className="mt-1 text-sm text-gray-600">
-                                  {block.teacherReflection}
-                                </p>
-                              </div>
-                            )}
-
-                            {block.nextStepSuggestion && (
-                              <div className="rounded-2xl bg-gray-50 p-3">
-                                <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
-                                  Próximo paso
-                                </p>
-                                <p className="mt-1 text-sm text-gray-600">
-                                  {block.nextStepSuggestion}
-                                </p>
-                              </div>
-                            )}
+                            <div className="rounded-2xl bg-gray-50 p-3">
+                              <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
+                                Próximo paso
+                              </p>
+                              <p className="mt-1 text-sm text-gray-600">
+                                {block.nextStepSuggestion}
+                              </p>
+                            </div>
                           </div>
                         )}
                       </div>
