@@ -21,6 +21,7 @@ import { useLessonStudents } from "@/lib/hooks/useLessonStudents";
 import type { LessonClassType } from "@/lib/types/lesson";
 import { buildLessonTitle } from "@/lib/utils/lesson-title";
 import { getCompatiblePlans } from "@/lib/utils/lesson-voucher";
+import type { WeekdayValue } from "@/lib/utils/lesson-recurrence";
 
 function getBlockTypeFromResource(
   resource: ResourceListItemDTO,
@@ -43,6 +44,13 @@ export type AddLessonFormValues = {
   scheduledEnd: string;
   timezone: string;
   courseId?: string;
+
+  recurrence: {
+    enabled: boolean;
+    frequency: "weekly";
+    daysOfWeek: WeekdayValue[];
+    endsOn: string;
+  };
 
   attendees: {
     studentId: string;
@@ -103,6 +111,13 @@ const defaultValues: AddLessonFormValues = {
   scheduledStart: "",
   scheduledEnd: "",
   timezone: "Europe/Madrid",
+
+  recurrence: {
+    enabled: false,
+    frequency: "weekly",
+    daysOfWeek: [],
+    endsOn: "",
+  },
 
   attendees: [
     {
@@ -296,6 +311,15 @@ export default function AddLessonWizard({
           values.timezone,
         ),
         timezone: values.timezone,
+        recurrence:
+          mode !== "edit" && values.recurrence.enabled
+            ? {
+                enabled: true,
+                frequency: values.recurrence.frequency,
+                daysOfWeek: values.recurrence.daysOfWeek,
+                endsOn: values.recurrence.endsOn,
+              }
+            : undefined,
 
         attendees: values.attendees.map((attendee) => ({
           ...attendee,
@@ -421,6 +445,7 @@ export default function AddLessonWizard({
               isLoading={isLoadingStudents}
               error={studentsError}
               onRefetchStudents={refetchStudents}
+              allowRecurrence={mode !== "edit"}
             />
           )}
 
@@ -495,6 +520,12 @@ function getStepValidationFields(
 
         return fields;
       }),
+      ...(values.recurrence.enabled
+        ? ([
+            "recurrence.daysOfWeek",
+            "recurrence.endsOn",
+          ] satisfies FieldPath<AddLessonFormValues>[])
+        : []),
     ];
   }
 
@@ -536,7 +567,8 @@ function getStepFromErrors(errors: FieldErrors<AddLessonFormValues>) {
     errors.scheduledStart ||
     errors.scheduledEnd ||
     errors.timezone ||
-    errors.attendees
+    errors.attendees ||
+    errors.recurrence
   ) {
     return 0;
   }

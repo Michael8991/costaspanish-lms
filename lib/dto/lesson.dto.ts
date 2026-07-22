@@ -142,6 +142,12 @@ export function mapLessonToFormValues(
       lesson.timezone,
     ),
     timezone: lesson.timezone,
+    recurrence: {
+      enabled: false,
+      frequency: "weekly",
+      daysOfWeek: [],
+      endsOn: "",
+    },
 
     attendees: lesson.attendees.map((attendee) => ({
       studentId: attendee.studentId,

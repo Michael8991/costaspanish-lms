@@ -29,6 +29,10 @@ type BuildLessonTitleInput = {
   classType?: string;
   courseName?: string;
   scheduledStart?: string | Date | null;
+  progressOverride?: {
+    currentLessonNumber: number;
+    creditsTotal?: number;
+  };
 };
 
 const classTypeLabels: Record<string, string> = {
@@ -167,6 +171,7 @@ export function buildLessonTitle({
   classType,
   courseName,
   scheduledStart,
+  progressOverride,
 }: BuildLessonTitleInput): string {
   const classTypeLabel = getClassTypeLabel(classType);
 
@@ -180,7 +185,11 @@ export function buildLessonTitle({
     students.map((student) => [student._id, student]),
   );
   const namePart = getLessonNamePart(attendees, studentsById);
-  const progressPart = getAttendeeProgressLabel(attendees, studentsById);
+  const progressPart = progressOverride
+    ? progressOverride.creditsTotal === undefined
+      ? `Clase ${progressOverride.currentLessonNumber}`
+      : `${progressOverride.currentLessonNumber}/${progressOverride.creditsTotal}`
+    : getAttendeeProgressLabel(attendees, studentsById);
 
   return `${namePart} - ${classTypeLabel} - ${progressPart}`;
 }

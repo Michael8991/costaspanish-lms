@@ -2,6 +2,7 @@
 
 import type { AddLessonFormValues } from "@/app/[locale]/dashboard/lessons/add/AddLessonWizard";
 import LessonDateTimePicker from "@/components/dashboard/lessons/add/LessonDateTimePicker";
+import LessonRecurrenceEditor from "@/components/dashboard/lessons/add/LessonRecurrenceEditor";
 import NewVoucherForm, {
   type NewVoucherFormData,
 } from "@/components/dashboard/teacher/forms/NewVoucherForm";
@@ -25,6 +26,7 @@ interface FirstStepAddLessonProps {
   isLoading: boolean;
   error: string | null;
   onRefetchStudents: () => Promise<void>;
+  allowRecurrence: boolean;
 }
 
 type QuickVoucherTarget = {
@@ -42,6 +44,7 @@ export default function FirstStepAddLesson({
   isLoading,
   error,
   onRefetchStudents,
+  allowRecurrence,
 }: FirstStepAddLessonProps) {
   const {
     control,
@@ -295,6 +298,8 @@ export default function FirstStepAddLesson({
         </div>
 
         <LessonDateTimePicker />
+
+        {allowRecurrence && <LessonRecurrenceEditor students={students} />}
 
         <div className="md:col-span-2">
           <h4 className="text-sm font-semibold text-gray-900">

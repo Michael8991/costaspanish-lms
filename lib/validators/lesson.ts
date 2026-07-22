@@ -12,6 +12,7 @@ import {
   LESSON_STATUSES,
 } from "@/lib/constants/lesson.constants";
 import { Types } from "mongoose";
+import { WEEKDAY_VALUES } from "@/lib/utils/lesson-recurrence";
 
 
 const objectIdSchema = z
@@ -147,13 +148,62 @@ const lessonBaseSchema = z.object({
     .optional(),
 });
 
-export const createLessonSchema = lessonBaseSchema.refine(
-  (data) => data.scheduledEnd > data.scheduledStart,
-  {
-    message: "scheduledEnd must be after scheduledStart",
-    path: ["scheduledEnd"],
-  },
-);
+const lessonRecurrenceSchema = z
+  .object({
+    enabled: z.boolean(),
+    frequency: z.literal("weekly").default("weekly"),
+    daysOfWeek: z.array(z.enum(WEEKDAY_VALUES)).max(7).default([]),
+    endsOn: z.string().trim().optional(),
+  })
+  .superRefine((recurrence, ctx) => {
+    if (!recurrence.enabled) return;
+
+    if (recurrence.daysOfWeek.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["daysOfWeek"],
+        message: "Selecciona al menos un día de repetición.",
+      });
+    }
+
+    if (new Set(recurrence.daysOfWeek).size !== recurrence.daysOfWeek.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["daysOfWeek"],
+        message: "Los días de repetición no pueden estar duplicados.",
+      });
+    }
+
+    const endsOn = recurrence.endsOn;
+    const parsedEndsOn = endsOn
+      ? new Date(`${endsOn}T00:00:00.000Z`)
+      : undefined;
+    const hasValidEndsOn =
+      Boolean(endsOn) &&
+      parsedEndsOn !== undefined &&
+      !Number.isNaN(parsedEndsOn.getTime()) &&
+      parsedEndsOn.toISOString().slice(0, 10) === endsOn;
+
+    if (!hasValidEndsOn) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["endsOn"],
+        message: "Selecciona hasta cuándo se repite la clase.",
+      });
+    }
+  });
+
+export const createLessonSchema = lessonBaseSchema
+  .extend({
+    recurrence: lessonRecurrenceSchema.optional(),
+  })
+  .refine(
+    (data) => data.scheduledEnd > data.scheduledStart,
+    {
+      message: "scheduledEnd must be after scheduledStart",
+      path: ["scheduledEnd"],
+    },
+  );
 
 const updateLessonBaseSchema = z.object({
   courseId: objectIdSchema.optional(),
@@ -205,3 +255,4 @@ export type CreateLessonInput = z.infer<typeof createLessonSchema>;
 export type UpdateLessonInput = z.infer<typeof updateLessonSchema>;
 export type LessonBlockInput = z.infer<typeof lessonBlockSchema>;
 export type LessonAttendeeInput = z.infer<typeof lessonAttendeeSchema>;
+export type LessonRecurrenceInput = z.infer<typeof lessonRecurrenceSchema>;
