@@ -17,6 +17,10 @@ import { ResourceListItemDTO } from "@/lib/dto/resource.dto";
 import { useRouter } from "next/navigation";
 import { zonedDateTimeToISOString } from "@/lib/utils/time-zone";
 import { createClientId } from "@/components/dashboard/lessons/add/createClientId";
+import { useLessonStudents } from "@/lib/hooks/useLessonStudents";
+import type { LessonClassType } from "@/lib/types/lesson";
+import { buildLessonTitle } from "@/lib/utils/lesson-title";
+import { getCompatiblePlans } from "@/lib/utils/lesson-voucher";
 
 function getBlockTypeFromResource(
   resource: ResourceListItemDTO,
@@ -34,12 +38,7 @@ function getBlockTypeFromResource(
 
 export type AddLessonFormValues = {
   title: string;
-  classType:
-    | "private"
-    | "pair"
-    | "group_regular"
-    | "semi_intensive"
-    | "intensive";
+  classType: LessonClassType | "";
   scheduledStart: string;
   scheduledEnd: string;
   timezone: string;
@@ -100,7 +99,7 @@ export type AddLessonFormValues = {
 
 const defaultValues: AddLessonFormValues = {
   title: "",
-  classType: "private",
+  classType: "",
   scheduledStart: "",
   scheduledEnd: "",
   timezone: "Europe/Madrid",
@@ -150,6 +149,11 @@ export default function AddLessonWizard({
   const [currentStep, setCurrentStep] = useState(0);
   const router = useRouter();
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const {
+    students,
+    isLoading: isLoadingStudents,
+    error: studentsError,
+  } = useLessonStudents();
 
   const form = useForm<AddLessonFormValues>({
     defaultValues: initialValues ?? defaultValues,
@@ -229,10 +233,59 @@ export default function AddLessonWizard({
     setSubmitError(null);
 
     try {
+      const classType = values.classType;
+
+      if (!classType) {
+        form.setError("classType", {
+          type: "required",
+          message: "Selecciona un tipo de clase",
+        });
+        setCurrentStep(0);
+        setSubmitError("Selecciona un tipo de clase antes de guardar.");
+        return;
+      }
+
+      const invalidVoucherIndexes = values.attendees.flatMap(
+        (attendee, index) => {
+          if (attendee.isTrial) return [];
+
+          const student = students.find(
+            (candidate) => candidate._id === attendee.studentId,
+          );
+          const hasCompatibleVoucher = getCompatiblePlans(
+            student,
+            classType,
+          ).some((plan) => plan._id === attendee.voucherId);
+
+          return hasCompatibleVoucher ? [] : [index];
+        },
+      );
+
+      if (invalidVoucherIndexes.length > 0) {
+        invalidVoucherIndexes.forEach((index) => {
+          form.setError(`attendees.${index}.voucherId`, {
+            type: "validate",
+            message:
+              "El alumno necesita un bono compatible o marcarse como clase de prueba.",
+          });
+        });
+        setCurrentStep(0);
+        setSubmitError(
+          "Revisa los bonos asignados antes de guardar la lección.",
+        );
+        return;
+      }
+
+      const generatedTitle = buildLessonTitle({
+        attendees: values.attendees,
+        students,
+        classType,
+        scheduledStart: values.scheduledStart,
+      });
       const payload = {
         courseId: values.courseId,
-        title: values.title,
-        classType: values.classType,
+        title: generatedTitle,
+        classType,
         scheduledStart: zonedDateTimeToISOString(
           values.scheduledStart,
           values.timezone,
@@ -248,7 +301,7 @@ export default function AddLessonWizard({
           voucherId: attendee.isTrial
             ? undefined
             : attendee.voucherId || undefined,
-          creditsToConsume: attendee.isTrial ? 0 : attendee.creditsToConsume,
+          creditsToConsume: attendee.isTrial ? 0 : 1,
         })),
 
         preparationNotes: values.preparationNotes,
@@ -350,15 +403,6 @@ export default function AddLessonWizard({
           onSubmit={handleFormSubmit}
           className={`${currentStep === 1 ? "col-span-11" : "col-span-12"} rounded-2xl border border-gray-200 bg-white p-6 shadow-sm `}
         >
-          <div className="mb-6">
-            <h2 className="mt-1 text-xl font-bold text-gray-900">
-              Nueva lección
-            </h2>
-            <p className="mt-1 text-sm text-gray-500 mb-6">
-              Prepara una clase manualmente y añade los detalles necesarios.
-            </p>
-          </div>
-
           <p className="text-sm font-medium text-[#9e2727]">
             Paso {currentStep + 1} de 3
           </p>
@@ -370,7 +414,13 @@ export default function AddLessonWizard({
               {submitError}
             </div>
           )}
-          {currentStep === 0 && <FirstStepAddLesson />}
+          {currentStep === 0 && (
+            <FirstStepAddLesson
+              students={students}
+              isLoading={isLoadingStudents}
+              error={studentsError}
+            />
+          )}
 
           {currentStep === 1 && (
             <SecondStepAddLesson
@@ -437,7 +487,7 @@ function getStepValidationFields(
           `attendees.${index}.studentId`,
         ];
 
-        if (!attendee.isTrial) {
+        if (!attendee.isTrial && values.classType) {
           fields.push(`attendees.${index}.voucherId`);
         }
 

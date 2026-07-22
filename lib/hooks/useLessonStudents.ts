@@ -35,7 +35,7 @@ export function useLessonStudents(): UseLessonStudentsResult {
       setIsLoading(true);
       setError(null);
 
-      const response = await fetch("/api/students?includeActivePlans.status=active", {
+      const response = await fetch("/api/students?limit=50", {
         cache: "no-store",
       });
 

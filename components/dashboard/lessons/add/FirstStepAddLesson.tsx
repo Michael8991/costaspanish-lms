@@ -1,40 +1,32 @@
 "use client";
 
-import { AddLessonFormValues } from "@/app/[locale]/dashboard/lessons/add/AddLessonWizard";
-import { useLessonStudents } from "@/lib/hooks/useLessonStudents";
-import { ChangeEvent, useMemo } from "react";
+import type { AddLessonFormValues } from "@/app/[locale]/dashboard/lessons/add/AddLessonWizard";
+import LessonDateTimePicker from "@/components/dashboard/lessons/add/LessonDateTimePicker";
+import type { LessonStudent } from "@/lib/hooks/useLessonStudents";
+import { buildLessonTitle } from "@/lib/utils/lesson-title";
+import {
+  formatAssignedVoucherLabel,
+  getCompatiblePlans,
+  selectBestCompatiblePlan,
+} from "@/lib/utils/lesson-voucher";
+import { type ChangeEvent, useEffect, useMemo } from "react";
 import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
-
-type LessonStudentPlanOption = {
-  _id: string;
-  classType: string;
-  status: string;
-  creditsRemaining: number;
-  creditsTotal?: number;
-  validUntil?: string | Date | null;
-};
-
-type LessonStudentOption = {
-  _id: string;
-  fullName?: string;
-  contactEmail?: string;
-  activePlans?: LessonStudentPlanOption[];
-};
 
 function isNonEmptyString(value: string | undefined | null): value is string {
   return typeof value === "string" && value.length > 0;
 }
 
-function isUsablePlan(plan: LessonStudentPlanOption) {
-  const isActive = plan.status === "active";
-  const hasCredits = plan.creditsRemaining > 0;
-  const isNotExpired =
-    !plan.validUntil || new Date(plan.validUntil) >= new Date();
-
-  return isActive && hasCredits && isNotExpired;
+interface FirstStepAddLessonProps {
+  students: LessonStudent[];
+  isLoading: boolean;
+  error: string | null;
 }
 
-export default function FirstStepAddLesson() {
+export default function FirstStepAddLesson({
+  students,
+  isLoading,
+  error,
+}: FirstStepAddLessonProps) {
   const {
     control,
     register,
@@ -42,28 +34,117 @@ export default function FirstStepAddLesson() {
     formState: { errors },
   } = useFormContext<AddLessonFormValues>();
 
-  const { students, isLoading, error } = useLessonStudents() as {
-    students: LessonStudentOption[];
-    isLoading: boolean;
-    error: string | null;
-  };
-
   const { fields, append, remove } = useFieldArray({
     control,
     name: "attendees",
   });
 
-  const attendees =
-    useWatch({
-      control,
-      name: "attendees",
-    }) ?? [];
+  const attendees = useWatch({
+    control,
+    name: "attendees",
+  });
+  const classType = useWatch({
+    control,
+    name: "classType",
+  });
+  const scheduledStart = useWatch({
+    control,
+    name: "scheduledStart",
+  });
 
   const selectedStudentIds = useMemo(() => {
     return new Set(
-      attendees.map((attendee) => attendee?.studentId).filter(isNonEmptyString),
+      (attendees ?? [])
+        .map((attendee) => attendee?.studentId)
+        .filter(isNonEmptyString),
     );
   }, [attendees]);
+  const generatedTitle = useMemo(
+    () =>
+      buildLessonTitle({
+        attendees: attendees ?? [],
+        students,
+        classType,
+        scheduledStart,
+      }),
+    [attendees, classType, scheduledStart, students],
+  );
+  const classTypeRegistration = register("classType", {
+    required: "Selecciona un tipo de clase",
+  });
+
+  useEffect(() => {
+    setValue("title", generatedTitle, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  }, [generatedTitle, setValue]);
+
+  useEffect(() => {
+    (attendees ?? []).forEach((attendee, index) => {
+      const voucherPath = `attendees.${index}.voucherId` as const;
+      const creditsPath = `attendees.${index}.creditsToConsume` as const;
+
+      if (!classType) {
+        if (attendee.voucherId) {
+          setValue(voucherPath, "", {
+            shouldDirty: true,
+            shouldValidate: true,
+          });
+        }
+        if (attendee.isTrial && attendee.creditsToConsume !== 0) {
+          setValue(creditsPath, 0, {
+            shouldDirty: true,
+            shouldValidate: true,
+          });
+        }
+        return;
+      }
+
+      if (attendee.isTrial) {
+        if (attendee.voucherId) {
+          setValue(voucherPath, "", {
+            shouldDirty: true,
+            shouldValidate: true,
+          });
+        }
+        if (attendee.creditsToConsume !== 0) {
+          setValue(creditsPath, 0, {
+            shouldDirty: true,
+            shouldValidate: true,
+          });
+        }
+        return;
+      }
+
+      if (attendee.creditsToConsume !== 1) {
+        setValue(creditsPath, 1, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      }
+
+      if (!attendee.studentId || isLoading) return;
+
+      const student = students.find(
+        (candidate) => candidate._id === attendee.studentId,
+      );
+      if (!student) return;
+
+      const selectedPlan = selectBestCompatiblePlan(
+        getCompatiblePlans(student, classType),
+      );
+      const nextVoucherId = selectedPlan?._id ?? "";
+
+      if (attendee.voucherId !== nextVoucherId) {
+        setValue(voucherPath, nextVoucherId, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      }
+    });
+  }, [attendees, classType, isLoading, setValue, students]);
+
   return (
     <section className="space-y-5">
       <div>
@@ -78,48 +159,81 @@ export default function FirstStepAddLesson() {
       <div className="grid gap-4 md:grid-cols-2">
         <div className="md:col-span-2">
           <label className="mb-1 block text-sm font-medium text-gray-700">
-            Título
+            Tipo de clase
           </label>
-          <input
-            type="text"
-            placeholder="Clase privada A1 - María"
-            {...register("title", {
-              required: "El título es obligatorio",
-            })}
+          <select
+            {...classTypeRegistration}
+            value={classType ?? ""}
+            onChange={(event) => {
+              void classTypeRegistration.onChange(event);
+
+              (attendees ?? []).forEach((attendee, index) => {
+                if (!attendee.voucherId) return;
+
+                setValue(`attendees.${index}.voucherId`, "", {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                });
+              });
+            }}
             className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none transition focus:border-[#9e2727] focus:ring-2 focus:ring-[#9e2727]/10"
-          />
-          {errors.title && (
-            <p className="mt-1 text-xs text-red-600">{errors.title.message}</p>
+          >
+            <option value="">Selecciona tipo de clase</option>
+            <option value="private">Privada</option>
+            <option value="pair">Pareja</option>
+            <option value="group_regular">Grupo regular</option>
+            <option value="semi_intensive">Semi-intensivo</option>
+            <option value="intensive">Intensivo</option>
+          </select>
+          {errors.classType && (
+            <p className="mt-1 text-xs text-red-600">
+              {errors.classType.message}
+            </p>
+          )}
+          {!classType && (
+            <p className="mt-2 text-sm text-amber-700">
+              Selecciona primero un tipo de clase para asignar bonos
+              compatibles.
+            </p>
           )}
         </div>
-        {/* Select alumnos */}
+
+        <LessonDateTimePicker />
+
+        <div className="md:col-span-2">
+          <h4 className="text-sm font-semibold text-gray-900">
+            Alumnos y bonos
+          </h4>
+          <p className="mt-1 text-sm text-gray-500">
+            El bono compatible se asigna automáticamente.
+          </p>
+        </div>
+
+        {error && (
+          <div className="md:col-span-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error}
+          </div>
+        )}
 
         {fields.map((field, index) => {
-          const attendee = attendees[index];
-
+          const attendee = attendees?.[index];
           const selectedStudentId = attendee?.studentId ?? "";
           const selectedVoucherId = attendee?.voucherId ?? "";
           const isTrial = attendee?.isTrial ?? false;
-
           const selectedStudent = students.find(
             (student) => student._id === selectedStudentId,
           );
-
-          const activePlans = (selectedStudent?.activePlans ?? [])
-            .filter(isUsablePlan)
-            .map((plan) => ({
-              id: plan._id,
-              classType: plan.classType,
-              status: plan.status,
-              creditsRemaining: plan.creditsRemaining,
-              creditsTotal: plan.creditsTotal,
-              validUntil: plan.validUntil,
-            }));
+          const compatiblePlans = classType
+            ? getCompatiblePlans(selectedStudent, classType)
+            : [];
+          const assignedPlan = selectedStudent?.activePlans.find(
+            (plan) => plan._id === selectedVoucherId,
+          );
 
           return (
             <div
               key={field.id}
-              className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm"
+              className="md:col-span-2 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm"
             >
               <div className="mb-4 flex items-center justify-between">
                 <span className="text-sm font-semibold text-gray-900">
@@ -142,7 +256,6 @@ export default function FirstStepAddLesson() {
                   <label className="mb-1 block text-sm font-medium text-gray-700">
                     Alumno
                   </label>
-
                   <select
                     {...register(`attendees.${index}.studentId` as const, {
                       required: "Selecciona un alumno",
@@ -158,7 +271,6 @@ export default function FirstStepAddLesson() {
                           shouldValidate: true,
                         },
                       );
-
                       setValue(`attendees.${index}.voucherId`, "", {
                         shouldDirty: true,
                         shouldValidate: true,
@@ -191,7 +303,6 @@ export default function FirstStepAddLesson() {
                       );
                     })}
                   </select>
-
                   {errors.attendees?.[index]?.studentId && (
                     <p className="mt-1 text-xs text-red-600">
                       {errors.attendees[index]?.studentId?.message}
@@ -201,46 +312,59 @@ export default function FirstStepAddLesson() {
 
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Bono
+                    Bono asignado
                   </label>
-
-                  <select
+                  <input
+                    type="hidden"
                     {...register(`attendees.${index}.voucherId` as const, {
-                      required: isTrial ? false : "Selecciona un bono",
+                      validate: (voucherId) =>
+                        isTrial ||
+                        compatiblePlans.some(
+                          (plan) => plan._id === voucherId,
+                        ) ||
+                        "El alumno necesita un bono compatible o marcarse como clase de prueba.",
                     })}
-                    value={selectedVoucherId}
-                    disabled={!selectedStudentId || isTrial}
-                    onChange={(event: ChangeEvent<HTMLSelectElement>) => {
-                      setValue(
-                        `attendees.${index}.voucherId`,
-                        event.target.value,
-                        {
-                          shouldDirty: true,
-                          shouldValidate: true,
-                        },
-                      );
-                    }}
-                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none transition disabled:bg-gray-50 disabled:text-gray-400 focus:border-[#9e2727] focus:ring-2 focus:ring-[#9e2727]/10"
+                  />
+                  <div
+                    aria-live="polite"
+                    className={`rounded-xl border px-3 py-2 text-sm ${
+                      classType && selectedStudentId && !isTrial && !assignedPlan
+                        ? "border-amber-200 bg-amber-50 text-amber-800"
+                        : "border-gray-200 bg-gray-50 text-gray-700"
+                    }`}
                   >
-                    <option value="">
-                      {isTrial
-                        ? "Trial: no consume bono"
-                        : "Selecciona un bono"}
-                    </option>
-
-                    {activePlans.map((plan) => (
-                      <option key={plan.id} value={plan.id}>
-                        {plan.classType} · {plan.creditsRemaining} créditos
-                      </option>
-                    ))}
-                  </select>
-
+                    {!classType
+                      ? "Selecciona primero un tipo de clase."
+                      : !selectedStudentId
+                        ? "Selecciona un alumno."
+                        : isTrial
+                          ? "Trial"
+                          : assignedPlan
+                            ? formatAssignedVoucherLabel(assignedPlan)
+                            : "Sin bono compatible"}
+                  </div>
+                  {classType &&
+                    selectedStudentId &&
+                    !isTrial &&
+                    compatiblePlans.length === 0 && (
+                      <p className="mt-1 text-xs text-amber-700">
+                        Este alumno no tiene bonos activos compatibles con este
+                        tipo de clase.
+                      </p>
+                    )}
+                  {!isTrial && compatiblePlans.length > 1 && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Hay más de un bono compatible. Se ha seleccionado
+                      automáticamente el más próximo a vencer.
+                    </p>
+                  )}
                   {errors.attendees?.[index]?.voucherId && (
                     <p className="mt-1 text-xs text-red-600">
                       {errors.attendees[index]?.voucherId?.message}
                     </p>
                   )}
                 </div>
+
                 <label className="flex items-center gap-2 text-sm text-gray-700">
                   <input
                     type="checkbox"
@@ -252,7 +376,6 @@ export default function FirstStepAddLesson() {
                         shouldDirty: true,
                         shouldValidate: true,
                       });
-
                       setValue(
                         `attendees.${index}.creditsToConsume`,
                         checked ? 0 : 1,
@@ -261,13 +384,10 @@ export default function FirstStepAddLesson() {
                           shouldValidate: true,
                         },
                       );
-
-                      if (checked) {
-                        setValue(`attendees.${index}.voucherId`, "", {
-                          shouldDirty: true,
-                          shouldValidate: true,
-                        });
-                      }
+                      setValue(`attendees.${index}.voucherId`, "", {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
                     }}
                   />
                   Clase de prueba para este alumno
@@ -276,6 +396,7 @@ export default function FirstStepAddLesson() {
             </div>
           );
         })}
+
         <button
           type="button"
           onClick={() =>
@@ -287,80 +408,33 @@ export default function FirstStepAddLesson() {
               isTrial: false,
             })
           }
-          className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-3 text-sm font-medium text-gray-600 transition hover:border-[#9e2727] hover:text-[#9e2727] min-h-45"
+          className="md:col-span-2 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-3 text-sm font-medium text-gray-600 transition hover:border-[#9e2727] hover:text-[#9e2727]"
         >
           Añadir alumno
         </button>
-        {/* Select alumnos */}
 
-        <div>
+        <div className="md:col-span-2">
           <label className="mb-1 block text-sm font-medium text-gray-700">
-            Tipo de clase
+            Título
           </label>
-          <select
-            {...register("classType", {
-              required: "El tipo de clase es obligatorio",
+          <input
+            type="hidden"
+            {...register("title", {
+              required: "El título es obligatorio",
             })}
-            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none transition focus:border-[#9e2727] focus:ring-2 focus:ring-[#9e2727]/10"
+          />
+          <input type="hidden" {...register("timezone")} />
+          <div
+            aria-live="polite"
+            className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-800"
           >
-            <option value="private">Privada</option>
-            <option value="pair">Pareja</option>
-            <option value="group_regular">Grupo regular</option>
-            <option value="semi_intensive">Semi-intensivo</option>
-            <option value="intensive">Intensivo</option>
-          </select>
-          {errors.classType && (
-            <p className="mt-1 text-xs text-red-600">
-              {errors.classType.message}
-            </p>
-          )}
-        </div>
-
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Zona horaria
-          </label>
-          <input
-            type="text"
-            {...register("timezone")}
-            readOnly
-            className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500 outline-none"
-          />
-        </div>
-
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Inicio
-          </label>
-          <input
-            type="datetime-local"
-            {...register("scheduledStart", {
-              required: "La fecha de inicio es obligatoria",
-            })}
-            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none transition focus:border-[#9e2727] focus:ring-2 focus:ring-[#9e2727]/10"
-          />
-          {errors.scheduledStart && (
-            <p className="mt-1 text-xs text-red-600">
-              {errors.scheduledStart.message}
-            </p>
-          )}
-        </div>
-
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Fin
-          </label>
-          <input
-            type="datetime-local"
-            {...register("scheduledEnd", {
-              required: "La fecha de fin es obligatoria",
-            })}
-            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none transition focus:border-[#9e2727] focus:ring-2 focus:ring-[#9e2727]/10"
-          />
-          {errors.scheduledEnd && (
-            <p className="mt-1 text-xs text-red-600">
-              {errors.scheduledEnd.message}
-            </p>
+            {generatedTitle}
+          </div>
+          <p className="mt-1 text-xs text-gray-500">
+            Se genera automáticamente para mantener un historial consistente.
+          </p>
+          {errors.title && (
+            <p className="mt-1 text-xs text-red-600">{errors.title.message}</p>
           )}
         </div>
       </div>
