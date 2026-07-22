@@ -17,6 +17,11 @@ import {
   LessonPreparationStatus,
   LessonBlockCompletionStatus,
 } from "@/lib/types/lesson";
+import {
+  calculateScheduledDurationMinutes,
+  calculateTotalActualMinutes,
+  calculateTotalEstimatedMinutes,
+} from "@/lib/utils/lesson-duration";
 
 interface RawLessonAttendee {
   studentId: Types.ObjectId;
@@ -145,6 +150,7 @@ export function toLessonDetailDTO(lesson: RawMongoLesson): LessonDetailDTO {
 
   const blocks: LessonBlockDTO[] = (lesson.blocks ?? []).map((block) => ({
     id: toId(block._id),
+    _id: toId(block._id),
     lineageId: block.lineageId,
 
     title: block.title,
@@ -190,6 +196,13 @@ export function toLessonDetailDTO(lesson: RawMongoLesson): LessonDetailDTO {
       : undefined,
   }));
 
+  const totalEstimatedMinutes = calculateTotalEstimatedMinutes(blocks);
+  const totalActualMinutes = calculateTotalActualMinutes(blocks);
+  const scheduledDurationMinutes = calculateScheduledDurationMinutes(
+    lesson.scheduledStart,
+    lesson.scheduledEnd,
+  );
+
   return {
     ...toLessonListDTO(lesson),
 
@@ -198,6 +211,9 @@ export function toLessonDetailDTO(lesson: RawMongoLesson): LessonDetailDTO {
 
     attendees,
     blocks,
+    totalEstimatedMinutes,
+    totalActualMinutes,
+    scheduledDurationMinutes,
 
     preparationNotes: lesson.preparationNotes,
     teacherNotes: lesson.teacherNotes,

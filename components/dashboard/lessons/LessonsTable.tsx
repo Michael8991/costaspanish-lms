@@ -122,7 +122,7 @@ export default function LessonsTable({ locale }: LessonTableProps) {
             className={`${btnBaseStyles} ${btnVariants.secondary}`}
           >
             <CalendarDays size={15} />
-            <span>Hoy</span>
+            <span>En el presente</span>
           </button>
 
           <button

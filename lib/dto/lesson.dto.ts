@@ -46,6 +46,7 @@ export interface LessonBlockOriginDTO {
 }
 
 export interface LessonBlockDTO {
+  id?: string;
   _id?: string;
   lineageId?: string;
 
@@ -98,6 +99,10 @@ export interface LessonListDTO {
 export interface LessonDetailDTO extends LessonListDTO {
   teacherId: string;
   courseId?: string;
+
+  totalEstimatedMinutes: number;
+  totalActualMinutes: number;
+  scheduledDurationMinutes: number;
 
   attendees: LessonAttendeeDTO[];
   blocks: LessonBlockDTO[];

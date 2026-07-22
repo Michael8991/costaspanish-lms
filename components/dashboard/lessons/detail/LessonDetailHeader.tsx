@@ -34,6 +34,11 @@ function getDeleteActionLabel(status: LessonStatus) {
   if (status === "in_progress") return "Anular clase";
   return "Archivar";
 }
+
+function formatMinutesValue(value: number, emptyLabel = "—") {
+  return value > 0 ? `${value} min` : emptyLabel;
+}
+
 export type RescheduleLessonPayload = {
   scheduledStart: string;
   scheduledEnd: string;
@@ -113,6 +118,7 @@ export default function LessonDetailHeader({
       setIsUpdatingPreparation(false);
     }
   };
+
   return (
     <>
       <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -168,6 +174,21 @@ export default function LessonDetailHeader({
                 {totalCredits === 1 ? "" : "s"}
               </span>
             </div>
+
+            <dl className="mt-4 grid max-w-2xl gap-2 sm:grid-cols-3">
+              <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+                <dt className="text-xs text-gray-500">Duración programada</dt>
+                <dd className="mt-0.5 text-sm font-semibold text-gray-900">
+                  {formatMinutesValue(lesson.totalEstimatedMinutes, "0 min")}
+                </dd>
+              </div>
+              <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+                <dt className="text-xs text-gray-500">Real trabajada</dt>
+                <dd className="mt-0.5 text-sm font-semibold text-gray-900">
+                  {formatMinutesValue(lesson.totalActualMinutes)}
+                </dd>
+              </div>
+            </dl>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
