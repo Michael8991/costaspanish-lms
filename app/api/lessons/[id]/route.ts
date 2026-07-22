@@ -310,7 +310,10 @@ export async function PATCH(
     }
 
     if (payload.blocks !== undefined) {
-      set.blocks = payload.blocks;
+      set.blocks = payload.blocks.map((block, index) => ({
+        ...block,
+        order: block.order ?? index,
+      }));
     }
 
     if (payload.preparationNotes !== undefined) {
@@ -332,10 +335,6 @@ export async function PATCH(
     if (payload.integration !== undefined) {
       set.integration = payload.integration;
     }
-    if (payload.blocks !== undefined) {
-      set.blocks = payload.blocks;
-    }
-
     if (Object.keys(set).length === 0) {
       return NextResponse.json(
         { ok: false, error: "No fields to update" },

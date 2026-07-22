@@ -62,6 +62,7 @@ export type AddLessonFormValues = {
 
   blocks: {
     lineageId?: string;
+    order?: number;
     title: string;
     type: string;
     cefrLevels: string[];
@@ -221,9 +222,12 @@ export default function AddLessonWizard({
   } = useFieldArray({ control: form.control, name: "blocks" });
 
   function createBlocksFromResources(resources: ResourceListItemDTO[]) {
-    resources.forEach((resource) => {
+    const currentBlockCount = form.getValues("blocks").length;
+
+    resources.forEach((resource, index) => {
       appendBlock({
         lineageId: createClientId(),
+        order: currentBlockCount + index,
         title: resource.title,
         type: getBlockTypeFromResource(resource),
         cefrLevels: resource.levels ?? [],
@@ -333,8 +337,9 @@ export default function AddLessonWizard({
         homeworkAssigned: values.homeworkAssigned,
         nextLessonFocus: values.nextLessonFocus,
 
-        blocks: values.blocks.map((block) => ({
+        blocks: values.blocks.map((block, index) => ({
           lineageId: block.lineageId,
+          order: block.order ?? index,
           title: block.title,
           type: block.type,
           cefrLevels: block.cefrLevels ?? [],

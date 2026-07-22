@@ -366,8 +366,9 @@ function ActualMinutesEditor({
 }
 
 function mapBlocksToPatchPayload(blocks: LessonBlockItem[]) {
-  return blocks.map((block) => ({
+  return blocks.map((block, index) => ({
     lineageId: block.lineageId,
+    order: block.order ?? index,
     title: block.title,
     type: block.type,
     cefrLevels: block.cefrLevels ?? [],
@@ -405,9 +406,7 @@ function mapBlocksToPatchPayload(blocks: LessonBlockItem[]) {
   }));
 }
 
-export default function LessonBlocksPanel({
-  lesson,
-}: LessonBlocksPanelProps) {
+export default function LessonBlocksPanel({ lesson }: LessonBlocksPanelProps) {
   const [blocks, setBlocks] = useState<LessonBlockItem[]>(
     () => lesson.blocks as LessonBlockItem[],
   );
@@ -521,7 +520,6 @@ export default function LessonBlocksPanel({
       carryOverToNextLesson: !(currentBlock.carryOverToNextLesson ?? false),
     });
   };
-
   return (
     <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
       <div className="mb-6 flex items-center justify-between gap-4">
@@ -711,7 +709,8 @@ export default function LessonBlocksPanel({
                             {block.origin.sourceBlockTitle &&
                               block.origin.sourceBlockTitle !== block.title && (
                                 <p className="mt-1 pl-[18px] text-blue-600">
-                                  Bloque original: {block.origin.sourceBlockTitle}
+                                  Bloque original:{" "}
+                                  {block.origin.sourceBlockTitle}
                                 </p>
                               )}
                           </div>

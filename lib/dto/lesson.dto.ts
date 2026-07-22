@@ -49,6 +49,7 @@ export interface LessonBlockDTO {
   id?: string;
   _id?: string;
   lineageId?: string;
+  order?: number;
 
   title: string;
   type: LessonBlockType;
@@ -161,8 +162,9 @@ export function mapLessonToFormValues(
     homeworkAssigned: lesson.homeworkAssigned ?? "",
     nextLessonFocus: lesson.nextLessonFocus ?? "",
 
-    blocks: lesson.blocks.map((block) => ({
+    blocks: lesson.blocks.map((block, index) => ({
       lineageId: block.lineageId,
+      order: block.order ?? index,
       title: block.title,
       type: block.type,
       cefrLevels: block.cefrLevels ?? [],

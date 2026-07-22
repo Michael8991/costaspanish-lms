@@ -36,9 +36,11 @@ function getPendingBlockKey(pendingBlock: PendingLessonBlock) {
 
 function buildBlockFromPendingBlock(
   pendingBlock: PendingLessonBlock,
+  order: number,
 ): AddLessonFormValues["blocks"][number] {
   return {
     lineageId: pendingBlock.block.lineageId ?? createClientId(),
+    order,
     title: pendingBlock.block.title,
     type: pendingBlock.block.type,
     cefrLevels: pendingBlock.block.cefrLevels ?? [],
@@ -323,6 +325,7 @@ export default function SecondStepAddLesson({
         onClick={() =>
           appendBlock({
             lineageId: createClientId(),
+            order: blockFields.length,
             title: "",
             type: "custom",
             cefrLevels: [],
@@ -411,7 +414,12 @@ export default function SecondStepAddLesson({
                         type="button"
                         disabled={isAdded}
                         onClick={() =>
-                          appendBlock(buildBlockFromPendingBlock(pendingBlock))
+                          appendBlock(
+                            buildBlockFromPendingBlock(
+                              pendingBlock,
+                              blockFields.length,
+                            ),
+                          )
                         }
                         className="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-lg border border-[#9e2727] bg-white px-3 py-2 text-xs font-medium text-[#9e2727] transition hover:bg-[#9e2727]/5 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-400"
                       >

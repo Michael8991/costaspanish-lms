@@ -131,6 +131,10 @@ export async function POST(req: NextRequest) {
 
     const payload = parsed.data;
     const { recurrence, ...basePayload } = payload;
+    const normalizedBlocks = basePayload.blocks.map((block, index) => ({
+      ...block,
+      order: block.order ?? index,
+    }));
 
     const isWholeLessonTrial =
       basePayload.attendees.length > 0 &&
@@ -280,6 +284,7 @@ export async function POST(req: NextRequest) {
 
     const currentLessonData = {
       ...basePayload,
+      blocks: normalizedBlocks,
       title: currentOccurrence.title,
       teacherId: currentUserObjectId,
       isTrial: isWholeLessonTrial,

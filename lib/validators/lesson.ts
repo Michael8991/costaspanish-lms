@@ -79,6 +79,7 @@ const lessonAttendeeSchema = z
   });
 export const lessonBlockSchema = z.object({
   lineageId: z.string().trim().min(1).optional(),
+  order: z.coerce.number().int().min(0).optional(),
   title: z.string().trim().min(1),
   type: z.enum(LESSON_BLOCK_TYPES),
 

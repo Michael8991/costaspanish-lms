@@ -85,6 +85,11 @@ const LessonBlockSchema = new Schema(
       required: false,
       index: true,
     },
+    order: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     title: {
       type: String,
       required: true,

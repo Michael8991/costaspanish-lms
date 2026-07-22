@@ -46,6 +46,7 @@ export interface LessonBlockOrigin {
 
 export interface LessonBlock{
     lineageId?: string;
+    order?: number;
     title: string;
     type: LessonBlockType;
 

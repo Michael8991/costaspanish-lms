@@ -85,8 +85,9 @@ function getReviewBlockKey(block: ReviewLessonBlock, index: number) {
 }
 
 function mapBlocksToPatchPayload(blocks: ReviewLessonBlock[]) {
-  return blocks.map((block) => ({
+  return blocks.map((block, index) => ({
     lineageId: block.lineageId,
+    order: block.order ?? index,
     title: block.title,
     type: block.type,
     cefrLevels: block.cefrLevels ?? [],

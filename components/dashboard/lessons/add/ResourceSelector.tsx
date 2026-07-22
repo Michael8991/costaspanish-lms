@@ -76,9 +76,6 @@ export default function ResourceSelector({
     });
   }
 
-  useEffect(() => {
-    console.log("Selected resources:", selectedResources);
-  }, [selectedResources]);
   return (
     <motion.div
       variants={listContainerVariants}
