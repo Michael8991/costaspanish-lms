@@ -219,6 +219,7 @@ export default function AddLessonWizard({
     fields: blockFields,
     append: appendBlock,
     remove: removeBlocks,
+    move: moveBlock,
   } = useFieldArray({ control: form.control, name: "blocks" });
 
   function createBlocksFromResources(resources: ResourceListItemDTO[]) {
@@ -339,7 +340,7 @@ export default function AddLessonWizard({
 
         blocks: values.blocks.map((block, index) => ({
           lineageId: block.lineageId,
-          order: block.order ?? index,
+          order: index,
           title: block.title,
           type: block.type,
           cefrLevels: block.cefrLevels ?? [],
@@ -459,6 +460,7 @@ export default function AddLessonWizard({
               blockFields={blockFields}
               appendBlock={appendBlock}
               removeBlock={removeBlocks}
+              moveBlock={moveBlock}
               lessonId={lessonId}
             />
           )}

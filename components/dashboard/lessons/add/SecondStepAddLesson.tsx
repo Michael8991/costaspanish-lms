@@ -12,6 +12,24 @@ import { formatLabel } from "@/lib/utils/lessonDetail-helpers";
 import { zonedDateTimeToISOString } from "@/lib/utils/time-zone";
 
 import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import type { DragEndEvent } from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+
+import {
   AudioLines,
   Blocks,
   BookOpen,
@@ -34,9 +52,11 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import {
   FieldArrayWithId,
   UseFieldArrayAppend,
+  UseFieldArrayMove,
   UseFieldArrayRemove,
   useFormContext,
   useWatch,
@@ -46,6 +66,7 @@ interface SecondStepAddLessonProps {
   blockFields: FieldArrayWithId<AddLessonFormValues, "blocks", "id">[];
   appendBlock: UseFieldArrayAppend<AddLessonFormValues, "blocks">;
   removeBlock: UseFieldArrayRemove;
+  moveBlock: UseFieldArrayMove;
   lessonId?: string;
 }
 
@@ -56,6 +77,60 @@ interface BlockTypeVisual {
   icon: LucideIcon;
   className: string;
   iconClassName: string;
+}
+
+interface SortableLessonBlockCardProps {
+  id: string;
+  isExpanded: boolean;
+  children: (dragHandle: ReactNode) => ReactNode;
+}
+
+function SortableLessonBlockCard({
+  id,
+  isExpanded,
+  children,
+}: SortableLessonBlockCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+  const dragHandle = (
+    <button
+      type="button"
+      {...attributes}
+      {...listeners}
+      onClick={(event) => event.stopPropagation()}
+      aria-label="Reordenar bloque"
+      title="Arrastra para reordenar"
+      className="flex w-10 shrink-0 touch-none cursor-grab items-center justify-center border-r border-slate-100 text-slate-400 transition hover:bg-slate-50 hover:text-slate-700 active:cursor-grabbing sm:w-11"
+    >
+      <GripVertical className="h-4 w-4" />
+    </button>
+  );
+
+  return (
+    <article
+      ref={setNodeRef}
+      style={style}
+      className={`overflow-hidden rounded-2xl border bg-white transition ${
+        isDragging
+          ? "relative z-10 border-[#9e2727]/30 opacity-70 shadow-lg ring-2 ring-[#9e2727]/20"
+          : isExpanded
+            ? "border-[#9e2727]/30 shadow-sm ring-2 ring-[#9e2727]/5"
+            : "border-slate-200 shadow-sm hover:border-slate-300 hover:shadow-md"
+      }`}
+    >
+      {children(dragHandle)}
+    </article>
+  );
 }
 
 function getBlockKey(block: LessonFormBlock, index: number, fieldId: string) {
@@ -255,6 +330,7 @@ export default function SecondStepAddLesson({
   blockFields,
   appendBlock,
   removeBlock,
+  moveBlock,
   lessonId,
 }: SecondStepAddLessonProps) {
   const [isPendingModalOpen, setIsPendingModalOpen] = useState(false);
@@ -271,9 +347,21 @@ export default function SecondStepAddLesson({
   );
   const {
     control,
+    getValues,
     register,
+    setValue,
     formState: { errors },
   } = useFormContext<AddLessonFormValues>();
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 6,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
 
   const attendees = useWatch({
     control,
@@ -343,6 +431,10 @@ export default function SecondStepAddLesson({
   );
   const hasPendingContext =
     Boolean(courseId) || uniqueSelectedStudentIds.length > 0;
+  const sortableItems = useMemo(
+    () => blockFields.map((field) => field.id),
+    [blockFields],
+  );
 
   useEffect(() => {
     const newFields = blockFields.filter(
@@ -378,6 +470,33 @@ export default function SecondStepAddLesson({
       }
 
       return next;
+    });
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = blockFields.findIndex(
+      (field) => field.id === active.id,
+    );
+    const newIndex = blockFields.findIndex((field) => field.id === over.id);
+
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reorderedBlocks = arrayMove(
+      getValues("blocks"),
+      oldIndex,
+      newIndex,
+    );
+
+    moveBlock(oldIndex, newIndex);
+    reorderedBlocks.forEach((_, index) => {
+      setValue(`blocks.${index}.order`, index, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
     });
   }
 
@@ -425,8 +544,17 @@ export default function SecondStepAddLesson({
         </div>
       )}
 
-      <div className="space-y-4">
-        {blockFields.map((field, index) => {
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={sortableItems}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="space-y-4">
+            {blockFields.map((field, index) => {
           const blockErrors = errors.blocks?.[index];
           const block = blocks?.[index] ?? field;
           const blockKey = getBlockKey(block, index, field.id);
@@ -434,37 +562,30 @@ export default function SecondStepAddLesson({
             expandedBlockKeys.has(blockKey) || Boolean(blockErrors);
           const blockTypeVisual = getBlockTypeVisual(block.type);
           const BlockIcon = blockTypeVisual.icon;
-          const displayOrder = block.order ?? index;
+          const displayOrder = index;
           const resourceCount = block.resources?.length ?? 0;
           const cefrLevels = block.cefrLevels ?? [];
           const skills = block.skills ?? [];
           const panelId = `lesson-block-panel-${field.id}`;
 
-          return (
-            <article
-              key={field.id}
-              className={`overflow-hidden rounded-2xl border bg-white shadow-sm transition ${
-                isExpanded
-                  ? "border-[#9e2727]/30 ring-2 ring-[#9e2727]/5"
-                  : "border-slate-200 hover:border-slate-300 hover:shadow-md"
-              }`}
-            >
-              <div className="flex items-stretch">
-                <span
-                  title="Ordenar próximamente"
-                  className="flex w-9 shrink-0 cursor-default items-center justify-center border-r border-slate-100 text-slate-300 sm:w-10"
-                  aria-hidden="true"
+              return (
+                <SortableLessonBlockCard
+                  key={field.id}
+                  id={field.id}
+                  isExpanded={isExpanded}
                 >
-                  <GripVertical className="h-4 w-4" />
-                </span>
+                  {(dragHandle) => (
+                    <>
+                      <div className="flex items-stretch">
+                        {dragHandle}
 
-                <button
-                  type="button"
-                  onClick={() => toggleExpandedBlock(blockKey)}
-                  aria-expanded={isExpanded}
-                  aria-controls={panelId}
-                  className="flex min-w-0 flex-1 cursor-pointer items-start gap-3 px-3 py-3 text-left sm:items-center sm:px-4"
-                >
+                        <button
+                          type="button"
+                          onClick={() => toggleExpandedBlock(blockKey)}
+                          aria-expanded={isExpanded}
+                          aria-controls={panelId}
+                          className="flex min-w-0 flex-1 cursor-pointer items-start gap-3 px-3 py-3 text-left sm:items-center sm:px-4"
+                        >
                   <span className="mt-0.5 shrink-0 font-mono text-xs font-semibold tracking-wider text-slate-400 sm:mt-0">
                     {formatBlockOrder(displayOrder)}
                   </span>
@@ -715,10 +836,14 @@ export default function SecondStepAddLesson({
                   </div>
                 </div>
               )}
-            </article>
-          );
-        })}
-      </div>
+                    </>
+                  )}
+                </SortableLessonBlockCard>
+              );
+            })}
+          </div>
+        </SortableContext>
+      </DndContext>
 
       <button
         type="button"
