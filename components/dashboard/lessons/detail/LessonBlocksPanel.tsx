@@ -1,6 +1,7 @@
 "use client";
 
 import { LessonDetailDTO } from "@/lib/dto/lesson.dto";
+import { getLessonBlockTypeVisual } from "@/lib/utils/lesson-block-visuals";
 import { formatLabel } from "@/lib/utils/lessonDetail-helpers";
 import {
   CheckCircle2,
@@ -13,6 +14,7 @@ import {
   Link2,
   MinusCircle,
   Music,
+  Paperclip,
   PlayCircle,
   RotateCcw,
   XCircle,
@@ -109,6 +111,10 @@ function getBlockKey(block: LessonBlockItem, index: number) {
   return block.id ?? block._id ?? `${index}-${block.title}`;
 }
 
+function formatBlockOrder(order: number) {
+  return String(order + 1).padStart(2, "0");
+}
+
 function getBlockCompletionStatus(
   block: LessonBlockItem,
 ): BlockCompletionStatus {
@@ -127,27 +133,32 @@ function formatOriginDate(value?: string) {
   }).format(date);
 }
 
-function getCompletionStatusLabel(status: BlockCompletionStatus) {
-  if (status === "completed") return "Completado";
-  if (status === "partially_completed") return "Parcial";
-  if (status === "skipped") return "Saltado";
-  return "Pendiente";
-}
-
-function getCompletionStatusClassName(status: BlockCompletionStatus) {
+function getCompletionStatusVisual(status?: BlockCompletionStatus) {
   if (status === "completed") {
-    return "bg-emerald-50 text-emerald-700 ring-emerald-100";
+    return {
+      label: "Completado",
+      className: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+    };
   }
 
   if (status === "partially_completed") {
-    return "bg-amber-50 text-amber-700 ring-amber-100";
+    return {
+      label: "Parcial",
+      className: "bg-amber-50 text-amber-700 ring-amber-100",
+    };
   }
 
   if (status === "skipped") {
-    return "bg-red-50 text-red-700 ring-red-100";
+    return {
+      label: "Saltado",
+      className: "bg-rose-50 text-rose-700 ring-rose-100",
+    };
   }
 
-  return "bg-gray-100 text-gray-600 ring-gray-200";
+  return {
+    label: "Pendiente",
+    className: "bg-gray-100 text-gray-700 ring-gray-200",
+  };
 }
 
 function BlockCompletionIcon({ status }: { status: BlockCompletionStatus }) {
@@ -425,6 +436,17 @@ export default function LessonBlocksPanel({ lesson }: LessonBlocksPanelProps) {
       blocks.flatMap((block) => block.resourceItems ?? []),
     );
   }, [blocks]);
+  const orderedBlocks = useMemo(
+    () =>
+      blocks
+        .map((block, index) => ({
+          block,
+          order: block.order ?? index,
+        }))
+        .sort((firstBlock, secondBlock) => firstBlock.order - secondBlock.order)
+        .map(({ block }) => block),
+    [blocks],
+  );
   const canOpenAllResources = allResourceItems.some((resource) => resource.url);
 
   const toggleExpandedBlock = (blockKey: string) => {
@@ -540,38 +562,61 @@ export default function LessonBlocksPanel({ lesson }: LessonBlocksPanelProps) {
       )}
 
       <div className="space-y-3">
-        {blocks.length === 0 ? (
+        {orderedBlocks.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-500">
             Esta lección todavía no tiene bloques.
           </div>
         ) : (
-          blocks.map((block, index) => {
+          orderedBlocks.map((block, index) => {
             const blockKey = getBlockKey(block, index);
             const blockResources = block.resourceItems ?? [];
+            const resourceCount =
+              blockResources.length || block.resources?.length || 0;
             const canOpenBlockResources = blockResources.some(
               (resource) => resource.url,
             );
             const isExpanded = expandedBlockKeys.has(blockKey);
             const isUpdating = updatingBlockKey === blockKey;
             const completionStatus = getBlockCompletionStatus(block);
+            const completionVisual =
+              getCompletionStatusVisual(completionStatus);
             const carryOverToNextLesson = block.carryOverToNextLesson ?? false;
             const originDate = formatOriginDate(block.origin?.sourceLessonDate);
+            const blockTypeVisual = getLessonBlockTypeVisual(block.type);
+            const BlockTypeIcon = blockTypeVisual.icon;
+            const displayOrder = block.order ?? index;
+            const displayedMinutes =
+              block.actualMinutes !== undefined
+                ? { label: "Real", value: block.actualMinutes }
+                : block.estimatedMinutes !== undefined
+                  ? { label: "Plan", value: block.estimatedMinutes }
+                  : null;
 
             return (
               <article
                 key={blockKey}
-                className="rounded-2xl border border-gray-200 bg-gray-50/70 p-4 transition hover:border-gray-300 hover:bg-white"
+                className={`overflow-hidden rounded-2xl border bg-white shadow-sm transition hover:shadow-md ${
+                  isExpanded
+                    ? "border-[#9e2727]/25 ring-2 ring-[#9e2727]/5"
+                    : "border-gray-200 hover:border-gray-300"
+                }`}
               >
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col gap-3 p-4">
+                  <div className="flex items-start justify-between gap-3">
                     <button
                       type="button"
                       onClick={() => toggleExpandedBlock(blockKey)}
-                      className="flex min-w-0 flex-1 cursor-pointer items-start gap-3 text-left"
+                      className="flex min-w-0 flex-1 cursor-pointer items-start gap-2.5 text-left sm:gap-3"
                     >
-                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-xs font-semibold text-gray-500 ring-1 ring-gray-200">
-                        {index + 1}
-                      </div>
+                      <span className="mt-2 shrink-0 font-mono text-xs font-semibold tracking-wider text-gray-400">
+                        {formatBlockOrder(displayOrder)}
+                      </span>
+
+                      <span
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${blockTypeVisual.iconClassName}`}
+                      >
+                        <BlockTypeIcon size={16} />
+                      </span>
 
                       <div className="min-w-0 flex-1">
                         <div className="mb-1 flex flex-wrap items-center gap-2">
@@ -580,42 +625,45 @@ export default function LessonBlocksPanel({ lesson }: LessonBlocksPanelProps) {
                           </h3>
 
                           <span
-                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${getCompletionStatusClassName(
-                              completionStatus,
-                            )}`}
+                            className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${blockTypeVisual.badgeClassName}`}
+                          >
+                            {blockTypeVisual.label}
+                          </span>
+
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${completionVisual.className}`}
                           >
                             <BlockCompletionIcon status={completionStatus} />
-                            {getCompletionStatusLabel(completionStatus)}
+                            {completionVisual.label}
                           </span>
 
                           {carryOverToNextLesson && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700 ring-1 ring-blue-100">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 ring-1 ring-inset ring-blue-100">
                               <RotateCcw size={11} />
                               Reutilizar
                             </span>
                           )}
                         </div>
 
-                        <p className="line-clamp-1 text-sm text-gray-500">
-                          {block.plannedContent || "Sin contenido planificado."}
+                        <p className="line-clamp-2 text-xs leading-5 text-gray-500 sm:text-sm">
+                          {block.plannedContent ||
+                            block.actualContent ||
+                            "Sin contenido planificado."}
                         </p>
 
-                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                          <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-gray-600 ring-1 ring-gray-200">
-                            {formatLabel(block.type)}
-                          </span>
-
-                          {block.estimatedMinutes ? (
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-gray-600">
+                          {displayedMinutes ? (
                             <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-gray-600 ring-1 ring-gray-200">
                               <Clock3 size={11} />
-                              {block.estimatedMinutes} min
+                              {displayedMinutes.label}: {displayedMinutes.value} min
                             </span>
                           ) : null}
 
-                          {blockResources.length > 0 ? (
-                            <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-gray-600 ring-1 ring-gray-200">
-                              {blockResources.length} recurso
-                              {blockResources.length === 1 ? "" : "s"}
+                          {resourceCount > 0 ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-gray-600 ring-1 ring-gray-200">
+                              <Paperclip size={11} />
+                              {resourceCount} recurso
+                              {resourceCount === 1 ? "" : "s"}
                             </span>
                           ) : null}
 
@@ -627,6 +675,25 @@ export default function LessonBlocksPanel({ lesson }: LessonBlocksPanelProps) {
                               {level}
                             </span>
                           ))}
+                          {block.cefrLevels.length > 2 && (
+                            <span className="font-medium text-gray-500">
+                              +{block.cefrLevels.length - 2}
+                            </span>
+                          )}
+
+                          {block.skills.slice(0, 2).map((skill) => (
+                            <span
+                              key={`${blockKey}-${skill}`}
+                              className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600"
+                            >
+                              {formatLabel(skill)}
+                            </span>
+                          ))}
+                          {block.skills.length > 2 && (
+                            <span className="font-medium text-gray-500">
+                              +{block.skills.length - 2}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </button>
@@ -634,6 +701,7 @@ export default function LessonBlocksPanel({ lesson }: LessonBlocksPanelProps) {
                     <button
                       type="button"
                       onClick={() => toggleExpandedBlock(blockKey)}
+                      aria-label={isExpanded ? "Plegar bloque" : "Abrir bloque"}
                       className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 transition hover:bg-gray-50"
                     >
                       <ChevronDown
