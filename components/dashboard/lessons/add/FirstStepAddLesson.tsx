@@ -2,6 +2,10 @@
 
 import type { AddLessonFormValues } from "@/app/[locale]/dashboard/lessons/add/AddLessonWizard";
 import LessonDateTimePicker from "@/components/dashboard/lessons/add/LessonDateTimePicker";
+import NewVoucherForm, {
+  type NewVoucherFormData,
+} from "@/components/dashboard/teacher/forms/NewVoucherForm";
+import CustomModal from "@/components/ui/CustomModal";
 import type { LessonStudent } from "@/lib/hooks/useLessonStudents";
 import { buildLessonTitle } from "@/lib/utils/lesson-title";
 import {
@@ -9,7 +13,7 @@ import {
   getCompatiblePlans,
   selectBestCompatiblePlan,
 } from "@/lib/utils/lesson-voucher";
-import { type ChangeEvent, useEffect, useMemo } from "react";
+import { type ChangeEvent, useEffect, useMemo, useState } from "react";
 import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
 
 function isNonEmptyString(value: string | undefined | null): value is string {
@@ -20,12 +24,24 @@ interface FirstStepAddLessonProps {
   students: LessonStudent[];
   isLoading: boolean;
   error: string | null;
+  onRefetchStudents: () => Promise<void>;
 }
+
+type QuickVoucherTarget = {
+  attendeeIndex: number;
+  studentId: string;
+};
+
+type CreatedVoucherResponse = {
+  error?: string;
+  activePlans?: LessonStudent["activePlans"];
+};
 
 export default function FirstStepAddLesson({
   students,
   isLoading,
   error,
+  onRefetchStudents,
 }: FirstStepAddLessonProps) {
   const {
     control,
@@ -33,6 +49,10 @@ export default function FirstStepAddLesson({
     setValue,
     formState: { errors },
   } = useFormContext<AddLessonFormValues>();
+  const [quickVoucherTarget, setQuickVoucherTarget] =
+    useState<QuickVoucherTarget | null>(null);
+  const [isCreatingVoucher, setIsCreatingVoucher] = useState(false);
+  const [createVoucherError, setCreateVoucherError] = useState("");
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -144,6 +164,82 @@ export default function FirstStepAddLesson({
       }
     });
   }, [attendees, classType, isLoading, setValue, students]);
+
+  const quickVoucherStudent = quickVoucherTarget
+    ? students.find(
+        (student) => student._id === quickVoucherTarget.studentId,
+      )
+    : undefined;
+
+  const closeQuickVoucherModal = () => {
+    setQuickVoucherTarget(null);
+    setCreateVoucherError("");
+  };
+
+  const createQuickVoucher = async (formData: NewVoucherFormData) => {
+    if (!quickVoucherTarget || !classType) {
+      setCreateVoucherError("Selecciona un alumno y un tipo de clase.");
+      return;
+    }
+
+    try {
+      setIsCreatingVoucher(true);
+      setCreateVoucherError("");
+
+      const response = await fetch(
+        `/api/students/${quickVoucherTarget.studentId}/plans`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+          cache: "no-store",
+        },
+      );
+      const responseData = (await response.json().catch(() => null)) as
+        | CreatedVoucherResponse
+        | null;
+
+      if (!response.ok) {
+        throw new Error(responseData?.error || "No se pudo crear el bono.");
+      }
+
+      const createdPlan = selectBestCompatiblePlan(
+        getCompatiblePlans(
+          { activePlans: responseData?.activePlans ?? [] },
+          classType,
+        ),
+      );
+      if (!createdPlan) {
+        throw new Error("El bono se creó, pero no se pudo seleccionarlo.");
+      }
+
+      await onRefetchStudents();
+      setValue(
+        `attendees.${quickVoucherTarget.attendeeIndex}.voucherId`,
+        createdPlan._id,
+        { shouldDirty: true, shouldValidate: true },
+      );
+      setValue(
+        `attendees.${quickVoucherTarget.attendeeIndex}.creditsToConsume`,
+        1,
+        { shouldDirty: true, shouldValidate: true },
+      );
+      setValue(
+        `attendees.${quickVoucherTarget.attendeeIndex}.isTrial`,
+        false,
+        { shouldDirty: true, shouldValidate: true },
+      );
+      closeQuickVoucherModal();
+    } catch (creationError) {
+      setCreateVoucherError(
+        creationError instanceof Error
+          ? creationError.message
+          : "No se pudo crear el bono.",
+      );
+    } finally {
+      setIsCreatingVoucher(false);
+    }
+  };
 
   return (
     <section className="space-y-5">
@@ -339,18 +435,37 @@ export default function FirstStepAddLesson({
                         ? "Selecciona un alumno."
                         : isTrial
                           ? "Trial"
+                          : isLoading
+                            ? "Comprobando bonos..."
                           : assignedPlan
                             ? formatAssignedVoucherLabel(assignedPlan)
                             : "Sin bono compatible"}
                   </div>
                   {classType &&
                     selectedStudentId &&
+                    selectedStudent &&
                     !isTrial &&
+                    !isLoading &&
                     compatiblePlans.length === 0 && (
-                      <p className="mt-1 text-xs text-amber-700">
-                        Este alumno no tiene bonos activos compatibles con este
-                        tipo de clase.
-                      </p>
+                      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs text-amber-700">
+                          Este alumno no tiene bonos activos compatibles con
+                          este tipo de clase.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCreateVoucherError("");
+                            setQuickVoucherTarget({
+                              attendeeIndex: index,
+                              studentId: selectedStudentId,
+                            });
+                          }}
+                          className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 transition hover:bg-amber-50"
+                        >
+                          Crear bono
+                        </button>
+                      </div>
                     )}
                   {!isTrial && compatiblePlans.length > 1 && (
                     <p className="mt-1 text-xs text-gray-500">
@@ -438,6 +553,29 @@ export default function FirstStepAddLesson({
           )}
         </div>
       </div>
+
+      <CustomModal
+        isOpen={Boolean(quickVoucherTarget && classType)}
+        onClose={closeQuickVoucherModal}
+        title="Crear bono"
+        maxWidth="md"
+      >
+        {quickVoucherTarget && classType && (
+          <NewVoucherForm
+            variant="quick"
+            student={
+              quickVoucherStudent?.fullName ||
+              quickVoucherStudent?.contactEmail ||
+              "Alumno"
+            }
+            initialClassType={classType}
+            onSubmitForm={createQuickVoucher}
+            isSubmitting={isCreatingVoucher}
+            submitError={createVoucherError}
+            onClose={closeQuickVoucherModal}
+          />
+        )}
+      </CustomModal>
     </section>
   );
 }

@@ -55,8 +55,6 @@ export default function LessonsTable({ locale }: LessonTableProps) {
 
         const rawText = await response.text();
 
-        console.log("Lessons API raw response:", rawText);
-
         let data = null;
 
         try {

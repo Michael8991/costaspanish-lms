@@ -108,7 +108,7 @@ export default function LessonDateTimePicker() {
   };
 
   return (
-    <div className="md:col-span-2 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+    <div className="md:col-span-2 mx-auto w-full max-w-3xl rounded-2xl border border-gray-200 bg-gray-50 p-3">
       <input
         type="hidden"
         {...register("scheduledStart", {
@@ -122,40 +122,40 @@ export default function LessonDateTimePicker() {
         })}
       />
 
-      <div className="mb-4">
+      <div className="mb-3">
         <h4 className="text-sm font-semibold text-gray-900">Fecha y hora</h4>
         <p className="mt-1 text-sm text-gray-500">
           Selecciona el día, la hora de inicio y la duración de la clase.
         </p>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.8fr)]">
-        <div className="rounded-2xl border border-gray-200 bg-white p-3">
-          <div className="mb-3 flex items-center justify-between">
+      <div className="grid gap-3 md:grid-cols-[280px_minmax(0,1fr)]">
+        <div className="w-full max-w-[280px] rounded-xl border border-gray-200 bg-white p-2">
+          <div className="mb-2 flex items-center justify-between">
             <button
               type="button"
               aria-label="Mes anterior"
               onClick={() => changeMonth(-1)}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 transition hover:bg-gray-50"
+              className="flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 text-xs text-gray-600 transition hover:bg-gray-50"
             >
               ←
             </button>
-            <p className="text-sm font-semibold text-gray-900">{monthLabel}</p>
+            <p className="text-xs font-semibold text-gray-900">{monthLabel}</p>
             <button
               type="button"
               aria-label="Mes siguiente"
               onClick={() => changeMonth(1)}
-              className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-600 transition hover:bg-gray-50"
+              className="flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 text-xs text-gray-600 transition hover:bg-gray-50"
             >
               →
             </button>
           </div>
 
-          <div className="grid grid-cols-7 gap-1 text-center">
+          <div className="grid grid-cols-7 gap-0.5 text-center">
             {weekdayLabels.map((weekday) => (
               <span
                 key={weekday}
-                className="py-1 text-xs font-medium text-gray-400"
+                className="py-0.5 text-[11px] font-medium text-gray-400"
               >
                 {weekday}
               </span>
@@ -172,7 +172,7 @@ export default function LessonDateTimePicker() {
                   aria-label={`Seleccionar ${day.dateValue}`}
                   aria-pressed={isSelected}
                   onClick={() => selectDate(day.dateValue)}
-                  className={`aspect-square rounded-lg text-sm transition ${
+                  className={`h-7 w-7 justify-self-center rounded-md text-xs transition sm:h-8 sm:w-8 ${
                     isSelected
                       ? "bg-[#9e2727] font-semibold text-white"
                       : isToday
@@ -189,9 +189,9 @@ export default function LessonDateTimePicker() {
           </div>
         </div>
 
-        <div className="space-y-5">
+        <div className="space-y-3">
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
               Hora de inicio
             </label>
             <div className="flex flex-wrap gap-2">
@@ -200,7 +200,7 @@ export default function LessonDateTimePicker() {
                   key={time}
                   type="button"
                   onClick={() => selectTime(time)}
-                  className={`rounded-lg border px-3 py-1.5 text-sm transition ${
+                  className={`rounded-md border px-2.5 py-1 text-xs transition ${
                     selectedTimeValue === time
                       ? "border-[#9e2727] bg-[#9e2727]/5 font-medium text-[#9e2727]"
                       : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
@@ -214,19 +214,19 @@ export default function LessonDateTimePicker() {
               type="time"
               value={selectedTimeValue}
               onChange={(event) => selectTime(event.target.value)}
-              className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-[#9e2727] focus:ring-2 focus:ring-[#9e2727]/10"
+              className="mt-1.5 w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-[#9e2727] focus:ring-2 focus:ring-[#9e2727]/10"
             />
           </div>
 
           <div>
-            <p className="mb-2 text-sm font-medium text-gray-700">Duración</p>
+            <p className="mb-1.5 text-sm font-medium text-gray-700">Duración</p>
             <div className="flex flex-wrap gap-2">
               {durationOptions.map((minutes) => (
                 <button
                   key={minutes}
                   type="button"
                   onClick={() => selectDuration(minutes)}
-                  className={`rounded-lg border px-3 py-1.5 text-sm transition ${
+                  className={`rounded-md border px-2.5 py-1 text-xs transition ${
                     durationMinutes === minutes
                       ? "border-[#9e2727] bg-[#9e2727]/5 font-medium text-[#9e2727]"
                       : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
@@ -238,7 +238,7 @@ export default function LessonDateTimePicker() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
+          <div className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-700">
             {scheduledStart && scheduledEnd ? (
               <>
                 <span className="font-medium">Horario:</span>{" "}

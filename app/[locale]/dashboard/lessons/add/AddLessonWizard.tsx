@@ -153,6 +153,7 @@ export default function AddLessonWizard({
     students,
     isLoading: isLoadingStudents,
     error: studentsError,
+    refetch: refetchStudents,
   } = useLessonStudents();
 
   const form = useForm<AddLessonFormValues>({
@@ -419,6 +420,7 @@ export default function AddLessonWizard({
               students={students}
               isLoading={isLoadingStudents}
               error={studentsError}
+              onRefetchStudents={refetchStudents}
             />
           )}
 
