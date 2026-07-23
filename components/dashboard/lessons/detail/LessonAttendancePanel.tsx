@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { LessonDetailDTO } from "@/lib/dto/lesson.dto";
 import { formatLabel } from "@/lib/utils/lessonDetail-helpers";
+import { normalizeLessonBlockCategories } from "@/lib/utils/lesson-block-categories";
 import CustomModal from "@/components/ui/CustomModal";
 import {
   CheckCircle2,
@@ -90,6 +91,10 @@ function mapBlocksToPatchPayload(blocks: ReviewLessonBlock[]) {
     order: block.order ?? index,
     title: block.title,
     type: block.type,
+    categories: normalizeLessonBlockCategories(
+      block.type,
+      block.categories,
+    ),
     cefrLevels: block.cefrLevels ?? [],
     skills: block.skills ?? [],
     tags: block.tags ?? [],

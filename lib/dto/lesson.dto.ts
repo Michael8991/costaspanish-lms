@@ -9,6 +9,7 @@ import {
   LessonSkill,
   LessonStatus,
 } from "@/lib/types/lesson";
+import { normalizeLessonBlockCategories } from "@/lib/utils/lesson-block-categories";
 import { isoToDatetimeLocalValue } from "@/lib/utils/time-zone";
 
 export interface LessonBlockResourceDTO{
@@ -53,6 +54,7 @@ export interface LessonBlockDTO {
 
   title: string;
   type: LessonBlockType;
+  categories?: LessonBlockType[];
 
   cefrLevels: CefrLevel[];
   skills: LessonSkill[];
@@ -167,6 +169,10 @@ export function mapLessonToFormValues(
       order: block.order ?? index,
       title: block.title,
       type: block.type,
+      categories: normalizeLessonBlockCategories(
+        block.type,
+        block.categories,
+      ),
       cefrLevels: block.cefrLevels ?? [],
       skills: block.skills ?? [],
       tags: block.tags ?? [],

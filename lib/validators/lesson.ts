@@ -77,42 +77,50 @@ const lessonAttendeeSchema = z
       creditsToConsume: 0,
     };
   });
-export const lessonBlockSchema = z.object({
-  lineageId: z.string().trim().min(1).optional(),
-  order: z.coerce.number().int().min(0).optional(),
-  title: z.string().trim().min(1),
-  type: z.enum(LESSON_BLOCK_TYPES),
+export const lessonBlockSchema = z
+  .object({
+    lineageId: z.string().trim().min(1).optional(),
+    order: z.coerce.number().int().min(0).optional(),
+    title: z.string().trim().min(1),
+    type: z.enum(LESSON_BLOCK_TYPES),
+    categories: z.array(z.enum(LESSON_BLOCK_TYPES)).optional(),
 
-  cefrLevels: z.array(z.enum(CEFR_LEVELS)).default([]),
-  skills: z.array(z.enum(LESSON_SKILLS)).default([]),
-  tags: z.array(z.string().trim().min(1)).default([]),
-  resources: z.array(objectIdSchema).default([]),
+    cefrLevels: z.array(z.enum(CEFR_LEVELS)).default([]),
+    skills: z.array(z.enum(LESSON_SKILLS)).default([]),
+    tags: z.array(z.string().trim().min(1)).default([]),
+    resources: z.array(objectIdSchema).default([]),
 
-  plannedContent: z.string().trim().min(1),
-  actualContent: z.string().trim().optional(),
+    plannedContent: z.string().trim().min(1),
+    actualContent: z.string().trim().optional(),
 
-  plannedObjectives: z.array(z.string().trim().min(1)).default([]),
-  achievedObjectives: z.array(z.string().trim().min(1)).default([]),
+    plannedObjectives: z.array(z.string().trim().min(1)).default([]),
+    achievedObjectives: z.array(z.string().trim().min(1)).default([]),
 
-  estimatedMinutes: z.coerce.number().min(0).optional(),
-  actualMinutes: z.coerce.number().min(0).optional(),
+    estimatedMinutes: z.coerce.number().min(0).optional(),
+    actualMinutes: z.coerce.number().min(0).optional(),
 
-  blockSuccessRating: z.coerce.number().min(1).max(5).optional(),
-  studentDifficultyLevel: z.coerce.number().min(1).max(5).optional(),
-  engagementLevel: z.coerce.number().min(1).max(5).optional(),
-  completionStatus: z
-  .enum(LESSON_BLOCK_COMPLETION_STATUSES)
-  .default("not_completed"),
+    blockSuccessRating: z.coerce.number().min(1).max(5).optional(),
+    studentDifficultyLevel: z.coerce.number().min(1).max(5).optional(),
+    engagementLevel: z.coerce.number().min(1).max(5).optional(),
+    completionStatus: z
+      .enum(LESSON_BLOCK_COMPLETION_STATUSES)
+      .default("not_completed"),
 
-  carryOverToNextLesson: z.boolean().default(false),
+    carryOverToNextLesson: z.boolean().default(false),
 
-  errorCategories: z.array(z.enum(LESSON_ERROR_CATEGORIES)).default([]),
+    errorCategories: z.array(z.enum(LESSON_ERROR_CATEGORIES)).default([]),
 
-  studentDifficultiesText: z.string().trim().optional(),
-  teacherReflection: z.string().trim().optional(),
-  nextStepSuggestion: z.string().trim().optional(),
-  origin: lessonBlockOriginSchema.optional(),
-});
+    studentDifficultiesText: z.string().trim().optional(),
+    teacherReflection: z.string().trim().optional(),
+    nextStepSuggestion: z.string().trim().optional(),
+    origin: lessonBlockOriginSchema.optional(),
+  })
+  .transform((block) => ({
+    ...block,
+    categories: Array.from(
+      new Set([block.type, ...(block.categories ?? [])]),
+    ),
+  }));
 
 const lessonBaseSchema = z.object({
   courseId: objectIdSchema.optional(),

@@ -22,6 +22,7 @@ import {
   calculateTotalActualMinutes,
   calculateTotalEstimatedMinutes,
 } from "@/lib/utils/lesson-duration";
+import { normalizeLessonBlockCategories } from "@/lib/utils/lesson-block-categories";
 
 interface RawLessonAttendee {
   studentId: Types.ObjectId;
@@ -38,6 +39,7 @@ interface RawLessonBlock {
 
   title: string;
   type: LessonBlockType;
+  categories?: LessonBlockType[];
 
   cefrLevels?: CefrLevel[];
   skills?: LessonSkill[];
@@ -158,6 +160,10 @@ export function toLessonDetailDTO(lesson: RawMongoLesson): LessonDetailDTO {
 
       title: block.title,
       type: block.type,
+      categories: normalizeLessonBlockCategories(
+        block.type,
+        block.categories,
+      ),
 
       cefrLevels: block.cefrLevels ?? [],
       skills: block.skills ?? [],

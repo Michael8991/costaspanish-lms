@@ -18,7 +18,8 @@ import { useRouter } from "next/navigation";
 import { zonedDateTimeToISOString } from "@/lib/utils/time-zone";
 import { createClientId } from "@/components/dashboard/lessons/add/createClientId";
 import { useLessonStudents } from "@/lib/hooks/useLessonStudents";
-import type { LessonClassType } from "@/lib/types/lesson";
+import type { LessonBlockType, LessonClassType } from "@/lib/types/lesson";
+import { normalizeLessonBlockCategories } from "@/lib/utils/lesson-block-categories";
 import { buildLessonTitle } from "@/lib/utils/lesson-title";
 import { getCompatiblePlans } from "@/lib/utils/lesson-voucher";
 import type { WeekdayValue } from "@/lib/utils/lesson-recurrence";
@@ -64,7 +65,8 @@ export type AddLessonFormValues = {
     lineageId?: string;
     order?: number;
     title: string;
-    type: string;
+    type: LessonBlockType;
+    categories?: LessonBlockType[];
     cefrLevels: string[];
     skills: string[];
     tags: string[];
@@ -226,11 +228,14 @@ export default function AddLessonWizard({
     const currentBlockCount = form.getValues("blocks").length;
 
     resources.forEach((resource, index) => {
+      const blockType = getBlockTypeFromResource(resource);
+
       appendBlock({
         lineageId: createClientId(),
         order: currentBlockCount + index,
         title: resource.title,
-        type: getBlockTypeFromResource(resource),
+        type: blockType,
+        categories: [blockType],
         cefrLevels: resource.levels ?? [],
         skills: resource.skills ?? [],
         tags: resource.tags ?? [],
@@ -343,6 +348,10 @@ export default function AddLessonWizard({
           order: index,
           title: block.title,
           type: block.type,
+          categories: normalizeLessonBlockCategories(
+            block.type,
+            block.categories,
+          ),
           cefrLevels: block.cefrLevels ?? [],
           skills: block.skills ?? [],
           tags: block.tags ?? [],

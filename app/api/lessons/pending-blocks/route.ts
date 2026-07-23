@@ -4,6 +4,8 @@ import { z } from "zod";
 import { requireAuth, requireRole } from "@/lib/auth/apiAuth";
 import { getCurrentUserObjectId } from "@/lib/auth/getCurrentUserObjectId";
 import dbConnect from "@/lib/mongo";
+import type { LessonBlockType } from "@/lib/types/lesson";
+import { normalizeLessonBlockCategories } from "@/lib/utils/lesson-block-categories";
 import Lesson from "@/models/Lesson";
 
 const pendingBlocksRequestSchema = z.object({
@@ -21,7 +23,8 @@ type PendingRawBlock = {
   _id?: Types.ObjectId;
   lineageId?: string;
   title: string;
-  type: string;
+  type: LessonBlockType;
+  categories?: LessonBlockType[];
   cefrLevels?: string[];
   skills?: string[];
   tags?: string[];
@@ -64,7 +67,8 @@ type PendingBlockItem = {
   block: {
     lineageId: string;
     title: string;
-    type: string;
+    type: LessonBlockType;
+    categories: LessonBlockType[];
     cefrLevels: string[];
     skills: string[];
     tags: string[];
@@ -224,6 +228,10 @@ export async function POST(req: NextRequest) {
             lineageId: lineageKey,
             title: block.title,
             type: block.type,
+            categories: normalizeLessonBlockCategories(
+              block.type,
+              block.categories,
+            ),
             cefrLevels: block.cefrLevels ?? [],
             skills: block.skills ?? [],
             tags: block.tags ?? [],
@@ -243,7 +251,7 @@ export async function POST(req: NextRequest) {
       .filter(
         (item) =>
           item.block.carryOverToNextLesson ||
-          item.block.completionStatus !== "completed",
+          !["completed", "skipped"].includes(item.block.completionStatus),
       )
       .sort((first, second) => {
         const dateDifference =

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import type { LessonBlockType } from "@/lib/types/lesson";
 
 export type PendingLessonBlock = {
   sourceLessonId: string;
@@ -18,7 +19,8 @@ export type PendingLessonBlock = {
   block: {
     lineageId?: string;
     title: string;
-    type: string;
+    type: LessonBlockType;
+    categories?: LessonBlockType[];
     cefrLevels: string[];
     skills: string[];
     tags: string[];

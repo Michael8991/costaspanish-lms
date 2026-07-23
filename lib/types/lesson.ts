@@ -49,6 +49,7 @@ export interface LessonBlock{
     order?: number;
     title: string;
     type: LessonBlockType;
+    categories?: LessonBlockType[];
 
     cerfLevels: CefrLevel[];
     skills: LessonSkill[];

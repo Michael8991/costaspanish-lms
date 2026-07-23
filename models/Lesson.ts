@@ -100,6 +100,11 @@ const LessonBlockSchema = new Schema(
       enum: LESSON_BLOCK_TYPES,
       required: true,
     },
+    categories: {
+      type: [String],
+      enum: LESSON_BLOCK_TYPES,
+      default: undefined,
+    },
 
     cefrLevels: {
       type: [String],

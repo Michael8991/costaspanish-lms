@@ -1,6 +1,10 @@
 "use client";
 
 import { LessonDetailDTO } from "@/lib/dto/lesson.dto";
+import {
+  getSecondaryLessonBlockCategories,
+  normalizeLessonBlockCategories,
+} from "@/lib/utils/lesson-block-categories";
 import { getLessonBlockTypeVisual } from "@/lib/utils/lesson-block-visuals";
 import { formatLabel } from "@/lib/utils/lessonDetail-helpers";
 import {
@@ -45,6 +49,7 @@ type BlockPartialUpdate = Partial<{
   lineageId: LessonBlockItem["lineageId"];
   title: LessonBlockItem["title"];
   type: LessonBlockItem["type"];
+  categories: LessonBlockItem["categories"];
   cefrLevels: LessonBlockItem["cefrLevels"];
   skills: LessonBlockItem["skills"];
   tags: LessonBlockItem["tags"];
@@ -382,6 +387,10 @@ function mapBlocksToPatchPayload(blocks: LessonBlockItem[]) {
     order: block.order ?? index,
     title: block.title,
     type: block.type,
+    categories: normalizeLessonBlockCategories(
+      block.type,
+      block.categories,
+    ),
     cefrLevels: block.cefrLevels ?? [],
     skills: block.skills ?? [],
     tags: block.tags ?? [],
@@ -584,6 +593,11 @@ export default function LessonBlocksPanel({ lesson }: LessonBlocksPanelProps) {
             const originDate = formatOriginDate(block.origin?.sourceLessonDate);
             const blockTypeVisual = getLessonBlockTypeVisual(block.type);
             const BlockTypeIcon = blockTypeVisual.icon;
+            const secondaryCategories =
+              getSecondaryLessonBlockCategories(
+                block.type,
+                block.categories,
+              );
             const displayOrder = block.order ?? index;
             const displayedMinutes =
               block.actualMinutes !== undefined
@@ -629,6 +643,22 @@ export default function LessonBlocksPanel({ lesson }: LessonBlocksPanelProps) {
                           >
                             {blockTypeVisual.label}
                           </span>
+
+                          {secondaryCategories
+                            .slice(0, 2)
+                            .map((category) => (
+                              <span
+                                key={`${blockKey}-${category}`}
+                                className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600 ring-1 ring-inset ring-gray-200"
+                              >
+                                {getLessonBlockTypeVisual(category).label}
+                              </span>
+                            ))}
+                          {secondaryCategories.length > 2 && (
+                            <span className="text-[10px] font-medium text-gray-500">
+                              +{secondaryCategories.length - 2}
+                            </span>
+                          )}
 
                           <span
                             className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${completionVisual.className}`}
