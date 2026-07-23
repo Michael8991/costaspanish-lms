@@ -394,7 +394,7 @@ function mapBlocksToPatchPayload(blocks: LessonBlockItem[]) {
     cefrLevels: block.cefrLevels ?? [],
     skills: block.skills ?? [],
     tags: block.tags ?? [],
-    resources: block.resources ?? [],
+    resources: Array.from(new Set(block.resources ?? [])),
     plannedContent: block.plannedContent,
 
     completionStatus: getBlockCompletionStatus(block),

@@ -5,12 +5,15 @@ import { useResources } from "@/lib/hooks/useResources";
 import { motion } from "framer-motion";
 import {
   Check,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Clock3,
+  Eye,
   ExternalLink,
   Loader2,
   Plus,
+  Repeat2,
   Search,
 } from "lucide-react";
 import {
@@ -28,13 +31,37 @@ import { useEffect, useMemo, useState } from "react";
 interface ResourceSelectorProps {
   onClose: () => void;
   locale: string;
-  onCreateBlocks: (resources: ResourceListItemDTO[]) => void;
+  onConfirmResources: (resources: ResourceListItemDTO[]) => void;
+  confirmAction: "create_blocks" | "add_to_block";
+  currentBlockResourceIds?: string[];
+  lessonResourceIds?: string[];
+  studentIds?: string[];
+  beforeDate?: string;
+  currentLessonId?: string;
 }
+
+type ResourceUsageItem = {
+  resourceId: string;
+  timesSeen: number;
+  lastSeenAt: string;
+  lastSeenLessonTitle: string;
+  seenByStudentIds: string[];
+};
+
+type ResourceUsageApiResponse = {
+  items?: ResourceUsageItem[];
+};
 
 export default function ResourceSelector({
   onClose,
   locale,
-  onCreateBlocks,
+  onConfirmResources,
+  confirmAction,
+  currentBlockResourceIds = [],
+  lessonResourceIds = [],
+  studentIds = [],
+  beforeDate,
+  currentLessonId,
 }: ResourceSelectorProps) {
   const {
     resources,
@@ -62,8 +89,81 @@ export default function ResourceSelector({
   const selectedResourceIdSet = useMemo(() => {
     return new Set(selectedResources.map((resource) => resource.id));
   }, [selectedResources]);
+  const currentBlockResourceIdSet = useMemo(
+    () => new Set(currentBlockResourceIds),
+    [currentBlockResourceIds],
+  );
+  const lessonResourceIdSet = useMemo(
+    () => new Set(lessonResourceIds),
+    [lessonResourceIds],
+  );
+  const [usageByResourceId, setUsageByResourceId] = useState<
+    Map<string, ResourceUsageItem>
+  >(() => new Map());
+  const visibleResourceIdsKey = resources
+    .map((resource) => resource.id)
+    .sort()
+    .join(",");
+  const studentIdsKey = Array.from(new Set(studentIds)).sort().join(",");
+  const selectedStudentCount = studentIdsKey
+    ? studentIdsKey.split(",").length
+    : 0;
+
+  useEffect(() => {
+    const visibleResourceIds = visibleResourceIdsKey
+      ? visibleResourceIdsKey.split(",")
+      : [];
+    const normalizedStudentIds = studentIdsKey ? studentIdsKey.split(",") : [];
+
+    if (
+      visibleResourceIds.length === 0 ||
+      normalizedStudentIds.length === 0 ||
+      !beforeDate
+    ) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const loadResourceUsage = async () => {
+      try {
+        const response = await fetch("/api/resources/usage", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            resourceIds: visibleResourceIds,
+            studentIds: normalizedStudentIds,
+            beforeDate,
+            excludeLessonId: currentLessonId,
+          }),
+          signal: controller.signal,
+        });
+        const data = (await response
+          .json()
+          .catch(() => null)) as ResourceUsageApiResponse | null;
+
+        if (!response.ok) return;
+
+        setUsageByResourceId(
+          new Map(
+            (data?.items ?? []).map((usage) => [usage.resourceId, usage]),
+          ),
+        );
+      } catch {
+        if (!controller.signal.aborted) {
+          setUsageByResourceId(new Map());
+        }
+      }
+    };
+
+    void loadResourceUsage();
+
+    return () => controller.abort();
+  }, [beforeDate, currentLessonId, studentIdsKey, visibleResourceIdsKey]);
 
   function toggleResource(resource: ResourceListItemDTO) {
+    if (currentBlockResourceIdSet.has(resource.id)) return;
+
     setSelectedResources((currentResources) => {
       const alreadySelected = currentResources.some(
         (item) => item.id === resource.id,
@@ -112,6 +212,10 @@ export default function ResourceSelector({
         ) : (
           resources.map((resource) => {
             const isSelected = selectedResourceIdSet.has(resource.id);
+            const isInCurrentBlock = currentBlockResourceIdSet.has(resource.id);
+            const isUsedInLesson =
+              !isInCurrentBlock && lessonResourceIdSet.has(resource.id);
+            const usage = usageByResourceId.get(resource.id);
             const isArchived = resource.status === "archived";
             const detailHref = `/${locale}/dashboard/resources/${resource.id}`;
 
@@ -130,9 +234,13 @@ export default function ResourceSelector({
                 key={resource.id}
                 variants={listRowVariants}
                 className={`group flex items-center gap-4 rounded-2xl border px-4 py-3 transition ${
-                  isSelected
-                    ? "border-[#9e2727]/60 bg-[#9e2727]/10"
-                    : "border-slate-600/50 bg-slate-800/50 hover:border-slate-500/70 hover:bg-slate-800"
+                  isInCurrentBlock
+                    ? "border-emerald-500/30 bg-emerald-500/10"
+                    : isSelected
+                      ? "border-[#9e2727]/60 bg-[#9e2727]/10"
+                      : isUsedInLesson
+                        ? "border-amber-500/25 bg-amber-500/5 hover:border-amber-500/40"
+                        : "border-slate-600/50 bg-slate-800/50 hover:border-slate-500/70 hover:bg-slate-800"
                 } ${isArchived ? "pointer-events-none opacity-40" : ""}`}
               >
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-700/70 text-slate-300">
@@ -140,10 +248,31 @@ export default function ResourceSelector({
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <p className="truncate text-sm text-slate-100">
                       {resource.title}
                     </p>
+
+                    {isInCurrentBlock && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-200">
+                        <CheckCircle2 size={11} />
+                        Ya añadido
+                      </span>
+                    )}
+
+                    {isUsedInLesson && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-200">
+                        <Repeat2 size={11} />
+                        Usado en esta clase
+                      </span>
+                    )}
+
+                    {usage && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-red-400/20 bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-200">
+                        <Eye size={11} />
+                        Visto
+                      </span>
+                    )}
 
                     {resource.levels?.slice(0, 2).map((level) => (
                       <span
@@ -180,6 +309,23 @@ export default function ResourceSelector({
                       </span>
                     ))}
                   </div>
+
+                  {usage && (
+                    <p
+                      className="mt-1.5 truncate text-[11px] text-red-200/65"
+                      title={usage.lastSeenLessonTitle}
+                    >
+                      {usage.seenByStudentIds.length === selectedStudentCount
+                        ? "Visto por todos"
+                        : `Visto por ${usage.seenByStudentIds.length}/${selectedStudentCount} alumnos`}
+                      {" · "}
+                      Última vez{" "}
+                      {new Intl.DateTimeFormat("es-ES", {
+                        day: "numeric",
+                        month: "short",
+                      }).format(new Date(usage.lastSeenAt))}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex shrink-0 items-center gap-2">
@@ -195,18 +341,26 @@ export default function ResourceSelector({
 
                   <button
                     type="button"
+                    disabled={isInCurrentBlock}
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
                       toggleResource(resource);
                     }}
-                    className={`cursor-pointer flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs transition ${
-                      isSelected
-                        ? "border-[#9e2727] bg-[#9e2727] text-white hover:bg-[#8d2323]"
-                        : "border-slate-600 bg-slate-700/40 text-slate-300 hover:bg-slate-700"
+                    className={`flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs transition ${
+                      isInCurrentBlock
+                        ? "cursor-not-allowed border-emerald-400/15 bg-emerald-500/10 text-emerald-200/60"
+                        : isSelected
+                          ? "border-[#9e2727] bg-[#9e2727] text-white hover:bg-[#8d2323]"
+                          : "cursor-pointer border-slate-600 bg-slate-700/40 text-slate-300 hover:bg-slate-700"
                     }`}
                   >
-                    {isSelected ? (
+                    {isInCurrentBlock ? (
+                      <>
+                        <CheckCircle2 size={13} />
+                        Ya añadido
+                      </>
+                    ) : isSelected ? (
                       <>
                         <Check size={13} />
                         Quitar
@@ -267,13 +421,15 @@ export default function ResourceSelector({
             type="button"
             disabled={selectedResources.length === 0}
             onClick={() => {
-              onCreateBlocks(selectedResources);
+              onConfirmResources(selectedResources);
               setSelectedResources([]);
               onClose();
             }}
             className="cursor-pointer rounded-xl border border-[#9e2727]/70 bg-[#9e2727] px-4 py-2 text-sm text-white transition hover:bg-[#8d2323] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Crear {selectedResources.length} bloques
+            {confirmAction === "create_blocks"
+              ? `Crear ${selectedResources.length} bloques`
+              : `Añadir ${selectedResources.length} recursos`}
           </button>
         </div>
       </div>

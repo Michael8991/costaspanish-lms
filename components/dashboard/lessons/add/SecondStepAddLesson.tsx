@@ -2,10 +2,12 @@
 
 import type { AddLessonFormValues } from "@/app/[locale]/dashboard/lessons/add/AddLessonWizard";
 import { createClientId } from "@/components/dashboard/lessons/add/createClientId";
+import ResourceSelector from "@/components/dashboard/lessons/add/ResourceSelector";
 import { usePendingLessonBlocks } from "@/components/dashboard/lessons/add/usePendingLessonBlocks";
 import type { PendingLessonBlock } from "@/components/dashboard/lessons/add/usePendingLessonBlocks";
 import CustomModal from "@/components/ui/CustomModal";
 import { LESSON_BLOCK_TYPES } from "@/lib/constants/lesson.constants";
+import type { ResourceListItemDTO } from "@/lib/dto/resource.dto";
 import type { LessonBlockType } from "@/lib/types/lesson";
 import {
   getSecondaryLessonBlockCategories,
@@ -57,6 +59,7 @@ import {
 } from "react-hook-form";
 
 interface SecondStepAddLessonProps {
+  locale: string;
   blockFields: FieldArrayWithId<AddLessonFormValues, "blocks", "id">[];
   appendBlock: UseFieldArrayAppend<AddLessonFormValues, "blocks">;
   removeBlock: UseFieldArrayRemove;
@@ -232,6 +235,7 @@ function getPendingCompletionStatusVisual(status: string) {
 }
 
 export default function SecondStepAddLesson({
+  locale,
   blockFields,
   appendBlock,
   removeBlock,
@@ -239,6 +243,9 @@ export default function SecondStepAddLesson({
   lessonId,
 }: SecondStepAddLessonProps) {
   const [isPendingModalOpen, setIsPendingModalOpen] = useState(false);
+  const [resourceBlockFieldId, setResourceBlockFieldId] = useState<
+    string | null
+  >(null);
   const [discardingBlockKey, setDiscardingBlockKey] = useState<string | null>(
     null,
   );
@@ -309,6 +316,20 @@ export default function SecondStepAddLesson({
     () => getPendingReferenceDate(scheduledStart, timezone),
     [scheduledStart, timezone],
   );
+  const lessonResourceIds = useMemo(
+    () =>
+      Array.from(
+        new Set((blocks ?? []).flatMap((block) => block.resources ?? [])),
+      ),
+    [blocks],
+  );
+  const resourceBlockIndex = resourceBlockFieldId
+    ? blockFields.findIndex((field) => field.id === resourceBlockFieldId)
+    : -1;
+  const currentBlockResourceIds =
+    resourceBlockIndex >= 0
+      ? (blocks?.[resourceBlockIndex]?.resources ?? [])
+      : [];
   const {
     items: pendingBlocks,
     meta: pendingBlocksMeta,
@@ -440,6 +461,24 @@ export default function SecondStepAddLesson({
       shouldValidate: true,
     });
     setValue(`blocks.${index}.categories`, nextCategories, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  }
+
+  function addResourcesToBlock(resources: ResourceListItemDTO[]) {
+    if (resourceBlockIndex < 0) return;
+
+    const currentResources =
+      getValues(`blocks.${resourceBlockIndex}.resources`) ?? [];
+    const nextResources = Array.from(
+      new Set([
+        ...currentResources,
+        ...resources.map((resource) => resource.id),
+      ]),
+    );
+
+    setValue(`blocks.${resourceBlockIndex}.resources`, nextResources, {
       shouldDirty: true,
       shouldValidate: true,
     });
@@ -830,9 +869,16 @@ export default function SecondStepAddLesson({
                                 {resourceCount}{" "}
                                 {resourceCount === 1 ? "recurso" : "recursos"}
                               </span>
-                              <span className="mt-1 block text-xs text-slate-400">
-                                Añade materiales desde el toolbox de recursos.
-                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setResourceBlockFieldId(field.id)
+                                }
+                                className="mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-600 transition hover:border-[#9e2727]/30 hover:bg-[#9e2727]/5 hover:text-[#9e2727]"
+                              >
+                                <Plus className="h-3.5 w-3.5" />
+                                Añadir recursos
+                              </button>
                             </div>
                           </div>
 
@@ -913,6 +959,27 @@ export default function SecondStepAddLesson({
         <Plus className="h-4 w-4" />
         Añadir bloque de contenido
       </button>
+
+      <CustomModal
+        isOpen={resourceBlockFieldId !== null}
+        onClose={() => setResourceBlockFieldId(null)}
+        title="Añadir recursos al bloque"
+        maxWidth="5xl"
+      >
+        <div className="p-4">
+          <ResourceSelector
+            locale={locale}
+            onConfirmResources={addResourcesToBlock}
+            confirmAction="add_to_block"
+            currentBlockResourceIds={currentBlockResourceIds}
+            lessonResourceIds={lessonResourceIds}
+            studentIds={uniqueSelectedStudentIds}
+            beforeDate={pendingReferenceDate}
+            currentLessonId={lessonId}
+            onClose={() => setResourceBlockFieldId(null)}
+          />
+        </div>
+      </CustomModal>
 
       <CustomModal
         isOpen={isPendingModalOpen}

@@ -120,6 +120,7 @@ export const lessonBlockSchema = z
     categories: Array.from(
       new Set([block.type, ...(block.categories ?? [])]),
     ),
+    resources: Array.from(new Set(block.resources)),
   }));
 
 const lessonBaseSchema = z.object({

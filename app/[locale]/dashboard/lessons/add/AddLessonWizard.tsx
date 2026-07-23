@@ -3,7 +3,7 @@
 import FirstStepAddLesson from "@/components/dashboard/lessons/add/FirstStepAddLesson";
 import SecondStepAddLesson from "@/components/dashboard/lessons/add/SecondStepAddLesson";
 import ThirdStepAddLesson from "@/components/dashboard/lessons/add/ThirdStepAddLesson";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import {
   type FieldErrors,
   type FieldPath,
@@ -11,6 +11,7 @@ import {
   type SubmitErrorHandler,
   useFieldArray,
   useForm,
+  useWatch,
 } from "react-hook-form";
 import LessonToolBox from "../../../../../components/dashboard/lessons/add/LessonToolBox";
 import { ResourceListItemDTO } from "@/lib/dto/resource.dto";
@@ -180,6 +181,54 @@ export default function AddLessonWizard({
     shouldUnregister: false,
   });
   const isSubmitting = form.formState.isSubmitting;
+  const watchedBlocks = useWatch({
+    control: form.control,
+    name: "blocks",
+  });
+  const watchedAttendees = useWatch({
+    control: form.control,
+    name: "attendees",
+  });
+  const watchedScheduledStart = useWatch({
+    control: form.control,
+    name: "scheduledStart",
+  });
+  const watchedTimezone = useWatch({
+    control: form.control,
+    name: "timezone",
+  });
+  const lessonResourceIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (watchedBlocks ?? []).flatMap((block) => block.resources ?? []),
+        ),
+      ),
+    [watchedBlocks],
+  );
+  const selectedStudentIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (watchedAttendees ?? [])
+            .map((attendee) => attendee.studentId)
+            .filter((studentId): studentId is string => Boolean(studentId)),
+        ),
+      ),
+    [watchedAttendees],
+  );
+  const resourceUsageBeforeDate = useMemo(() => {
+    if (!watchedScheduledStart || !watchedTimezone) return undefined;
+
+    try {
+      return zonedDateTimeToISOString(
+        watchedScheduledStart,
+        watchedTimezone,
+      );
+    } catch {
+      return undefined;
+    }
+  }, [watchedScheduledStart, watchedTimezone]);
 
   const handleNext = async () => {
     const values = form.getValues();
@@ -355,7 +404,7 @@ export default function AddLessonWizard({
           cefrLevels: block.cefrLevels ?? [],
           skills: block.skills ?? [],
           tags: block.tags ?? [],
-          resources: block.resources ?? [],
+          resources: Array.from(new Set(block.resources ?? [])),
           plannedContent: block.plannedContent,
           actualContent: block.actualContent,
           plannedObjectives: block.plannedObjectives ?? [],
@@ -466,6 +515,7 @@ export default function AddLessonWizard({
 
           {currentStep === 1 && (
             <SecondStepAddLesson
+              locale={locale}
               blockFields={blockFields}
               appendBlock={appendBlock}
               removeBlock={removeBlocks}
@@ -508,6 +558,10 @@ export default function AddLessonWizard({
             <LessonToolBox
               locale={locale}
               onCreateBlocksFromResources={createBlocksFromResources}
+              lessonResourceIds={lessonResourceIds}
+              studentIds={selectedStudentIds}
+              beforeDate={resourceUsageBeforeDate}
+              currentLessonId={lessonId}
             />
           </div>
         ) : (

@@ -9,11 +9,19 @@ import { ResourceListItemDTO } from "@/lib/dto/resource.dto";
 interface LessonToolBoxProps {
   locale: string;
   onCreateBlocksFromResources: (resources: ResourceListItemDTO[]) => void;
+  lessonResourceIds: string[];
+  studentIds: string[];
+  beforeDate?: string;
+  currentLessonId?: string;
 }
 
 export default function LessonToolBox({
   locale,
   onCreateBlocksFromResources,
+  lessonResourceIds,
+  studentIds,
+  beforeDate,
+  currentLessonId,
 }: LessonToolBoxProps) {
   const [isResourcesModalOpen, setIsResourcesModalOpen] = useState(false);
   return (
@@ -39,7 +47,12 @@ export default function LessonToolBox({
         <div className="p-4">
           <ResourceSelector
             locale={locale}
-            onCreateBlocks={onCreateBlocksFromResources}
+            onConfirmResources={onCreateBlocksFromResources}
+            confirmAction="create_blocks"
+            lessonResourceIds={lessonResourceIds}
+            studentIds={studentIds}
+            beforeDate={beforeDate}
+            currentLessonId={currentLessonId}
             onClose={() => setIsResourcesModalOpen(false)}
           />
         </div>

@@ -98,7 +98,7 @@ function mapBlocksToPatchPayload(blocks: ReviewLessonBlock[]) {
     cefrLevels: block.cefrLevels ?? [],
     skills: block.skills ?? [],
     tags: block.tags ?? [],
-    resources: block.resources ?? [],
+    resources: Array.from(new Set(block.resources ?? [])),
     plannedContent: block.plannedContent,
     completionStatus: block.completionStatus ?? "not_completed",
     carryOverToNextLesson: block.carryOverToNextLesson ?? false,
