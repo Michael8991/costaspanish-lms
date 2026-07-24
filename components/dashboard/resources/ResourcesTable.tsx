@@ -57,8 +57,6 @@ const FILTER_KEYS = [
   "page",
 ] as const;
 
-type FilterKey = (typeof FILTER_KEYS)[number];
-
 type DraftFilters = {
   search: string;
   format: string;
@@ -93,13 +91,20 @@ type ResourceListItem = ComponentProps<
 
 type ResourcesResponse = {
   items: ResourceListItem[];
-  page?: number;
-  totalPages?: number;
-  totalItems?: number;
+  pagination?: ResourcePagination;
+  meta?: ResourcePagination & {
+    hasPrevPage?: boolean;
+  };
 };
 
-const controlClassName =
-  "w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-all hover:bg-slate-50 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#9e2727]/30";
+type ResourcePagination = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage?: boolean;
+};
 
 const fetcher = async (url: string): Promise<ResourcesResponse> => {
   const res = await fetch(url);
@@ -153,7 +158,7 @@ export default function ResourcesTable({ locale }: { locale: string }) {
       requiresTeacherReview: searchParams.get("requiresTeacherReview") || "",
       sort: searchParams.get("sort") || "",
     }),
-    [searchParams, queryString],
+    [searchParams],
   );
 
   const [draftFilters, setDraftFilters] =
@@ -178,6 +183,7 @@ export default function ResourcesTable({ locale }: { locale: string }) {
   );
 
   const items = data?.items ?? [];
+  const pagination = data?.pagination ?? data?.meta;
 
   const activeFilterCount = useMemo(
     () => countActiveFilters(appliedFilters),
@@ -262,7 +268,7 @@ export default function ResourcesTable({ locale }: { locale: string }) {
   if (error) {
     return (
       <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">
-        Error cargando recursos.
+        No se pudieron cargar los recursos.
       </div>
     );
   }
@@ -282,9 +288,9 @@ export default function ResourcesTable({ locale }: { locale: string }) {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <h2 className="text-lg font-semibold text-slate-800">Recursos</h2>
-            {typeof data?.totalItems === "number" && (
+            {typeof pagination?.total === "number" && (
               <span className="rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-xs font-medium text-slate-500">
-                {data.totalItems} resultados
+                {pagination.total} resultados
               </span>
             )}
             {isValidating && data && (
@@ -596,7 +602,11 @@ export default function ResourcesTable({ locale }: { locale: string }) {
 
       {!items.length ? (
         <div className="p-10 text-center text-slate-500">
-          No se han encontrado recursos con los filtros actuales.
+          {appliedFilters.search
+            ? "No hay recursos que coincidan con la búsqueda."
+            : activeFilterCount > 0
+              ? "No se han encontrado recursos con los filtros actuales."
+              : "No hay recursos disponibles."}
         </div>
       ) : (
         <>
@@ -608,8 +618,16 @@ export default function ResourcesTable({ locale }: { locale: string }) {
 
           <div className="border-t border-slate-200 bg-slate-50">
             <Pagination
-              totalItems={data?.totalItems || 0}
-              itemsPerPage={10} // Pon el número de elementos que devuelve tu API por defecto
+              currentPage={pagination?.page ?? 1}
+              totalPages={pagination?.totalPages ?? 1}
+              totalItems={pagination?.total ?? items.length}
+              hasNextPage={pagination?.hasNextPage ?? false}
+              hasPreviousPage={
+                pagination?.hasPreviousPage ??
+                data?.meta?.hasPrevPage ??
+                false
+              }
+              itemsPerPage={pagination?.limit ?? 12}
             />
           </div>
         </>

@@ -72,6 +72,8 @@ export default function ResourceSelector({
     page,
     totalPages,
     total,
+    hasNextPage,
+    hasPrevPage,
     goToPage,
   } = useResources({
     limit: 8,
@@ -79,8 +81,8 @@ export default function ResourceSelector({
     status: "published",
   });
 
-  const canGoPrevious = page > 1;
-  const canGoNext = page < totalPages;
+  const canGoPrevious = hasPrevPage;
+  const canGoNext = hasNextPage;
 
   const [selectedResources, setSelectedResources] = useState<
     ResourceListItemDTO[]
@@ -207,7 +209,9 @@ export default function ResourceSelector({
           </div>
         ) : resources.length === 0 ? (
           <div className="flex min-h-40 items-center justify-center rounded-2xl border border-dashed border-slate-600/60 bg-slate-800/40 text-sm text-slate-400">
-            No hay recursos disponibles.
+            {search.trim()
+              ? "No hay recursos que coincidan con la búsqueda."
+              : "No hay recursos disponibles."}
           </div>
         ) : (
           resources.map((resource) => {
@@ -243,7 +247,7 @@ export default function ResourceSelector({
                         : "border-slate-600/50 bg-slate-800/50 hover:border-slate-500/70 hover:bg-slate-800"
                 } ${isArchived ? "pointer-events-none opacity-40" : ""}`}
               >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-700/70 text-slate-300">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/5 text-slate-300 ring-1 ring-white/10">
                   <FormatIcon size={16} />
                 </div>
 

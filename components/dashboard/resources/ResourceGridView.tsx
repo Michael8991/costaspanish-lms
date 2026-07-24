@@ -21,7 +21,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { motion, type Variants } from "framer-motion";
-import Image from "next/image";
 
 import { ResourceListItemDTO } from "@/lib/dto/resource.dto";
 import { useEffect, useState } from "react";
@@ -40,6 +39,7 @@ import {
 
 import DeleteResourceForm from "./DeleteResourceForm";
 import { useResourceActions } from "@/lib/hooks/useResourceActions";
+import ResourcePreview from "./ResourcePreview";
 
 interface ResourcesGridViewProps {
   resources: ResourceListItemDTO[];
@@ -217,36 +217,24 @@ const itemVariants: Variants = {
   },
 };
 
-function ResourcePreview({ resource }: { resource: ResourceListItemDTO }) {
+function ResourceCardPreview({ resource }: { resource: ResourceListItemDTO }) {
   const {
     icon: FormatIcon,
     color: formatColor,
     label: formatLabel,
   } = getFileTypeBadge(resource.asset.format);
 
-  const previewSrc =
-    resource.asset.format === "image"
-      ? resource.asset.thumbnailUrl
-      : resource.asset.format === "pdf"
-        ? resource.asset.thumbnailUrl || null
-        : null;
-
-  const shouldShowThumbnail =
-    (resource.asset.format === "image" || resource.asset.format === "pdf") &&
-    !!previewSrc;
-
-  if (shouldShowThumbnail) {
-    return (
-      <div className="relative h-44 w-full overflow-hidden rounded-t-2xl bg-slate-100 sm:h-48">
-        <Image
-          src={previewSrc}
-          alt={resource.title}
-          fill
-          sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
-          className="object-cover"
-          loading="lazy"
-        />
-
+  return (
+    <ResourcePreview
+      resource={{
+        title: resource.title,
+        format: resource.asset.format,
+        mimeType: resource.asset.mimeType,
+        thumbnailUrl: resource.asset.thumbnailUrl,
+        fileUrl: resource.asset.fileUrl,
+      }}
+      className="relative h-44 w-full rounded-t-2xl bg-slate-100 sm:h-48"
+      imageOverlay={
         <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-slate-900/18 to-transparent p-3">
           <span
             title="File format"
@@ -256,26 +244,27 @@ function ResourcePreview({ resource }: { resource: ResourceListItemDTO }) {
             {formatLabel}
           </span>
         </div>
-      </div>
-    );
-  }
+      }
+      fallback={
+        <div className="relative flex h-full w-full items-center justify-center bg-linear-to-br from-slate-50 via-white to-slate-100">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(158,39,39,0.08),transparent_42%)]" />
+          <div className="relative flex flex-col items-center gap-3 px-4 text-center">
+            <div className={`rounded-2xl p-4 shadow-sm ${formatColor}`}>
+              <FormatIcon size={28} />
+            </div>
 
-  return (
-    <div className="relative flex h-44 w-full items-center justify-center rounded-t-2xl bg-linear-to-br from-slate-50 via-white to-slate-100 sm:h-48">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(158,39,39,0.08),transparent_42%)]" />
-      <div className="relative flex flex-col items-center gap-3 px-4 text-center">
-        <div className={`rounded-2xl p-4 shadow-sm ${formatColor}`}>
-          <FormatIcon size={28} />
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-slate-800">
+                {formatLabel}
+              </p>
+              <p className="text-xs text-slate-500">
+                {getPedagogicalTypeLabel(resource.pedagogicalType)}
+              </p>
+            </div>
+          </div>
         </div>
-
-        <div className="space-y-1">
-          <p className="text-sm font-semibold text-slate-800">{formatLabel}</p>
-          <p className="text-xs text-slate-500">
-            {getPedagogicalTypeLabel(resource.pedagogicalType)}
-          </p>
-        </div>
-      </div>
-    </div>
+      }
+    />
   );
 }
 
@@ -326,7 +315,6 @@ export default function ResourcesGridView({
     setIsDeleteResourceModalOpen,
     isSubmittingArchiveResource,
     isDelettingResource,
-    isSubmittingReactivateResource,
     handleArchiveResource,
     handlePermanentDelete,
     handleReactivateResource,
@@ -433,7 +421,7 @@ export default function ResourcesGridView({
                   : "bg-white border-slate-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/70"
               }`}
             >
-              <ResourcePreview resource={resource} />
+              <ResourceCardPreview resource={resource} />
 
               <div className="space-y-4 p-4 sm:p-5">
                 <div className="space-y-2">

@@ -174,10 +174,15 @@ export async function GET(req: NextRequest) {
     const {
       search,
       level,
+      skill,
       pedagogicalType,
       format,
+      deliveryMode,
       status,
       visibility,
+      hasAnswerKey,
+      requiresTeacherReview,
+      sort: requestedSort,
       ownership,
       ownerTeacherId,
       page,
@@ -226,6 +231,10 @@ export async function GET(req: NextRequest) {
       finalQuery.levels = level;
     }
 
+    if (skill) {
+      finalQuery.skills = skill;
+    }
+
     /**
      * Filtra por tipo pedagógico del recurso.
      */
@@ -238,6 +247,18 @@ export async function GET(req: NextRequest) {
      */
     if (format) {
       finalQuery.format = format;
+    }
+
+    if (deliveryMode) {
+      finalQuery.deliveryModes = deliveryMode;
+    }
+
+    if (hasAnswerKey !== undefined) {
+      finalQuery.hasAnswerKey = hasAnswerKey;
+    }
+
+    if (requiresTeacherReview !== undefined) {
+      finalQuery.requiresTeacherReview = requiresTeacherReview;
     }
 
     // ========================================================================
@@ -346,11 +367,6 @@ export async function GET(req: NextRequest) {
       };
     }
     /**
-     * Cálculo de offset para paginación clásica por página y tamaño de página.
-     */
-    const skip = (page - 1) * limit;
-
-    /**
      * Proyección de listado.
      *
      * Se limita explícitamente el conjunto de campos devueltos por MongoDB para:
@@ -381,6 +397,7 @@ export async function GET(req: NextRequest) {
       pageCount: 1,
       durationSeconds: 1,
       thumbnailUrl: 1,
+      fileUrl: 1,
       externalUrl: 1,
       timesUsed: 1,
       ownerTeacherId: 1,
@@ -403,32 +420,43 @@ export async function GET(req: NextRequest) {
      * - con búsqueda textual: primero relevancia (`textScore`), después fecha.
      * - sin búsqueda textual: orden descendente por creación.
      */
-    const sort: Record<string, SortOrder | { $meta: "textScore" }> = search
-      ? {
-          score: { $meta: "textScore" },
-          createdAt: -1 as SortOrder,
-        }
-      : {
-          createdAt: -1 as SortOrder,
-        };
+    const requestedSortMap: Record<
+      NonNullable<typeof requestedSort>,
+      Record<string, SortOrder>
+    > = {
+      updatedAt_desc: { updatedAt: -1 },
+      createdAt_desc: { createdAt: -1 },
+      title_asc: { title: 1 },
+      title_desc: { title: -1 },
+      timesUsed_desc: { timesUsed: -1, createdAt: -1 },
+      difficulty_asc: { difficulty: 1, createdAt: -1 },
+      difficulty_desc: { difficulty: -1, createdAt: -1 },
+    };
+    const sort: Record<string, SortOrder | { $meta: "textScore" }> =
+      requestedSort
+        ? requestedSortMap[requestedSort]
+        : search
+          ? {
+              score: { $meta: "textScore" },
+              createdAt: -1 as SortOrder,
+            }
+          : {
+              createdAt: -1 as SortOrder,
+            };
 
     /**
-     * Se ejecutan en paralelo:
-     * - la consulta paginada,
-     * - el conteo total sobre el mismo filtro.
-     *
-     * `lean<ResourceListSource[]>()` devuelve objetos planos en lugar de
-     * documentos Mongoose hidratados, reduciendo coste y ajustándose mejor
-     * al posterior mapeo a DTO.
+     * El conteo permite ajustar páginas fuera de rango antes de consultar.
+     * La búsqueda y el conteo comparten exactamente el mismo filtro.
      */
-    const [documents, total] = await Promise.all([
-      Resource.find(finalQuery, findProjection)
-        .sort(sort)
-        .skip(skip)
-        .limit(limit)
-        .lean<ResourceListSource[]>(),
-      Resource.countDocuments(finalQuery),
-    ]);
+    const total = await Resource.countDocuments(finalQuery);
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const effectivePage = Math.min(page, totalPages);
+    const skip = (effectivePage - 1) * limit;
+    const documents = await Resource.find(finalQuery, findProjection)
+      .sort(sort)
+      .skip(skip)
+      .limit(limit)
+      .lean<ResourceListSource[]>();
 
     /**
      * Transformación explícita a DTO de listado.
@@ -444,9 +472,12 @@ export async function GET(req: NextRequest) {
     /**
      * Respuesta paginada normalizada.
      */
-    return NextResponse.json(toPaginatedResponse(items, page, limit, total), {
-      status: 200,
-    });
+    return NextResponse.json(
+      toPaginatedResponse(items, effectivePage, limit, total),
+      {
+        status: 200,
+      },
+    );
   } catch (error) {
     /**
      * Se evita propagar detalles internos al cliente, pero se conserva un

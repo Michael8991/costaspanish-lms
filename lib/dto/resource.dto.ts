@@ -101,6 +101,7 @@ export interface ResourceListItemDTO {
   asset: {
     format: IResource["format"];
     thumbnailUrl?: string;
+    fileUrl?: string;
     externalUrl?: string;
     originalFilename?: string;
     mimeType?: string;
@@ -130,12 +131,21 @@ export interface ResourceDetailDTO extends ResourceListItemDTO {
 
 export interface PaginatedResponse<T> {
   items: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
   meta: {
     page: number;
     limit: number;
     total: number;
     totalPages: number;
     hasNextPage: boolean;
+    hasPreviousPage: boolean;
     hasPrevPage: boolean;
   };
 }
@@ -174,7 +184,8 @@ export function toResourceListItemDTO(
 
     asset: {
       format: resource.format,
-      thumbnailUrl: resource.format === "image" ? resource.fileUrl : resource.thumbnailUrl,
+      thumbnailUrl: resource.thumbnailUrl,
+      fileUrl: resource.fileUrl,
       externalUrl: resource.externalUrl,
       originalFilename: resource.originalFilename,
       mimeType: resource.mimeType,
@@ -218,16 +229,21 @@ export function toPaginatedResponse<T>(
   total: number,
 ): PaginatedResponse<T> {
   const totalPages = Math.max(1, Math.ceil(total / limit));
+  const pagination = {
+    page,
+    limit,
+    total,
+    totalPages,
+    hasNextPage: page < totalPages,
+    hasPreviousPage: page > 1,
+  };
 
   return {
     items,
+    pagination,
     meta: {
-      page,
-      limit,
-      total,
-      totalPages,
-      hasNextPage: page < totalPages,
-      hasPrevPage: page > 1,
+      ...pagination,
+      hasPrevPage: pagination.hasPreviousPage,
     },
   };
 }

@@ -103,10 +103,31 @@ export const resourceIdParamSchema = z.object({
 export const resourceListQuerySchema = z.object({
   search: optionalTrimmedString(120),
   level: z.enum(CEFR_LEVELS).optional(),
+  skill: z.enum(SKILL_FOCUS).optional(),
   pedagogicalType: z.enum(PEDAGOGICAL_TYPES).optional(),
   format: z.enum(FORMAT_TYPES).optional(),
+  deliveryMode: z.enum(DELIVERY_MODES).optional(),
   status: z.enum(RESOURCE_STATUS).optional(),
   visibility: z.enum(RESOURCE_VISIBILITY).optional(),
+  hasAnswerKey: z
+    .enum(["true", "false"])
+    .transform((value) => value === "true")
+    .optional(),
+  requiresTeacherReview: z
+    .enum(["true", "false"])
+    .transform((value) => value === "true")
+    .optional(),
+  sort: z
+    .enum([
+      "updatedAt_desc",
+      "createdAt_desc",
+      "title_asc",
+      "title_desc",
+      "timesUsed_desc",
+      "difficulty_asc",
+      "difficulty_desc",
+    ])
+    .optional(),
   ownership: z.enum(["mine", "shared", "all"]).default("all"),
   ownerTeacherId: z
     .string()

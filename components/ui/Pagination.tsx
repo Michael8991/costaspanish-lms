@@ -4,33 +4,38 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface PaginationProps {
+  currentPage: number;
+  totalPages: number;
   totalItems: number;
-  itemsPerPage?: number;
+  itemsPerPage: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
 }
 
 export default function Pagination({
+  currentPage,
+  totalPages,
   totalItems,
-  itemsPerPage = 10,
+  itemsPerPage,
+  hasNextPage,
+  hasPreviousPage,
 }: PaginationProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const currentPage = Number(searchParams.get("page")) || 1;
-
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
-
   if (totalPages <= 1) return null;
 
   const handlePageChange = (newPage: number) => {
+    const safePage = Math.min(Math.max(newPage, 1), totalPages);
     const current = new URLSearchParams(Array.from(searchParams.entries()));
-    current.set("page", newPage.toString());
+    current.set("page", safePage.toString());
     router.push(`${pathname}?${current.toString()}`);
   };
 
   return (
-    <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 mt-6 rounded-b-lg">
-      <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+    <div className="mt-6 flex items-center justify-between rounded-b-lg border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
+      <div className="flex flex-1 flex-col items-center justify-between gap-3 sm:flex-row">
         <div>
           <p className="text-sm text-gray-700">
             Mostrando{" "}
@@ -51,12 +56,14 @@ export default function Pagination({
             aria-label="Pagination"
           >
             <button
+              type="button"
+              aria-label="Página anterior"
               onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!hasPreviousPage}
+              className="relative inline-flex items-center gap-1 rounded-l-md px-3 py-2 text-gray-600 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <span className="sr-only">Anterior</span>
               <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+              <span className="hidden text-sm sm:inline">Anterior</span>
             </button>
 
             <span className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 focus:z-20 focus:outline-offset-0">
@@ -64,11 +71,13 @@ export default function Pagination({
             </span>
 
             <button
+              type="button"
+              aria-label="Página siguiente"
               onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage >= totalPages}
-              className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!hasNextPage}
+              className="relative inline-flex items-center gap-1 rounded-r-md px-3 py-2 text-gray-600 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <span className="sr-only">Siguiente</span>
+              <span className="hidden text-sm sm:inline">Siguiente</span>
               <ChevronRight className="h-5 w-5" aria-hidden="true" />
             </button>
           </nav>

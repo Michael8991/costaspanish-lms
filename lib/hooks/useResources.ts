@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ResourceListItemDTO } from "@/lib/dto/resource.dto";
 
 type ResourceOwnership = "mine" | "shared" | "all";
@@ -23,6 +23,14 @@ type UseResourcesOptions = ResourceFilters & {
 
 type ResourcesApiResponse = {
   items?: ResourceListItemDTO[];
+  pagination?: {
+    page?: number;
+    limit?: number;
+    total?: number;
+    totalPages?: number;
+    hasNextPage?: boolean;
+    hasPreviousPage?: boolean;
+  };
   meta?: {
     page?: number;
     limit?: number;
@@ -30,6 +38,7 @@ type ResourcesApiResponse = {
     totalPages?: number;
     hasNextPage?: boolean;
     hasPrevPage?: boolean;
+    hasPreviousPage?: boolean;
   };
   error?: string;
 };
@@ -84,6 +93,7 @@ export function useResources({
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -128,7 +138,7 @@ export function useResources({
         params.set("ownership", ownership);
       }
 
-      return `/api/resources?status=published&${params.toString()}`;
+      return `/api/resources?${params.toString()}`;
     },
     [
       limit,
@@ -148,6 +158,9 @@ export function useResources({
       mode: "replace" | "append" = "replace",
     ): Promise<void> => {
       if (!enabled) return;
+
+      const requestId = requestIdRef.current + 1;
+      requestIdRef.current = requestId;
 
       try {
         if (mode === "append") {
@@ -169,24 +182,37 @@ export function useResources({
         }
 
         const incomingItems = data.items ?? [];
-        const meta = data.meta ?? {};
+        const pagination = data.pagination ?? data.meta ?? {};
 
-        const responsePage = meta.page ?? targetPage;
-        const responseLimit = meta.limit ?? limit;
-        const responseTotal = meta.total ?? incomingItems.length;
+        const responsePage = pagination.page ?? targetPage;
+        const responseLimit = pagination.limit ?? limit;
+        const responseTotal = pagination.total ?? incomingItems.length;
         const responseTotalPages =
-          meta.totalPages ??
+          pagination.totalPages ??
           Math.max(1, Math.ceil(responseTotal / responseLimit));
 
         const responseHasNextPage =
-          meta.hasNextPage ?? responsePage < responseTotalPages;
+          pagination.hasNextPage ?? responsePage < responseTotalPages;
 
         const responseHasPrevPage =
-          meta.hasPrevPage ?? responsePage > 1;
+          pagination.hasPreviousPage ??
+          data.meta?.hasPrevPage ??
+          responsePage > 1;
+
+        if (requestId !== requestIdRef.current) {
+          return;
+        }
 
         setResources((currentResources) => {
           if (mode === "append") {
-            return [...currentResources, ...incomingItems];
+            return Array.from(
+              new Map(
+                [...currentResources, ...incomingItems].map((resource) => [
+                  resource.id,
+                  resource,
+                ]),
+              ).values(),
+            );
           }
 
           return incomingItems;
@@ -198,13 +224,19 @@ export function useResources({
         setHasNextPage(responseHasNextPage);
         setHasPrevPage(responseHasPrevPage);
       } catch (error) {
+        if (requestId !== requestIdRef.current) {
+          return;
+        }
+
         const message =
           error instanceof Error ? error.message : "Error desconocido";
 
         setError(message);
       } finally {
-        setIsLoading(false);
-        setIsLoadingMore(false);
+        if (requestId === requestIdRef.current) {
+          setIsLoading(false);
+          setIsLoadingMore(false);
+        }
       }
     },
     [buildUrl, enabled, limit],
@@ -222,11 +254,14 @@ export function useResources({
 
   const goToPage = useCallback(
     async (targetPage: number) => {
-      const safePage = Math.max(1, targetPage);
+      const safePage = Math.min(
+        Math.max(1, targetPage),
+        Math.max(1, totalPages),
+      );
 
       await fetchResources(safePage, "replace");
     },
-    [fetchResources],
+    [fetchResources, totalPages],
   );
 
   const loadMore = useCallback(async () => {

@@ -240,7 +240,7 @@ export default function ResourceTableView({
   const [isSubmittingArchive, setIsSubmittingArchive] = useState(false);
 
   const [isAddResourceModalOpen, setIsAddResourceModalOpen] = useState(false);
-  const [isSubmittingAddResource, setIsSubmittingAddResource] = useState(false);
+  const isSubmittingAddResource = false;
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeletingResource, setIsDeletingResource] = useState(false);
@@ -451,45 +451,52 @@ export default function ResourceTableView({
                 >
                   {/* Title */}
                   <td className="min-w-90 px-6 py-4">
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-2">
-                        <p
-                          title="Resource title"
-                          className="text-[15px] font-semibold leading-6 text-slate-900"
-                        >
-                          {resource.title}
-                        </p>
-                        {isArchived && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-red-50 border border-red-200/80 px-2 py-0.5 text-[11px] text-red-500">
-                            <CircleAlert size={10} />
-                            Se eliminará pronto
-                          </span>
-                        )}
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${formatColor}`}
+                      >
+                        <FormatIcon size={16} />
                       </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span
-                          title="File format"
-                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${formatColor}`}
-                        >
-                          <FormatIcon size={13} />
-                          {formatLabel}
-                        </span>
-                        {mediaDuration && (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-slate-200/80 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
-                            <Clock3 size={13} />
-                            {mediaDuration}
+                      <div className="flex min-w-0 flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <p
+                            title="Resource title"
+                            className="truncate text-[15px] font-semibold leading-6 text-slate-900"
+                          >
+                            {resource.title}
+                          </p>
+                          {isArchived && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-red-50 border border-red-200/80 px-2 py-0.5 text-[11px] text-red-500">
+                              <CircleAlert size={10} />
+                              Se eliminará pronto
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            title="File format"
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${formatColor}`}
+                          >
+                            <FormatIcon size={13} />
+                            {formatLabel}
                           </span>
-                        )}
-                        <span className="inline-flex items-center rounded-full border border-slate-200/80 bg-white px-2.5 py-1 text-xs font-medium text-slate-700">
-                          {getPedagogicalTypeLabel(resource.pedagogicalType)}
-                        </span>
-                        <span
-                          title="Visibility"
-                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${visibilityClassName}`}
-                        >
-                          <VisibilityIcon size={13} />
-                          {visibilityLabel}
-                        </span>
+                          {mediaDuration && (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-slate-200/80 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
+                              <Clock3 size={13} />
+                              {mediaDuration}
+                            </span>
+                          )}
+                          <span className="inline-flex items-center rounded-full border border-slate-200/80 bg-white px-2.5 py-1 text-xs font-medium text-slate-700">
+                            {getPedagogicalTypeLabel(resource.pedagogicalType)}
+                          </span>
+                          <span
+                            title="Visibility"
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${visibilityClassName}`}
+                          >
+                            <VisibilityIcon size={13} />
+                            {visibilityLabel}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </td>
