@@ -21,7 +21,6 @@ import { createClientId } from "@/components/dashboard/lessons/add/createClientI
 import { useLessonStudents } from "@/lib/hooks/useLessonStudents";
 import type { LessonBlockType, LessonClassType } from "@/lib/types/lesson";
 import { normalizeLessonBlockCategories } from "@/lib/utils/lesson-block-categories";
-import { buildLessonTitle } from "@/lib/utils/lesson-title";
 import { getCompatiblePlans } from "@/lib/utils/lesson-voucher";
 import type { WeekdayValue } from "@/lib/utils/lesson-recurrence";
 
@@ -351,15 +350,9 @@ export default function AddLessonWizard({
         return;
       }
 
-      const generatedTitle = buildLessonTitle({
-        attendees: values.attendees,
-        students,
-        classType,
-        scheduledStart: values.scheduledStart,
-      });
       const payload = {
         courseId: values.courseId,
-        title: generatedTitle,
+        title: values.title.trim(),
         classType,
         scheduledStart: zonedDateTimeToISOString(
           values.scheduledStart,

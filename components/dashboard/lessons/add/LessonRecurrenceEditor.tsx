@@ -57,6 +57,7 @@ export default function LessonRecurrenceEditor({
     [watchedAttendees],
   );
   const classType = useWatch({ control, name: "classType" });
+  const lessonTitle = useWatch({ control, name: "title" }) ?? "";
   const scheduledStart =
     useWatch({ control, name: "scheduledStart" }) ?? "";
   const scheduledEnd = useWatch({ control, name: "scheduledEnd" }) ?? "";
@@ -130,27 +131,32 @@ export default function LessonRecurrenceEditor({
     () =>
       occurrences.map((occurrence, occurrenceIndex) => ({
         ...occurrence,
-        title: buildLessonTitle({
-          attendees,
-          students,
-          classType,
-          scheduledStart: occurrence.scheduledStart,
-          progressOverride:
-            baseLessonNumber !== undefined &&
-            selectedPlan?.creditsTotal !== undefined
-              ? {
-                  currentLessonNumber:
-                    baseLessonNumber + occurrenceIndex,
-                  creditsTotal: selectedPlan.creditsTotal,
-                }
-              : undefined,
-        }),
+        title:
+          occurrence.scheduledStart === scheduledStart && lessonTitle.trim()
+            ? lessonTitle.trim()
+            : buildLessonTitle({
+                attendees,
+                students,
+                classType,
+                scheduledStart: occurrence.scheduledStart,
+                progressOverride:
+                  baseLessonNumber !== undefined &&
+                  selectedPlan?.creditsTotal !== undefined
+                    ? {
+                        currentLessonNumber:
+                          baseLessonNumber + occurrenceIndex,
+                        creditsTotal: selectedPlan.creditsTotal,
+                      }
+                    : undefined,
+              }),
       })),
     [
       attendees,
       baseLessonNumber,
       classType,
+      lessonTitle,
       occurrences,
+      scheduledStart,
       selectedPlan,
       students,
     ],

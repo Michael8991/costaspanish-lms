@@ -285,7 +285,7 @@ export async function POST(req: NextRequest) {
     const currentLessonData = {
       ...basePayload,
       blocks: normalizedBlocks,
-      title: currentOccurrence.title,
+      title: basePayload.title,
       teacherId: currentUserObjectId,
       isTrial: isWholeLessonTrial,
     };

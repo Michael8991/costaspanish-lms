@@ -14,7 +14,13 @@ import {
   getCompatiblePlans,
   selectBestCompatiblePlan,
 } from "@/lib/utils/lesson-voucher";
-import { type ChangeEvent, useEffect, useMemo, useState } from "react";
+import {
+  type ChangeEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
 
 function isNonEmptyString(value: string | undefined | null): value is string {
@@ -48,6 +54,7 @@ export default function FirstStepAddLesson({
 }: FirstStepAddLessonProps) {
   const {
     control,
+    getValues,
     register,
     setValue,
     formState: { errors },
@@ -92,16 +99,26 @@ export default function FirstStepAddLesson({
       }),
     [attendees, classType, scheduledStart, students],
   );
+  const lastGeneratedTitleRef = useRef("");
   const classTypeRegistration = register("classType", {
     required: "Selecciona un tipo de clase",
   });
 
   useEffect(() => {
-    setValue("title", generatedTitle, {
-      shouldDirty: true,
-      shouldValidate: true,
-    });
-  }, [generatedTitle, setValue]);
+    const currentTitle = getValues("title");
+    const shouldUseGeneratedTitle =
+      !currentTitle.trim() ||
+      currentTitle === lastGeneratedTitleRef.current;
+
+    if (shouldUseGeneratedTitle) {
+      setValue("title", generatedTitle, {
+        shouldDirty: false,
+        shouldValidate: true,
+      });
+    }
+
+    lastGeneratedTitleRef.current = generatedTitle;
+  }, [generatedTitle, getValues, setValue]);
 
   useEffect(() => {
     (attendees ?? []).forEach((attendee, index) => {
@@ -538,20 +555,20 @@ export default function FirstStepAddLesson({
             Título
           </label>
           <input
-            type="hidden"
+            type="text"
             {...register("title", {
               required: "El título es obligatorio",
+              validate: (value) =>
+                value.trim().length > 0 ||
+                "El título es obligatorio",
             })}
+            placeholder={generatedTitle}
+            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-800 outline-none transition focus:border-[#9e2727] focus:ring-2 focus:ring-[#9e2727]/10"
           />
           <input type="hidden" {...register("timezone")} />
-          <div
-            aria-live="polite"
-            className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-800"
-          >
-            {generatedTitle}
-          </div>
           <p className="mt-1 text-xs text-gray-500">
-            Se genera automáticamente para mantener un historial consistente.
+            Se genera automáticamente, pero puedes editarlo para añadir más
+            detalles.
           </p>
           {errors.title && (
             <p className="mt-1 text-xs text-red-600">{errors.title.message}</p>
