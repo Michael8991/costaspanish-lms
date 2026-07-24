@@ -5,14 +5,12 @@ import { createClientId } from "@/components/dashboard/lessons/add/createClientI
 import ResourceSelector from "@/components/dashboard/lessons/add/ResourceSelector";
 import { usePendingLessonBlocks } from "@/components/dashboard/lessons/add/usePendingLessonBlocks";
 import type { PendingLessonBlock } from "@/components/dashboard/lessons/add/usePendingLessonBlocks";
+import LessonBlockCategoryStack from "@/components/dashboard/lessons/LessonBlockCategoryStack";
 import CustomModal from "@/components/ui/CustomModal";
 import { LESSON_BLOCK_TYPES } from "@/lib/constants/lesson.constants";
 import type { ResourceListItemDTO } from "@/lib/dto/resource.dto";
 import type { LessonBlockType } from "@/lib/types/lesson";
-import {
-  getSecondaryLessonBlockCategories,
-  normalizeLessonBlockCategories,
-} from "@/lib/utils/lesson-block-categories";
+import { normalizeLessonBlockCategories } from "@/lib/utils/lesson-block-categories";
 import { getLessonBlockTypeVisual } from "@/lib/utils/lesson-block-visuals";
 import { formatLabel } from "@/lib/utils/lessonDetail-helpers";
 import { zonedDateTimeToISOString } from "@/lib/utils/time-zone";
@@ -574,17 +572,10 @@ export default function SecondStepAddLesson({
               const blockKey = getBlockKey(block, index, field.id);
               const isExpanded =
                 expandedBlockKeys.has(blockKey) || Boolean(blockErrors);
-              const blockTypeVisual = getLessonBlockTypeVisual(block.type);
-              const BlockIcon = blockTypeVisual.icon;
               const blockCategories = normalizeLessonBlockCategories(
                 block.type,
                 block.categories,
               );
-              const secondaryCategories =
-                getSecondaryLessonBlockCategories(
-                  block.type,
-                  blockCategories,
-                );
               const displayOrder = index;
               const resourceCount = block.resources?.length ?? 0;
               const cefrLevels = block.cefrLevels ?? [];
@@ -613,40 +604,14 @@ export default function SecondStepAddLesson({
                             {formatBlockOrder(displayOrder)}
                           </span>
 
-                          <span
-                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${blockTypeVisual.iconClassName}`}
-                          >
-                            <BlockIcon className="h-4 w-4" />
-                          </span>
-
                           <span className="min-w-0 flex-1">
-                            <span className="flex flex-wrap items-center gap-2">
+                            <LessonBlockCategoryStack
+                              categories={blockCategories}
+                            />
+                            <span className="mt-2 flex flex-wrap items-center gap-2">
                               <span className="truncate text-sm font-semibold text-slate-900 sm:text-base">
                                 {block.title?.trim() || "Bloque sin título"}
                               </span>
-                              <span
-                                className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${blockTypeVisual.badgeClassName}`}
-                              >
-                                {blockTypeVisual.label}
-                              </span>
-                              {secondaryCategories
-                                .slice(0, 2)
-                                .map((category) => (
-                                  <span
-                                    key={`${blockKey}-${category}`}
-                                    className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 ring-1 ring-inset ring-slate-200"
-                                  >
-                                    {
-                                      getLessonBlockTypeVisual(category)
-                                        .label
-                                    }
-                                  </span>
-                                ))}
-                              {secondaryCategories.length > 2 && (
-                                <span className="text-[10px] font-medium text-slate-500">
-                                  +{secondaryCategories.length - 2}
-                                </span>
-                              )}
                               {blockErrors && (
                                 <span className="inline-flex rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700 ring-1 ring-inset ring-red-100">
                                   Revisar
@@ -1065,15 +1030,10 @@ export default function SecondStepAddLesson({
                   const formattedDate = formatPendingLessonDate(
                     pendingBlock.sourceLessonDate,
                   );
-                  const blockTypeVisual = getLessonBlockTypeVisual(
+                  const blockCategories = normalizeLessonBlockCategories(
                     pendingBlock.block.type,
+                    pendingBlock.block.categories,
                   );
-                  const secondaryCategories =
-                    getSecondaryLessonBlockCategories(
-                      pendingBlock.block.type,
-                      pendingBlock.block.categories,
-                    );
-                  const PendingBlockIcon = blockTypeVisual.icon;
                   const completionStatusVisual =
                     getPendingCompletionStatusVisual(
                       pendingBlock.block.completionStatus,
@@ -1085,41 +1045,16 @@ export default function SecondStepAddLesson({
                       className="rounded-2xl border border-white/10 bg-white/5 p-4 transition-all duration-200 hover:border-white/20 hover:bg-white/[0.08]"
                     >
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="flex min-w-0 flex-1 items-start gap-3">
-                          <div
-                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ring-white/10 ${blockTypeVisual.iconClassName}`}
-                          >
-                            <PendingBlockIcon className="h-4 w-4" />
-                          </div>
-
+                        <div className="min-w-0 flex-1">
                           <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
+                            <LessonBlockCategoryStack
+                              categories={blockCategories}
+                              tone="dark"
+                            />
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
                               <h5 className="text-sm font-semibold text-white">
                                 {pendingBlock.block.title}
                               </h5>
-                              <span
-                                className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${blockTypeVisual.badgeClassName}`}
-                              >
-                                {blockTypeVisual.label}
-                              </span>
-                              {secondaryCategories
-                                .slice(0, 2)
-                                .map((category) => (
-                                  <span
-                                    key={`${pendingBlockKey}-${category}`}
-                                    className="inline-flex rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-medium text-white/55 ring-1 ring-inset ring-white/10"
-                                  >
-                                    {
-                                      getLessonBlockTypeVisual(category)
-                                        .label
-                                    }
-                                  </span>
-                                ))}
-                              {secondaryCategories.length > 2 && (
-                                <span className="text-[10px] font-medium text-white/40">
-                                  +{secondaryCategories.length - 2}
-                                </span>
-                              )}
                             </div>
 
                             <p className="mt-1 truncate text-xs text-white/40">

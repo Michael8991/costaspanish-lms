@@ -1,11 +1,8 @@
 "use client";
 
+import LessonBlockCategoryStack from "@/components/dashboard/lessons/LessonBlockCategoryStack";
 import { LessonDetailDTO } from "@/lib/dto/lesson.dto";
-import {
-  getSecondaryLessonBlockCategories,
-  normalizeLessonBlockCategories,
-} from "@/lib/utils/lesson-block-categories";
-import { getLessonBlockTypeVisual } from "@/lib/utils/lesson-block-visuals";
+import { normalizeLessonBlockCategories } from "@/lib/utils/lesson-block-categories";
 import { formatLabel } from "@/lib/utils/lessonDetail-helpers";
 import {
   CheckCircle2,
@@ -591,13 +588,10 @@ export default function LessonBlocksPanel({ lesson }: LessonBlocksPanelProps) {
               getCompletionStatusVisual(completionStatus);
             const carryOverToNextLesson = block.carryOverToNextLesson ?? false;
             const originDate = formatOriginDate(block.origin?.sourceLessonDate);
-            const blockTypeVisual = getLessonBlockTypeVisual(block.type);
-            const BlockTypeIcon = blockTypeVisual.icon;
-            const secondaryCategories =
-              getSecondaryLessonBlockCategories(
-                block.type,
-                block.categories,
-              );
+            const blockCategories = normalizeLessonBlockCategories(
+              block.type,
+              block.categories,
+            );
             const displayOrder = block.order ?? index;
             const displayedMinutes =
               block.actualMinutes !== undefined
@@ -626,39 +620,14 @@ export default function LessonBlocksPanel({ lesson }: LessonBlocksPanelProps) {
                         {formatBlockOrder(displayOrder)}
                       </span>
 
-                      <span
-                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${blockTypeVisual.iconClassName}`}
-                      >
-                        <BlockTypeIcon size={16} />
-                      </span>
-
                       <div className="min-w-0 flex-1">
-                        <div className="mb-1 flex flex-wrap items-center gap-2">
+                        <LessonBlockCategoryStack
+                          categories={blockCategories}
+                        />
+                        <div className="mb-1 mt-2 flex flex-wrap items-center gap-2">
                           <h3 className="truncate text-sm font-semibold text-gray-950">
                             {block.title || "Bloque sin título"}
                           </h3>
-
-                          <span
-                            className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${blockTypeVisual.badgeClassName}`}
-                          >
-                            {blockTypeVisual.label}
-                          </span>
-
-                          {secondaryCategories
-                            .slice(0, 2)
-                            .map((category) => (
-                              <span
-                                key={`${blockKey}-${category}`}
-                                className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600 ring-1 ring-inset ring-gray-200"
-                              >
-                                {getLessonBlockTypeVisual(category).label}
-                              </span>
-                            ))}
-                          {secondaryCategories.length > 2 && (
-                            <span className="text-[10px] font-medium text-gray-500">
-                              +{secondaryCategories.length - 2}
-                            </span>
-                          )}
 
                           <span
                             className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${completionVisual.className}`}
