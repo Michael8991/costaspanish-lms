@@ -30,7 +30,6 @@ import CustomModal from "@/components/ui/CustomModal";
 import ArchiveResourceForm from "./ArchiveResourceForm";
 
 import { CircleAlert } from "lucide-react";
-import { MOCK_UPCOMING_CLASSES } from "@/lib/mocks/lessons.mock"; //!Mock de clases
 import AddResourceToLessonForm from "./AddResourceToLessonForm";
 import {
   FormatType,
@@ -318,12 +317,10 @@ export default function ResourcesGridView({
     handleArchiveResource,
     handlePermanentDelete,
     handleReactivateResource,
-    handleAddResourceToLesson,
     isAddResourceModalOpen,
     setIsAddResourceModalOpen,
-    isSubmittingAddResource,
     handleActionClick,
-  } = useResourceActions(resources);
+  } = useResourceActions();
 
   const [isOpenQO, setIsOpenQO] = useState<string | null>(null);
 
@@ -608,7 +605,7 @@ export default function ResourcesGridView({
                   <button
                     key={index}
                     onClick={() =>
-                      handleActionClick(option.action!, resourceToArchive)
+                      handleActionClick(option.action!)
                     }
                     className="cursor-pointer flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-white transition-all hover:bg-white/10"
                   >
@@ -649,9 +646,6 @@ export default function ResourcesGridView({
           <AddResourceToLessonForm
             resource={resourceToArchive}
             resourceName={resourceToArchiveName}
-            lessons={MOCK_UPCOMING_CLASSES}
-            onSubmitForm={handleAddResourceToLesson}
-            isSubmitting={isSubmittingAddResource}
             onClose={() => setIsAddResourceModalOpen(false)}
           />
         </div>

@@ -1,15 +1,11 @@
 "use client";
 
-import { ResourceDetailDTO, ResourceListItemDTO } from "@/lib/dto/resource.dto";
 import { toast } from "sonner";
-import { deleteObject, ref } from "firebase/storage";
-import { storage } from "@/lib/firebase";
 import { mutate } from "swr";
 import { useState } from "react";
-import { ArchiveResourceFormData } from "@/components/dashboard/resources/ArchiveResourceForm";
 import { useRouter, usePathname, useParams } from 'next/navigation';
 type ResourceMenuAction = "ARCHIVE" | "ADD_TO_CLASS";
-export function useResourceActions(resources: ResourceListItemDTO[] | ResourceDetailDTO) {
+export function useResourceActions() {
 
 
   const router = useRouter();
@@ -34,42 +30,20 @@ export function useResourceActions(resources: ResourceListItemDTO[] | ResourceDe
 
   const [isSubmittingReactivateResource, setIsSubmittingReactivateResource] =
     useState(false);
-  const [archivingResource, setArchivingResource] = useState<string | null>(
-    null,
-  );
   const [isAddResourceModalOpen, setIsAddResourceModalOpen] = useState(false);
-  const [isSubmittingAddResource, setIsSubmittingAddResource] = useState(false);
 
-   const [menuPosition, setMenuPosition] = useState<{
-    top: number;
-    left: number;
-  } | null>(null);
-  
 const handleActionClick = (
     action: ResourceMenuAction,
-    resourceId: string | null,
   ) => {
     if (action === "ARCHIVE") {
-      setArchivingResource(resourceId);
       setIsArchiveModalOpen(true);
-      setMenuPosition(null);
     } else if (action === "ADD_TO_CLASS") {
-      setArchivingResource(resourceId);
       setIsAddResourceModalOpen(true);
-      setMenuPosition(null);
     }
-  };
-
-  const handleAddResourceToLesson = async (
-    resourceId: string | null,
-    lessonId: string,
-  ) => {
-    console.log("Hola!"); //!Subida
   };
 
   const handleArchiveResource = async (
     resourceId: string | null,
-    formData: ArchiveResourceFormData,
   ) => {
     setIsSubmittingArchiveResource(true);
     try {
@@ -191,9 +165,7 @@ const handleActionClick = (
     isSubmittingArchiveResource,
     isDelettingResource,
     isSubmittingReactivateResource,
-    isSubmittingAddResource,
     // --- FUNCIONES Y HANDLERS ---
-    handleAddResourceToLesson,
     handleArchiveResource,
     handleReactivateResource,
     handlePermanentDelete,

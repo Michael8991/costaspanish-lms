@@ -21,7 +21,6 @@ import { useState } from "react";
 import ArchiveResourceForm from "../ArchiveResourceForm";
 import DeleteResourceForm from "../DeleteResourceForm";
 import AddResourceToLessonForm from "../AddResourceToLessonForm";
-import { MOCK_UPCOMING_CLASSES } from "@/lib/mocks/lessons.mock";
 
 const getStatusClasses = (status: string) => {
   switch (status) {
@@ -119,16 +118,12 @@ export default function HeaderResource({ resource, locale }: ResourceProps) {
     setIsDeleteResourceModalOpen,
     isSubmittingArchiveResource,
     isDelettingResource,
-    isSubmittingReactivateResource,
     handleArchiveResource,
     handlePermanentDelete,
     handleReactivateResource,
-    handleAddResourceToLesson,
     isAddResourceModalOpen,
     setIsAddResourceModalOpen,
-    isSubmittingAddResource,
-    handleActionClick,
-  } = useResourceActions(resource);
+  } = useResourceActions();
 
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
   const formatMeta = formatMetaMap[resource.asset.format];
@@ -323,9 +318,6 @@ export default function HeaderResource({ resource, locale }: ResourceProps) {
           <AddResourceToLessonForm
             resource={resourceToArchive}
             resourceName={resourceToArchiveName}
-            lessons={MOCK_UPCOMING_CLASSES}
-            onSubmitForm={handleAddResourceToLesson}
-            isSubmitting={isSubmittingAddResource}
             onClose={() => setIsAddResourceModalOpen(false)}
           />
         </div>

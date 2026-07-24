@@ -29,7 +29,6 @@ import CustomModal from "@/components/ui/CustomModal";
 import ArchiveResourceForm from "./ArchiveResourceForm";
 import DeleteResourceForm from "./DeleteResourceForm";
 import AddResourceToLessonForm from "./AddResourceToLessonForm";
-import { MOCK_UPCOMING_CLASSES } from "@/lib/mocks/lessons.mock";
 import { toast } from "sonner";
 import { mutate } from "swr";
 import { deleteObject, ref } from "firebase/storage";
@@ -240,7 +239,6 @@ export default function ResourceTableView({
   const [isSubmittingArchive, setIsSubmittingArchive] = useState(false);
 
   const [isAddResourceModalOpen, setIsAddResourceModalOpen] = useState(false);
-  const isSubmittingAddResource = false;
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeletingResource, setIsDeletingResource] = useState(false);
@@ -370,13 +368,6 @@ export default function ResourceTableView({
       setIsDeletingResource(false);
       setIsDeleteModalOpen(false);
     }
-  };
-
-  const handleAddResource = async (
-    resourceId: string | null,
-    lessonId: string,
-  ) => {
-    console.log("Añadir recurso a clase:", resourceId, lessonId); //!Mock
   };
 
   useEffect(() => {
@@ -653,9 +644,6 @@ export default function ResourceTableView({
           <AddResourceToLessonForm
             resource={selectedResourceId}
             resourceName={selectedResourceName}
-            lessons={MOCK_UPCOMING_CLASSES}
-            onSubmitForm={handleAddResource}
-            isSubmitting={isSubmittingAddResource}
             onClose={() => setIsAddResourceModalOpen(false)}
           />
         </div>
