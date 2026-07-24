@@ -45,15 +45,54 @@ interface StudentsOverviewApiError {
   error?: string;
 }
 
+type StudentsOverviewQuery = {
+  page: number;
+  limit: number;
+  search: string;
+  level: string;
+  status: string;
+  planType: string;
+  classType: string;
+  planHealth: string;
+};
+
+function buildStudentsParams(query: StudentsOverviewQuery): URLSearchParams {
+  const params = new URLSearchParams();
+
+  params.set("page", String(query.page));
+  params.set("limit", String(query.limit));
+
+  if (query.search.trim()) params.set("search", query.search.trim());
+  if (query.level) params.set("level", query.level);
+  if (query.status) params.set("status", query.status);
+  if (query.planType) params.set("planType", query.planType);
+  if (query.classType) params.set("classType", query.classType);
+  if (query.planHealth) params.set("planHealth", query.planHealth);
+
+  return params;
+}
+
 export interface UseStudentsOverviewResult {
   items: StudentListDTO[];
   pagination: StudentListPagination;
   summary: StudentListSummary;
   search: string;
+  level: string;
+  status: string;
+  planType: string;
+  classType: string;
+  planHealth: string;
+  hasActiveFilters: boolean;
   isLoading: boolean;
   hasLoaded: boolean;
   error: string | null;
   setSearch: (value: string) => void;
+  setLevel: (value: string) => void;
+  setStatus: (value: string) => void;
+  setPlanType: (value: string) => void;
+  setClassType: (value: string) => void;
+  setPlanHealth: (value: string) => void;
+  clearFilters: () => void;
   goToPreviousPage: () => void;
   goToNextPage: () => void;
 }
@@ -66,10 +105,18 @@ export function useStudentsOverview(): UseStudentsOverviewResult {
     useState<StudentListSummary>(INITIAL_SUMMARY);
   const [page, setPage] = useState(1);
   const [search, setSearchValue] = useState("");
+  const [level, setLevelValue] = useState("");
+  const [status, setStatusValue] = useState("");
+  const [planType, setPlanTypeValue] = useState("");
+  const [classType, setClassTypeValue] = useState("");
+  const [planHealth, setPlanHealthValue] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const debouncedSearch = useDebouncedValue(search.trim(), 300);
+  const hasActiveFilters = Boolean(
+    search.trim() || level || status || planType || classType || planHealth,
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -79,14 +126,16 @@ export function useStudentsOverview(): UseStudentsOverviewResult {
         setIsLoading(true);
         setError(null);
 
-        const params = new URLSearchParams({
-          page: String(page),
-          limit: String(DEFAULT_LIMIT),
+        const params = buildStudentsParams({
+          page,
+          limit: DEFAULT_LIMIT,
+          search: debouncedSearch,
+          level,
+          status,
+          planType,
+          classType,
+          planHealth,
         });
-
-        if (debouncedSearch) {
-          params.set("search", debouncedSearch);
-        }
 
         const response = await fetch(`/api/students?${params.toString()}`, {
           cache: "no-store",
@@ -128,10 +177,53 @@ export function useStudentsOverview(): UseStudentsOverviewResult {
     void loadStudents();
 
     return () => controller.abort();
-  }, [debouncedSearch, page]);
+  }, [
+    classType,
+    debouncedSearch,
+    level,
+    page,
+    planHealth,
+    planType,
+    status,
+  ]);
 
   const setSearch = useCallback((value: string) => {
     setSearchValue(value);
+    setPage(1);
+  }, []);
+
+  const setLevel = useCallback((value: string) => {
+    setLevelValue(value);
+    setPage(1);
+  }, []);
+
+  const setStatus = useCallback((value: string) => {
+    setStatusValue(value);
+    setPage(1);
+  }, []);
+
+  const setPlanType = useCallback((value: string) => {
+    setPlanTypeValue(value);
+    setPage(1);
+  }, []);
+
+  const setClassType = useCallback((value: string) => {
+    setClassTypeValue(value);
+    setPage(1);
+  }, []);
+
+  const setPlanHealth = useCallback((value: string) => {
+    setPlanHealthValue(value);
+    setPage(1);
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    setSearchValue("");
+    setLevelValue("");
+    setStatusValue("");
+    setPlanTypeValue("");
+    setClassTypeValue("");
+    setPlanHealthValue("");
     setPage(1);
   }, []);
 
@@ -152,10 +244,22 @@ export function useStudentsOverview(): UseStudentsOverviewResult {
     pagination,
     summary,
     search,
+    level,
+    status,
+    planType,
+    classType,
+    planHealth,
+    hasActiveFilters,
     isLoading,
     hasLoaded,
     error,
     setSearch,
+    setLevel,
+    setStatus,
+    setPlanType,
+    setClassType,
+    setPlanHealth,
+    clearFilters,
     goToPreviousPage,
     goToNextPage,
   };

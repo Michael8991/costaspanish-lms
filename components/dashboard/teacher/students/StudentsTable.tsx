@@ -5,7 +5,6 @@ import type {
   StudentListPagination,
 } from "@/lib/dto/student.dto";
 import {
-  Search,
   Plus,
   MoreVertical,
   Mail,
@@ -81,10 +80,9 @@ interface StudentsTableProps {
   locale: string;
   items: StudentListDTO[];
   pagination: StudentListPagination;
-  search: string;
+  hasActiveFilters: boolean;
   isLoading: boolean;
   error: string | null;
-  onSearchChange: (value: string) => void;
   onPreviousPage: () => void;
   onNextPage: () => void;
 }
@@ -93,10 +91,9 @@ export default function StudentsTable({
   locale,
   items,
   pagination,
-  search,
+  hasActiveFilters,
   isLoading,
   error,
-  onSearchChange,
   onPreviousPage,
   onNextPage,
 }: StudentsTableProps) {
@@ -178,8 +175,6 @@ export default function StudentsTable({
     };
   }, []);
 
-  console.log(students);
-
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200">
       <div className="p-5 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4 bg-gray-50/50">
@@ -192,29 +187,13 @@ export default function StudentsTable({
           )}
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-          <div className="relative w-full sm:w-72">
-            <Search
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-              size={18}
-            />
-            <input
-              type="text"
-              value={search}
-              onChange={(event) => onSearchChange(event.target.value)}
-              placeholder="Buscar alumno..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9e2727] focus:border-transparent transition-shadow"
-            />
-          </div>
-
-          <Link
-            href={`/${locale}/dashboard/students/newStudent`}
-            className="w-full sm:w-auto bg-[#9e2727] hover:bg-[#a85d5d] text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-all shadow-sm font-medium text-sm"
-          >
-            <Plus size={18} />
-            <span>Nuevo Alumno</span>
-          </Link>
-        </div>
+        <Link
+          href={`/${locale}/dashboard/students/newStudent`}
+          className="w-full sm:w-auto bg-[#9e2727] hover:bg-[#a85d5d] text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-all shadow-sm font-medium text-sm"
+        >
+          <Plus size={18} />
+          <span>Nuevo Alumno</span>
+        </Link>
       </div>
 
       {isLoading && students.length === 0 && (
@@ -233,8 +212,8 @@ export default function StudentsTable({
 
       {!isLoading && !error && students.length <= 0 && (
         <div className="flex items-center justify-center py-5 gap-2 text-green-900">
-          {search.trim()
-            ? "No hay estudiantes que coincidan con la búsqueda."
+          {hasActiveFilters
+            ? "No hay estudiantes que coincidan con los filtros."
             : "No hay estudiantes todavía."}
           <BrushCleaning size={16} />
         </div>
