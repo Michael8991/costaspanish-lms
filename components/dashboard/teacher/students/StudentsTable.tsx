@@ -1,6 +1,9 @@
 "use client";
 
-import { DBStudent, TableStudent } from "@/lib/types/student";
+import type {
+  StudentListDTO,
+  StudentListPagination,
+} from "@/lib/dto/student.dto";
 import {
   Search,
   Plus,
@@ -16,7 +19,7 @@ import {
   BrushCleaning,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type QuickOptionsMenu = {
   label: string;
@@ -37,7 +40,7 @@ const quickOptionsMenu: QuickOptionsMenu[] = [
   },
   {
     label: "New Lesson",
-    href: (id) => `/dashboard/lessons/add`,
+    href: () => `/dashboard/lessons/add`,
     icon: CalendarPlus,
   },
   {
@@ -62,10 +65,11 @@ const getLevelBadge = (level: string) => {
   return "bg-purple-100 text-purple-700 border-purple-200";
 };
 
-type StudentTableRow = Omit<
-  TableStudent,
-  "status" | "planType" | "creditsRemaining"
-> & {
+type StudentTableRow = {
+  id: string;
+  name: string;
+  email: string;
+  level: string;
   status: "active" | "inactive";
   activePlansCount: number;
   highlightedPlanName: string;
@@ -73,69 +77,60 @@ type StudentTableRow = Omit<
   highlightedPlanCreditsTotal: number;
 };
 
-export default function StudentsTable({ locale }: { locale: string }) {
+interface StudentsTableProps {
+  locale: string;
+  items: StudentListDTO[];
+  pagination: StudentListPagination;
+  search: string;
+  isLoading: boolean;
+  error: string | null;
+  onSearchChange: (value: string) => void;
+  onPreviousPage: () => void;
+  onNextPage: () => void;
+}
+
+export default function StudentsTable({
+  locale,
+  items,
+  pagination,
+  search,
+  isLoading,
+  error,
+  onSearchChange,
+  onPreviousPage,
+  onNextPage,
+}: StudentsTableProps) {
   const withLocale = (path: string) =>
     `/${locale}${path.startsWith("/") ? path : `/${path}`}`;
+  const students = useMemo<StudentTableRow[]>(() => {
+    return items.map((student) => {
+      const activePlans = student.activePlans.filter(
+        (plan) => plan.status === "active",
+      );
+      const highlightedPlan =
+        [...activePlans].sort(
+          (a, b) => (b.creditsRemaining ?? 0) - (a.creditsRemaining ?? 0),
+        )[0] ?? null;
 
-  const [students, setStudents] = useState<StudentTableRow[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchStudent = async () => {
-      try {
-        setIsLoading(true);
-        const response = await fetch("/api/students");
-        if (!response.ok) {
-          throw new Error("Error al cargar los alumnos");
-        }
-        const data = await response.json();
-
-        const formattedData: StudentTableRow[] = data.items.map(
-          (student: DBStudent) => {
-            const allPlans = Array.isArray(student.activePlans)
-              ? student.activePlans
-              : [];
-
-            const activePlans = allPlans.filter(
-              (plan) => plan.status === "active",
-            );
-
-            const highlightedPlan =
-              [...activePlans].sort(
-                (a, b) => (b.creditsRemaining ?? 0) - (a.creditsRemaining ?? 0),
-              )[0] ?? null;
-
-            return {
-              id: student._id,
-              name: student.fullName,
-              email: student.contactEmail,
-              level: student.level,
-              status: student.isActive ? "active" : "inactive",
-              activePlansCount: activePlans.length,
-              highlightedPlanName:
-                highlightedPlan?.name ?? "Sin planes activos",
-              highlightedPlanCreditsRemaining:
-                highlightedPlan?.creditsRemaining ?? 0,
-              highlightedPlanCreditsTotal: highlightedPlan?.creditsTotal ?? 0,
-            };
-          },
-        );
-
-        setStudents(formattedData);
-      } catch (error) {
-        if (error instanceof Error) {
-          setError(error.message);
-        } else {
-          setError("Ocurrio un error inesperado");
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchStudent();
-  }, []);
+      return {
+        id: student.id,
+        name: student.fullName,
+        email: student.contactEmail,
+        level: student.level,
+        status: student.status,
+        activePlansCount: activePlans.length,
+        highlightedPlanName: highlightedPlan?.name ?? "Sin planes activos",
+        highlightedPlanCreditsRemaining: highlightedPlan?.creditsRemaining ?? 0,
+        highlightedPlanCreditsTotal: highlightedPlan?.creditsTotal ?? 0,
+      };
+    });
+  }, [items]);
+  const rangeStart =
+    pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1;
+  const rangeEnd = Math.min(
+    pagination.page * pagination.limit,
+    pagination.total,
+  );
 
   const [isOpenQO, setIsOpenQO] = useState<string | null>(null);
   const [menuPosition, setMenuPosition] = useState<{
@@ -183,10 +178,19 @@ export default function StudentsTable({ locale }: { locale: string }) {
     };
   }, []);
 
+  console.log(students);
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200">
       <div className="p-5 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4 bg-gray-50/50">
-        <h2 className="font-semibold text-gray-800 text-lg">Students</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-semibold text-gray-800">Students</h2>
+          {isLoading && students.length > 0 && (
+            <span className="text-xs italic text-gray-400">
+              Actualizando...
+            </span>
+          )}
+        </div>
 
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
           <div className="relative w-full sm:w-72">
@@ -196,6 +200,8 @@ export default function StudentsTable({ locale }: { locale: string }) {
             />
             <input
               type="text"
+              value={search}
+              onChange={(event) => onSearchChange(event.target.value)}
               placeholder="Buscar alumno..."
               className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9e2727] focus:border-transparent transition-shadow"
             />
@@ -211,29 +217,35 @@ export default function StudentsTable({ locale }: { locale: string }) {
         </div>
       </div>
 
-      {isLoading && (
+      {isLoading && students.length === 0 && (
         <div className="p-8 text-center text-gray-500">
           <p className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#9e2727] mx-auto mb-4"></p>
-          Loading students...
+          Cargando estudiantes...
         </div>
       )}
 
       {error && (
         <div className="w-full flex items-center justify-center py-4 gap-2 text-red-500">
           <AlertCircle size={16} />
-          Ocurrio un error {error}
+          No se pudieron cargar los estudiantes.
         </div>
       )}
 
       {!isLoading && !error && students.length <= 0 && (
         <div className="flex items-center justify-center py-5 gap-2 text-green-900">
-          No hay alumnos registrados
+          {search.trim()
+            ? "No hay estudiantes que coincidan con la búsqueda."
+            : "No hay estudiantes todavía."}
           <BrushCleaning size={16} />
         </div>
       )}
 
-      {!isLoading && !error && students.length > 0 && (
-        <div className="overflow-x-auto">
+      {!error && students.length > 0 && (
+        <div
+          className={`overflow-x-auto transition-opacity ${
+            isLoading ? "opacity-60" : "opacity-100"
+          }`}
+        >
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 text-xs uppercase tracking-wider">
@@ -360,6 +372,40 @@ export default function StudentsTable({ locale }: { locale: string }) {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {!error && (!isLoading || students.length > 0) && (
+        <div className="flex flex-col gap-3 border-t border-gray-200 bg-gray-50/50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-gray-500">
+            Mostrando {rangeStart}–{rangeEnd} de {pagination.total} estudiantes
+          </p>
+
+          {pagination.totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onPreviousPage}
+                disabled={!pagination.hasPreviousPage || isLoading}
+                className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Anterior
+              </button>
+
+              <span className="px-2 text-sm font-medium text-gray-600">
+                Página {pagination.page} de {pagination.totalPages}
+              </span>
+
+              <button
+                type="button"
+                onClick={onNextPage}
+                disabled={!pagination.hasNextPage || isLoading}
+                className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Siguiente
+              </button>
+            </div>
+          )}
         </div>
       )}
 

@@ -21,6 +21,7 @@ export interface PlanDoc {
 
 export interface StudentProfileDoc{
     _id: Types.ObjectId;
+    teacherId?: Types.ObjectId;
     userId?: Types.ObjectId;
     contactEmail: string;
     contactEmailLower: string;
@@ -56,7 +57,12 @@ const PlanSchema = new Schema<PlanDoc>({
 })
 
 const StudentProfileSchema = new Schema<StudentProfileDoc>({
-    userId: { type: Schema.Types.ObjectId, ref: "User", index: true },
+    teacherId: {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+        index: true,
+    },
+    userId: { type: Schema.Types.ObjectId, ref: "User" },
     contactEmail: { type: String, required: true, trim: true },
     contactEmailLower: {type: String, required: true, unique: true, index: true, trim: true},
     fullName: { type: String, required: true, trim: true, maxlength: 120 },
@@ -80,4 +86,4 @@ StudentProfileSchema.index(
     {unique: true, partialFilterExpression:{userId:{$exists: true}}}
 )
 
-export const StudentProfile: Model<StudentProfileDoc> = models.StudentProfile || model<StudentProfileDoc>("StudentProfile", StudentProfileSchema) 
+export const StudentProfile: Model<StudentProfileDoc> = models.StudentProfile || model<StudentProfileDoc>("StudentProfile", StudentProfileSchema)

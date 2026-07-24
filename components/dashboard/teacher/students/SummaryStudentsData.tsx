@@ -1,40 +1,20 @@
-import { authOptions } from "@/lib/auth";
-import dbConnect from "@/lib/mongo";
-import { StudentProfile } from "@/models/StudentProfile";
 import { AlertCircle, GraduationCap, Users } from "lucide-react";
-import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
 
-export default async function SummaryStudentsData() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user || session.user.role === "student") {
-    redirect(`/en/dashboard`);
-  }
-  let activeCount = 0;
-  let pendingLevelCount = 0;
-  let expiringPlansCount = 0;
-  try {
-    await dbConnect();
-    [activeCount, pendingLevelCount, expiringPlansCount] = await Promise.all([
-      StudentProfile.countDocuments({ isActive: true }),
-      StudentProfile.countDocuments({ level: "Evaluando", isActive: true }),
-      StudentProfile.countDocuments({
-        activePlans: {
-          $elemMatch: {
-            status: "active",
-            creditsRemaining: { $lte: 2 },
-          },
-        },
-      }),
-    ]);
-  } catch (error) {
-    console.error("Error fetching summary stats:", error);
-  }
+import type { StudentListSummary } from "@/lib/dto/student.dto";
 
+interface SummaryStudentsDataProps {
+  summary: StudentListSummary;
+  isLoading: boolean;
+}
+
+export default function SummaryStudentsData({
+  summary,
+  isLoading,
+}: SummaryStudentsDataProps) {
   const stats = [
     {
       title: "Alumnos Activos",
-      value: activeCount.toString(),
+      value: summary.activeStudents,
       icon: Users,
       color: "text-blue-600",
       bg: "bg-blue-50",
@@ -42,7 +22,7 @@ export default async function SummaryStudentsData() {
     },
     {
       title: "Bonos que terminarán pronto",
-      value: expiringPlansCount.toString(),
+      value: summary.expiringPlansSoon,
       icon: AlertCircle,
       color: "text-red-600",
       bg: "bg-red-50",
@@ -50,31 +30,35 @@ export default async function SummaryStudentsData() {
     },
     {
       title: "Nivel Pendiente",
-      value: pendingLevelCount.toString(),
+      value: summary.pendingLevel,
       icon: GraduationCap,
       color: "text-amber-600",
       bg: "bg-amber-50",
       border: "border-amber-100",
     },
   ];
+
   return (
-    <div className="container mx-auto py-8 px-4 md:px-8 text-gray-800 max-w-6xl">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-        {stats.map((stat, i) => {
+    <div className="container mx-auto max-w-6xl px-4 py-8 text-gray-800 md:px-8">
+      <div className="mb-10 grid grid-cols-1 gap-6 md:grid-cols-3">
+        {stats.map((stat) => {
           const Icon = stat.icon;
+
           return (
             <div
-              key={i}
-              className={`bg-white p-6 rounded-xl shadow-sm border ${stat.border} flex items-center gap-5 transition-transform hover:-translate-y-1 duration-200 hover:cursor-pointer`}
+              key={stat.title}
+              className={`flex items-center gap-5 rounded-xl border bg-white p-6 shadow-sm ${stat.border}`}
             >
-              <div className={`p-4 rounded-full ${stat.bg}`}>
+              <div className={`rounded-full p-4 ${stat.bg}`}>
                 <Icon className={stat.color} size={28} strokeWidth={2} />
               </div>
               <div>
-                <p className="text-sm text-gray-500 font-medium mb-1">
+                <p className="mb-1 text-sm font-medium text-gray-500">
                   {stat.title}
                 </p>
-                <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {isLoading ? "—" : stat.value}
+                </p>
               </div>
             </div>
           );

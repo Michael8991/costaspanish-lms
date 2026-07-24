@@ -1,5 +1,4 @@
-import StudentsTable from "@/components/dashboard/teacher/students/StudentsTable";
-import SummaryStudentsData from "@/components/dashboard/teacher/students/SummaryStudentsData";
+import StudentsOverview from "@/components/dashboard/teacher/students/StudentsOverview";
 import Breadcrumbs from "@/components/ui/Breadcrumbs";
 import { authOptions } from "@/lib/auth";
 import { getServerSession } from "next-auth";
@@ -24,12 +23,12 @@ export default async function StudentsPage({
   return (
     <div className="container mx-auto py-8 px-4 md:px-8 text-gray-800 max-w-6xl">
       <Breadcrumbs items={breadcrumbItems} locale={locale} />
-      <h1 className="text-2xl">Students Overview</h1>
-      <p className="italic text-sm font-light">
-        A quick summary of all ours students, their information and plans
+      <h1 className="text-2xl">Estudiantes</h1>
+      <p className="text-sm font-light">
+        Un resumen rápido de todos nuestros estudiantes, su información y
+        planes.
       </p>
-      <SummaryStudentsData />
-      <StudentsTable locale={locale} />
+      <StudentsOverview locale={locale} />
     </div>
   );
 }

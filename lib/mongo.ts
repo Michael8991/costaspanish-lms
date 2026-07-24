@@ -34,11 +34,17 @@
 
 import mongoose from "mongoose";
 
-const MONGODB_URI = process.env.MONGO_URI;
+function getMongoUri(): string {
+    const uri = process.env.MONGODB_URI ?? process.env.MONGO_URI;
 
-if (!MONGODB_URI) {
-    throw new Error("Missing MONGODB_URI in environment variables");
+    if (!uri) {
+        throw new Error("Please define the MONGODB_URI environment variable");
+    }
+
+    return uri;
 }
+
+const MONGODB_URI = getMongoUri();
 
 
 //Evitamos múltiples conexiones en dev(HMR)
@@ -49,18 +55,32 @@ declare global {
     } | undefined;
 }
 
-global.__mongooseConn ||= { conn: null, promise: null };
+const mongooseCache = global.__mongooseConn ?? {
+    conn: null,
+    promise: null,
+};
+
+global.__mongooseConn = mongooseCache;
 
 export async function dbConnect() {
-    if (global.__mongooseConn!.conn) return global.__mongooseConn!.conn;
+    const cached = mongooseCache;
 
-    if (!global.__mongooseConn!.promise) {
-        global.__mongooseConn!.promise = mongoose.connect(MONGODB_URI!, {
+    if (cached.conn) {
+        return cached.conn;
+    }
+
+    if (!cached.promise) {
+        cached.promise = mongoose.connect(MONGODB_URI, {
             //Opciones de mongoose. //TODO: Leer documentación
         }).then((m) => m);
     }
-    global.__mongooseConn!.conn = await global.__mongooseConn!.promise;
-    return global.__mongooseConn!.conn;
+    try {
+        cached.conn = await cached.promise;
+        return cached.conn;
+    } catch (error) {
+        cached.promise = null;
+        throw error;
+    }
 }
 
 export default dbConnect;
