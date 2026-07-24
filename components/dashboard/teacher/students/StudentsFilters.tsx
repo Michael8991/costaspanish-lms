@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, Trash2, X } from "lucide-react";
+import { Search, Trash2 } from "lucide-react";
 
 interface StudentsFiltersProps {
   search: string;

@@ -179,7 +179,7 @@ export default function StudentsTable({
     <div className="bg-white rounded-xl shadow-sm border border-gray-200">
       <div className="p-5 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4 bg-gray-50/50">
         <div className="flex items-center gap-3">
-          <h2 className="text-lg font-semibold text-gray-800">Students</h2>
+          <h2 className="text-lg font-semibold text-gray-800">Estudiantes</h2>
           {isLoading && students.length > 0 && (
             <span className="text-xs italic text-gray-400">
               Actualizando...

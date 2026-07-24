@@ -160,10 +160,10 @@ export default async function StudentPage({
         activePlans={plans}
       />
       {/* Recent Lessons */}
-      <div className="xl:col-span-2 flex flex-col gap-6 my-5">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          {/* Header de la sección */}
-          <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+      {/* <div className="xl:col-span-2 flex flex-col gap-6 my-5">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"> */}
+      {/* Header de la sección */}
+      {/* <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
             <div className="flex items-center gap-2">
               <Presentation size={18} className="text-[#9e2727]" />
               <h2 className="font-semibold text-gray-900">Recent Lessons</h2>
@@ -172,88 +172,88 @@ export default async function StudentPage({
               <Plus size={16} />
               Add New Lesson
             </button>
-          </div>
+          </div> */}
 
-          {/* Lista de clases */}
-          {/* <div className="p-5 flex flex-col gap-4">
+      {/* Lista de clases */}
+      {/* <div className="p-5 flex flex-col gap-4">
             {Lessons.map((lesson, index) => (
               <div
                 key={index}
                 className="flex flex-col sm:flex-row justify-between items-start sm:items-center border border-gray-100 rounded-lg p-4 hover:border-gray-200 transition-colors bg-white shadow-sm gap-4"
               >
                 {/* Lado izquierdo: Título, Prep Status y meta-info */}
-          {/* <div className="flex flex-col gap-1.5"> */}
-          {/* <div className="flex flex-wrap items-center gap-3"> */}
-          {/* <h3 className="font-semibold text-gray-900"> */}
-          {/* {lesson.title} */}
-          {/* </h3> */}
-          {/* <span */}
-          {/* className={`flex items-center gap-1.5 text-[11px] uppercase font-bold tracking-wider ${ */}
-          {/* lesson.prepStatus === "pending" */}
-          {/* ? "text-amber-600" */}
-          {/* : "text-emerald-600" */}
-          {/* }`} */}
-          {/* > */}
-          {/* {lesson.prepStatus === "pending" ? ( */}
-          {/* <> */}
-          {/* <AlertCircle size={14} /> Needs Prep */}
-          {/* </> */}
-          {/* ) : ( */}
-          {/* <> */}
-          {/* <CheckCircle size={14} /> Prepped */}
-          {/* </> */}
-          {/* )} */}
-          {/* </span> */}
-          {/* </div> */}
-          {/*  */}
-          {/* <div className="flex items-center gap-4 text-xs text-gray-500 mt-1"> */}
-          {/* <div className="flex items-center gap-1.5"> */}
-          {/* <Calendar size={14} /> */}
-          {/* <span>{lesson.date}</span> */}
-          {/* </div> */}
-          {/* <div className="flex items-center gap-1.5"> */}
-          {/* <Clock size={14} /> */}
-          {/* <span>{lesson.time}</span> */}
-          {/* </div> */}
-          {/* </div> */}
-          {/* </div> */}
+      {/* <div className="flex flex-col gap-1.5"> */}
+      {/* <div className="flex flex-wrap items-center gap-3"> */}
+      {/* <h3 className="font-semibold text-gray-900"> */}
+      {/* {lesson.title} */}
+      {/* </h3> */}
+      {/* <span */}
+      {/* className={`flex items-center gap-1.5 text-[11px] uppercase font-bold tracking-wider ${ */}
+      {/* lesson.prepStatus === "pending" */}
+      {/* ? "text-amber-600" */}
+      {/* : "text-emerald-600" */}
+      {/* }`} */}
+      {/* > */}
+      {/* {lesson.prepStatus === "pending" ? ( */}
+      {/* <> */}
+      {/* <AlertCircle size={14} /> Needs Prep */}
+      {/* </> */}
+      {/* ) : ( */}
+      {/* <> */}
+      {/* <CheckCircle size={14} /> Prepped */}
+      {/* </> */}
+      {/* )} */}
+      {/* </span> */}
+      {/* </div> */}
+      {/*  */}
+      {/* <div className="flex items-center gap-4 text-xs text-gray-500 mt-1"> */}
+      {/* <div className="flex items-center gap-1.5"> */}
+      {/* <Calendar size={14} /> */}
+      {/* <span>{lesson.date}</span> */}
+      {/* </div> */}
+      {/* <div className="flex items-center gap-1.5"> */}
+      {/* <Clock size={14} /> */}
+      {/* <span>{lesson.time}</span> */}
+      {/* </div> */}
+      {/* </div> */}
+      {/* </div> */}
 
-          {/* <div className="flex flex-col sm:items-end gap-2 w-full sm:w-auto mt-2 sm:mt-0"> */}
-          {/* <span */}
-          {/* className={`px-3 py-1 text-xs font-semibold rounded-md border text-center w-fit ${ */}
-          {/* statusStyles[lesson.status] || "bg-gray-100 text-gray-500" */}
-          {/* }`} */}
-          {/* > */}
-          {/* {lesson.status.charAt(0).toUpperCase() + */}
-          {/* lesson.status.slice(1)} */}
-          {/* </span> */}
+      {/* <div className="flex flex-col sm:items-end gap-2 w-full sm:w-auto mt-2 sm:mt-0"> */}
+      {/* <span */}
+      {/* className={`px-3 py-1 text-xs font-semibold rounded-md border text-center w-fit ${ */}
+      {/* statusStyles[lesson.status] || "bg-gray-100 text-gray-500" */}
+      {/* }`} */}
+      {/* > */}
+      {/* {lesson.status.charAt(0).toUpperCase() + */}
+      {/* lesson.status.slice(1)} */}
+      {/* </span> */}
 
-          {/* //TODO:Botón de editar clase integrado -- Agregar enlace real */}
-          {/* <Link */}
-          {/* </div>                href={"#"} */}
-          {/* className="items-center text-[11px] font-medium text-gray-400 hover:text-[#9e2727] transition-colors flex gap-1 mt-1 border rounded-lg border-gray-300 px-2 py-1 hover:border-[#9e2727]" */}
-          {/* > */}
-          {/* <Pencil size={12} /> Edit Lesson */}
-          {/* </Link> */}
-          {/* </div> */}
-          {/* </div> */}
-          {/* ))} */}
-          {/* <div className="flex w-full items-center justify-end"> */}
-          {/* //TODO: Agregar enlace real al historial de clases */}
-          {/* <Link */}
-          {/* href={"#"} */}
-          {/* className="text-[#9e2727] text-sm flex items-center gap-2 group" */}
-          {/* > */}
-          {/* See Full Lessons History */}
-          {/* <ArrowRight */}
-          {/* size={14} */}
-          {/* className="group-hover:translate-x-1 transition-all transform duration-100 ease-in" */}
-          {/* /> */}
-          {/* </Link> */}
-          {/* </div> */}
-          {/* </div> */}
-        </div>
-      </div>
+      {/* //TODO:Botón de editar clase integrado -- Agregar enlace real */}
+      {/* <Link */}
+      {/* </div>                href={"#"} */}
+      {/* className="items-center text-[11px] font-medium text-gray-400 hover:text-[#9e2727] transition-colors flex gap-1 mt-1 border rounded-lg border-gray-300 px-2 py-1 hover:border-[#9e2727]" */}
+      {/* > */}
+      {/* <Pencil size={12} /> Edit Lesson */}
+      {/* </Link> */}
+      {/* </div> */}
+      {/* </div> */}
+      {/* ))} */}
+      {/* <div className="flex w-full items-center justify-end"> */}
+      {/* //TODO: Agregar enlace real al historial de clases */}
+      {/* <Link */}
+      {/* href={"#"} */}
+      {/* className="text-[#9e2727] text-sm flex items-center gap-2 group" */}
+      {/* > */}
+      {/* See Full Lessons History */}
+      {/* <ArrowRight */}
+      {/* size={14} */}
+      {/* className="group-hover:translate-x-1 transition-all transform duration-100 ease-in" */}
+      {/* /> */}
+      {/* </Link> */}
+      {/* </div> */}
+      {/* </div> */}
+      {/* </div> */}
+      {/* // </div> */}
       {/* //Internal Notes acordeon */}
       <div className="xl:col-span-2 flex flex-col gap-6 my-5">
         {/* 1. Usamos <details> nativo con la clase "group" para detectar si está abierto */}

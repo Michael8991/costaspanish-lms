@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import type {
   StudentListDTO,
@@ -27,25 +27,11 @@ const INITIAL_SUMMARY: StudentListSummary = {
   studentsWithoutActivePlan: 0,
 };
 
-function useDebouncedValue<T>(value: T, delayMs: number): T {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      setDebouncedValue(value);
-    }, delayMs);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [delayMs, value]);
-
-  return debouncedValue;
-}
-
 interface StudentsOverviewApiError {
   error?: string;
 }
 
-type StudentsOverviewQuery = {
+export interface StudentsOverviewQuery {
   page: number;
   limit: number;
   search: string;
@@ -54,7 +40,40 @@ type StudentsOverviewQuery = {
   planType: string;
   classType: string;
   planHealth: string;
-};
+}
+
+export type StudentsQuickFilter =
+  | "active_students"
+  | "expiring_plans"
+  | "pending_level"
+  | "without_active_plan";
+
+export function getActiveQuickFilter({
+  status,
+  level,
+  planHealth,
+}: Pick<
+  StudentsOverviewQuery,
+  "status" | "level" | "planHealth"
+>): StudentsQuickFilter | null {
+  if (status === "active" && !level && !planHealth) {
+    return "active_students";
+  }
+
+  if (!status && !level && planHealth === "expiring_soon") {
+    return "expiring_plans";
+  }
+
+  if (!status && level === "pending" && !planHealth) {
+    return "pending_level";
+  }
+
+  if (!status && !level && planHealth === "no_active_plan") {
+    return "without_active_plan";
+  }
+
+  return null;
+}
 
 function buildStudentsParams(query: StudentsOverviewQuery): URLSearchParams {
   const params = new URLSearchParams();
@@ -76,47 +95,29 @@ export interface UseStudentsOverviewResult {
   items: StudentListDTO[];
   pagination: StudentListPagination;
   summary: StudentListSummary;
-  search: string;
-  level: string;
-  status: string;
-  planType: string;
-  classType: string;
-  planHealth: string;
-  hasActiveFilters: boolean;
   isLoading: boolean;
   hasLoaded: boolean;
   error: string | null;
-  setSearch: (value: string) => void;
-  setLevel: (value: string) => void;
-  setStatus: (value: string) => void;
-  setPlanType: (value: string) => void;
-  setClassType: (value: string) => void;
-  setPlanHealth: (value: string) => void;
-  clearFilters: () => void;
-  goToPreviousPage: () => void;
-  goToNextPage: () => void;
 }
 
-export function useStudentsOverview(): UseStudentsOverviewResult {
+export function useStudentsOverview({
+  page,
+  limit,
+  search,
+  level,
+  status,
+  planType,
+  classType,
+  planHealth,
+}: StudentsOverviewQuery): UseStudentsOverviewResult {
   const [items, setItems] = useState<StudentListDTO[]>([]);
   const [pagination, setPagination] =
     useState<StudentListPagination>(INITIAL_PAGINATION);
   const [summary, setSummary] =
     useState<StudentListSummary>(INITIAL_SUMMARY);
-  const [page, setPage] = useState(1);
-  const [search, setSearchValue] = useState("");
-  const [level, setLevelValue] = useState("");
-  const [status, setStatusValue] = useState("");
-  const [planType, setPlanTypeValue] = useState("");
-  const [classType, setClassTypeValue] = useState("");
-  const [planHealth, setPlanHealthValue] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const debouncedSearch = useDebouncedValue(search.trim(), 300);
-  const hasActiveFilters = Boolean(
-    search.trim() || level || status || planType || classType || planHealth,
-  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -128,8 +129,8 @@ export function useStudentsOverview(): UseStudentsOverviewResult {
 
         const params = buildStudentsParams({
           page,
-          limit: DEFAULT_LIMIT,
-          search: debouncedSearch,
+          limit,
+          search,
           level,
           status,
           planType,
@@ -179,88 +180,21 @@ export function useStudentsOverview(): UseStudentsOverviewResult {
     return () => controller.abort();
   }, [
     classType,
-    debouncedSearch,
     level,
+    limit,
     page,
     planHealth,
     planType,
+    search,
     status,
   ]);
-
-  const setSearch = useCallback((value: string) => {
-    setSearchValue(value);
-    setPage(1);
-  }, []);
-
-  const setLevel = useCallback((value: string) => {
-    setLevelValue(value);
-    setPage(1);
-  }, []);
-
-  const setStatus = useCallback((value: string) => {
-    setStatusValue(value);
-    setPage(1);
-  }, []);
-
-  const setPlanType = useCallback((value: string) => {
-    setPlanTypeValue(value);
-    setPage(1);
-  }, []);
-
-  const setClassType = useCallback((value: string) => {
-    setClassTypeValue(value);
-    setPage(1);
-  }, []);
-
-  const setPlanHealth = useCallback((value: string) => {
-    setPlanHealthValue(value);
-    setPage(1);
-  }, []);
-
-  const clearFilters = useCallback(() => {
-    setSearchValue("");
-    setLevelValue("");
-    setStatusValue("");
-    setPlanTypeValue("");
-    setClassTypeValue("");
-    setPlanHealthValue("");
-    setPage(1);
-  }, []);
-
-  const goToPreviousPage = useCallback(() => {
-    if (!pagination.hasPreviousPage) return;
-    setPage((currentPage) => Math.max(1, currentPage - 1));
-  }, [pagination.hasPreviousPage]);
-
-  const goToNextPage = useCallback(() => {
-    if (!pagination.hasNextPage) return;
-    setPage((currentPage) =>
-      Math.min(pagination.totalPages, currentPage + 1),
-    );
-  }, [pagination.hasNextPage, pagination.totalPages]);
 
   return {
     items,
     pagination,
     summary,
-    search,
-    level,
-    status,
-    planType,
-    classType,
-    planHealth,
-    hasActiveFilters,
     isLoading,
     hasLoaded,
     error,
-    setSearch,
-    setLevel,
-    setStatus,
-    setPlanType,
-    setClassType,
-    setPlanHealth,
-    clearFilters,
-    goToPreviousPage,
-    goToNextPage,
   };
 }

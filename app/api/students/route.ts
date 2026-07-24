@@ -170,6 +170,7 @@ const PLAN_HEALTH_VALUES = [
     "low_credits",
     "no_active_plan",
 ] as const;
+const LOW_REMAINING_RATIO = 0.25;
 
 function parsePositiveInteger(
     value: string | null,
@@ -232,6 +233,68 @@ function noActivePlanCondition(): StudentMongoFilter {
             $not: {
                 $elemMatch: { status: "active" },
             },
+        },
+    };
+}
+
+function planRemainingRatioCondition({
+    maxRatio = LOW_REMAINING_RATIO,
+    classType,
+    billingType,
+}: {
+    maxRatio?: number;
+    classType?: ClassType;
+    billingType?: PlanBillingType;
+} = {}): StudentMongoFilter {
+    const planConditions: StudentMongoFilter[] = [
+        { $eq: ["$$plan.status", "active"] },
+        { $gt: ["$$plan.creditsTotal", 0] },
+        { $isNumber: "$$plan.creditsRemaining" },
+        {
+            $lte: [
+                {
+                    $divide: [
+                        "$$plan.creditsRemaining",
+                        {
+                            $cond: [
+                                { $gt: ["$$plan.creditsTotal", 0] },
+                                "$$plan.creditsTotal",
+                                1,
+                            ],
+                        },
+                    ],
+                },
+                maxRatio,
+            ],
+        },
+    ];
+
+    if (classType) {
+        planConditions.push({
+            $eq: ["$$plan.classType", classType],
+        });
+    }
+
+    if (billingType) {
+        planConditions.push({
+            $eq: ["$$plan.billingType", billingType],
+        });
+    }
+
+    return {
+        $expr: {
+            $gt: [
+                {
+                    $size: {
+                        $filter: {
+                            input: { $ifNull: ["$activePlans", []] },
+                            as: "plan",
+                            cond: { $and: planConditions },
+                        },
+                    },
+                },
+                0,
+            ],
         },
     };
 }
@@ -402,26 +465,30 @@ export async function GET(req: NextRequest) {
             andConditions.push({ isActive: status === "active" });
         }
 
-        const now = new Date();
-        const soonDate = new Date(now);
-        soonDate.setDate(soonDate.getDate() + 14);
-
         if (planHealth === "no_active_plan") {
             andConditions.push(noActivePlanCondition());
         }
 
-        const activePlanMatch: Record<string, unknown> = {};
-        const shouldMatchActivePlan =
-            Boolean(planType || classType || legacyPlanStatus) ||
+        const usesRemainingRatio =
             planHealth === "low_credits" ||
             planHealth === "expiring_soon";
 
+        if (usesRemainingRatio) {
+            andConditions.push(
+                planRemainingRatioCondition({
+                    classType,
+                    billingType: planType,
+                }),
+            );
+        }
+
+        const activePlanMatch: Record<string, unknown> = {};
+        const shouldMatchActivePlan =
+            !usesRemainingRatio &&
+            Boolean(planType || classType || legacyPlanStatus);
+
         if (shouldMatchActivePlan) {
-            activePlanMatch.status =
-                planHealth === "low_credits" ||
-                planHealth === "expiring_soon"
-                    ? "active"
-                    : legacyPlanStatus ?? "active";
+            activePlanMatch.status = legacyPlanStatus ?? "active";
         }
 
         if (planType) {
@@ -430,17 +497,6 @@ export async function GET(req: NextRequest) {
 
         if (classType) {
             activePlanMatch.classType = classType;
-        }
-
-        if (planHealth === "low_credits") {
-            activePlanMatch.creditsRemaining = { $lte: 3 };
-        }
-
-        if (planHealth === "expiring_soon") {
-            activePlanMatch.$or = [
-                { creditsRemaining: { $lte: 3 } },
-                { validUntil: { $gte: now, $lte: soonDate } },
-            ];
         }
 
         if (shouldMatchActivePlan) {
@@ -456,17 +512,7 @@ export async function GET(req: NextRequest) {
 
         debugStudents("final Mongo filter", filter);
 
-        const expiringSoonCondition: StudentMongoFilter = {
-            activePlans: {
-                $elemMatch: {
-                    status: "active",
-                    $or: [
-                        { creditsRemaining: { $lte: 3 } },
-                        { validUntil: { $gte: now, $lte: soonDate } },
-                    ],
-                },
-            },
-        };
+        const expiringSoonCondition = planRemainingRatioCondition();
         const projection = {
             teacherId: 1,
             userId: 1,
