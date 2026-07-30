@@ -167,10 +167,38 @@ export const subModuleSchema = z.object({
   durationLabel: optionalTrimmedString,
 });
 
+export const templateBlockSchema = z.object({
+  title: nonEmptyTrimmedString("title", 140),
+  type: nonEmptyTrimmedString("type", 80),
+  categories: normalizeStringArray(80),
+  plannedContent: optionalTrimmedString,
+  plannedObjectives: normalizeStringArray(200),
+  estimatedMinutes: z.number().int().min(0).optional(),
+  cefrLevels: z.array(z.enum(CEFR_LEVELS)).default([]),
+  skills: normalizeStringArray(80),
+  tags: normalizeStringArray(80),
+  resources: z.array(z.string().trim().min(1)).default([]),
+  order: z.number().int().min(0).default(0),
+});
+
+export const templateLessonSchema = z.object({
+  title: nonEmptyTrimmedString("title", 140),
+  description: optionalTrimmedString,
+  order: z.number().int().min(0).default(0),
+  estimatedMinutes: z.number().int().min(0).optional(),
+  objectives: normalizeStringArray(200),
+  blocks: z.array(templateBlockSchema).default([]),
+  teacherNotes: optionalTrimmedString,
+});
+
 export const moduleDataSchema = z.object({
   title: nonEmptyTrimmedString("title", 120),
+  description: optionalTrimmedString,
   durationLabel: optionalTrimmedString,
   type: optionalTrimmedString,
+  order: z.number().int().min(0).default(0),
+  objectives: normalizeStringArray(200),
+  lessons: z.array(templateLessonSchema).default([]),
   submodules: z.array(subModuleSchema).default([]),
 });
 

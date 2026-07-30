@@ -1,8 +1,7 @@
-import type { LessonBlockType } from "@/lib/types/lesson";
 import { getLessonBlockTypeVisual } from "@/lib/utils/lesson-block-visuals";
 
 interface LessonBlockCategoryStackProps {
-  categories: readonly LessonBlockType[];
+  categories: readonly string[];
   tone?: "light" | "dark";
 }
 

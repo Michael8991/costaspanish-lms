@@ -6,7 +6,8 @@ import type {
   IPedagogicalMeta,
   ISubModule,
   IModuleData,
-  ICurriculum,
+  ITemplateBlock,
+  ITemplateLesson,
   IStorefront,
 } from "@/models/CourseTemplate";
 
@@ -20,12 +21,41 @@ export interface PriceOptionDTO extends Omit<IPriceOption, "condition"> {
   condition?: PriceConditionDTO;
 }
 
+export interface TemplateBlockDTO
+  extends Omit<
+    ITemplateBlock,
+    | "categories"
+    | "plannedObjectives"
+    | "cefrLevels"
+    | "skills"
+    | "tags"
+    | "resources"
+    | "order"
+  > {
+  categories: string[];
+  plannedObjectives: string[];
+  cefrLevels: NonNullable<ITemplateBlock["cefrLevels"]>;
+  skills: string[];
+  tags: string[];
+  resources: string[];
+  order: number;
+}
 
-export interface ModuleDataDTO extends Omit<IModuleData, "submodules"> {
+export interface TemplateLessonDTO
+  extends Omit<ITemplateLesson, "objectives" | "blocks"> {
+  objectives: string[];
+  blocks: TemplateBlockDTO[];
+}
+
+export interface ModuleDataDTO
+  extends Omit<IModuleData, "submodules" | "objectives" | "lessons" | "order"> {
+  order: number;
+  objectives: string[];
+  lessons: TemplateLessonDTO[];
   submodules: SubModuleDTO[];
 }
 
-export interface CurriculumDTO extends ICurriculum {
+export interface CurriculumDTO {
   modules: ModuleDataDTO[];
   units: string[];
 }
@@ -33,6 +63,13 @@ export interface CurriculumDTO extends ICurriculum {
 export interface DefaultStorefrontDTO
   extends Omit<IStorefront, "priceOptions"> {
   priceOptions: PriceOptionDTO[];
+}
+
+export interface CourseTemplateStatsDTO {
+  modulesCount: number;
+  lessonsCount: number;
+  blocksCount: number;
+  resourcesCount: number;
 }
 
 /**
@@ -53,6 +90,10 @@ export interface CourseTemplateListItemDTO {
   priceMode: IStorefront["priceMode"];
   currency: IStorefront["currency"];
   priceOptionsCount: number;
+  modulesCount: number;
+  lessonsCount: number;
+  blocksCount: number;
+  resourcesCount: number;
 
   createdAt: string;
   updatedAt: string;
@@ -72,6 +113,7 @@ export interface CourseTemplateDetailDTO {
   pedagogicalMeta: PedagogicalMetaDTO;
   storefront: DefaultStorefrontDTO;
   curriculum: CurriculumDTO;
+  stats: CourseTemplateStatsDTO;
 
   createdAt: string;
   updatedAt: string;

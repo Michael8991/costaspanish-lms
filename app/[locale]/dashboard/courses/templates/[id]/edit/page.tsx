@@ -18,7 +18,7 @@ export default async function EditCourseTemplatePage({
   const session = await getServerSession(authOptions);
   if (!session?.user) return null;
 
-  if (!session?.user || session.user.role === "student") {
+  if (session.user.role === "student") {
     redirect(`/${locale}/dashboard`);
   }
 
@@ -27,7 +27,17 @@ export default async function EditCourseTemplatePage({
   }
 
   await dbConnect();
-  const rawCourseTemplate = await CourseTemplate.findById(id).lean();
+  const templateId = new Types.ObjectId(id);
+  const currentUserId = session.user.id;
+  const templateFilter =
+    session.user.role === "admin"
+      ? { _id: templateId }
+      : {
+          _id: templateId,
+          ownerTeacherId: currentUserId,
+        };
+  const rawCourseTemplate =
+    await CourseTemplate.findOne(templateFilter).lean();
 
   if (!rawCourseTemplate) {
     notFound();
@@ -35,20 +45,37 @@ export default async function EditCourseTemplatePage({
 
   const courseTemplate = toCourseTemplateDetailDTO(rawCourseTemplate);
 
+  if (courseTemplate.status === "archived") {
+    redirect(
+      `/${locale}/dashboard/courses/templates/${courseTemplate.id}`,
+    );
+  }
+
   const breadcrumbItems = [
-    { label: "Courses", href: `/${locale}/dashboard/courses` },
+    { label: "Cursos", href: `/${locale}/dashboard/courses` },
     {
-      label: "`Details Course",
+      label: "Detalle de plantilla",
       href: `/${locale}/dashboard/courses/templates/${courseTemplate.id}`,
     },
-    { label: `Edit ${courseTemplate.code}` },
+    { label: `Editar ${courseTemplate.code}` },
   ];
   return (
     <div className="container mx-auto py-8 px-4 md:px-8 text-gray-800 max-w-6xl">
       <Breadcrumbs items={breadcrumbItems} locale={locale} />
-      <h1 className="text-2xl">Detalles de plantilla de curso</h1>
+      <h1 className="text-2xl font-semibold">Editar plantilla de curso</h1>
+      <p className="mt-1 text-sm text-gray-500">
+        Ajusta la guía pedagógica sin modificar cursos activos ni alumnos.
+      </p>
       <div className="flex flex-col">
-        <CourseTemplateForm locale={locale} />
+        <CourseTemplateForm
+          locale={locale}
+          initialData={courseTemplate}
+          submitLabel="Guardar cambios"
+          endpoint={`/api/course-template/${courseTemplate.id}`}
+          method="PATCH"
+          redirectTo={`/${locale}/dashboard/courses/templates/${courseTemplate.id}`}
+          cancleHref={`/${locale}/dashboard/courses/templates/${courseTemplate.id}`}
+        />
       </div>
     </div>
   );

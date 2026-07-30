@@ -106,3 +106,29 @@ export function isoToDatetimeLocalValue(value: string, timeZone: string) {
 
   return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}T${pad(parts.hour)}:${pad(parts.minute)}`;
 }
+
+export function getTodayRange(
+  timeZone = "Europe/Madrid",
+  now = new Date(),
+) {
+  const current = getDateTimeParts(now, timeZone);
+  const nextDay = new Date(
+    Date.UTC(current.year, current.month - 1, current.day + 1),
+  );
+  const pad = (part: number) => String(part).padStart(2, "0");
+  const currentDate = `${current.year}-${pad(current.month)}-${pad(current.day)}`;
+  const nextDate = `${nextDay.getUTCFullYear()}-${pad(
+    nextDay.getUTCMonth() + 1,
+  )}-${pad(nextDay.getUTCDate())}`;
+  const start = new Date(
+    zonedDateTimeToISOString(`${currentDate}T00:00:00`, timeZone),
+  );
+  const nextStart = new Date(
+    zonedDateTimeToISOString(`${nextDate}T00:00:00`, timeZone),
+  );
+
+  return {
+    start,
+    end: new Date(nextStart.getTime() - 1),
+  };
+}

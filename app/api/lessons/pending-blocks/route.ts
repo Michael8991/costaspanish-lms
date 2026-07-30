@@ -46,12 +46,38 @@ type PendingRawLesson = {
   courseId?: Types.ObjectId;
   title: string;
   scheduledStart: Date;
+  nextLessonFocus?: string;
   attendees?: PendingRawAttendee[];
   blocks?: PendingRawBlock[];
 };
 
+type CurrentLessonContext = Pick<
+  PendingRawLesson,
+  "_id" | "courseId" | "scheduledStart" | "attendees"
+>;
+
 function validateOptionalObjectId(value: string | undefined) {
   return value === undefined || Types.ObjectId.isValid(value);
+}
+
+function addLessonScopeFilter(
+  filter: Record<string, unknown>,
+  courseId: string | undefined,
+  studentIds: string[],
+) {
+  if (courseId) {
+    filter.courseId = new Types.ObjectId(courseId);
+    return;
+  }
+
+  const studentObjectIds = studentIds.map(
+    (studentId) => new Types.ObjectId(studentId),
+  );
+
+  filter["attendees.studentId"] = { $all: studentObjectIds };
+  filter.$expr = {
+    $eq: [{ $size: "$attendees" }, studentObjectIds.length],
+  };
 }
 
 type PendingBlockItem = {
@@ -104,8 +130,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { courseId, excludeLessonId, referenceDate } = parsed.data;
-    const studentIds = Array.from(new Set(parsed.data.studentIds));
+    const { excludeLessonId, referenceDate } = parsed.data;
+    let courseId = parsed.data.courseId;
+    let studentIds = Array.from(new Set(parsed.data.studentIds));
 
     if (
       !validateOptionalObjectId(courseId) ||
@@ -118,14 +145,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!courseId && studentIds.length === 0) {
-      return NextResponse.json({
-        items: [],
-        meta: { total: 0, previousLessonPendingCount: 0 },
-      });
-    }
-
-    const cutoffDate = referenceDate ? new Date(referenceDate) : new Date();
+    let cutoffDate = referenceDate ? new Date(referenceDate) : new Date();
 
     if (Number.isNaN(cutoffDate.getTime())) {
       return NextResponse.json(
@@ -143,9 +163,50 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    await dbConnect();
+
+    if (excludeLessonId) {
+      const currentLessonFilter: Record<string, unknown> = {
+        _id: new Types.ObjectId(excludeLessonId),
+      };
+
+      if (user.role !== "admin") {
+        currentLessonFilter.teacherId = currentUserObjectId;
+      }
+
+      const currentLesson = await Lesson.findOne(currentLessonFilter)
+        .select("courseId scheduledStart attendees.studentId")
+        .lean<CurrentLessonContext>();
+
+      if (!currentLesson) {
+        return NextResponse.json(
+          { error: "Lesson not found" },
+          { status: 404 },
+        );
+      }
+
+      courseId = currentLesson.courseId?.toString();
+      studentIds = Array.from(
+        new Set(
+          (currentLesson.attendees ?? [])
+            .map((attendee) => attendee.studentId?.toString())
+            .filter((studentId): studentId is string => Boolean(studentId)),
+        ),
+      );
+      cutoffDate = new Date(currentLesson.scheduledStart);
+    }
+
+    if (!courseId && studentIds.length === 0) {
+      return NextResponse.json({
+        focusNote: null,
+        items: [],
+        meta: { total: 0, previousLessonPendingCount: 0 },
+      });
+    }
+
     const filter: Record<string, unknown> = {
       status: { $nin: ["voided", "canceled_by_teacher"] },
-      scheduledStart: referenceDate
+      scheduledStart: referenceDate || excludeLessonId
         ? { $lt: cutoffDate }
         : { $lte: cutoffDate },
     };
@@ -158,25 +219,36 @@ export async function POST(req: NextRequest) {
       filter._id = { $ne: new Types.ObjectId(excludeLessonId) };
     }
 
-    if (courseId) {
-      filter.courseId = new Types.ObjectId(courseId);
-    } else {
-      const studentObjectIds = studentIds.map(
-        (studentId) => new Types.ObjectId(studentId),
-      );
+    addLessonScopeFilter(filter, courseId, studentIds);
 
-      filter["attendees.studentId"] = { $all: studentObjectIds };
-      filter.$expr = {
-        $eq: [{ $size: "$attendees" }, studentObjectIds.length],
-      };
-    }
+    const previousLessonFilter: Record<string, unknown> = {
+      ...filter,
+      status: "completed",
+      scheduledStart: { $lt: cutoffDate },
+    };
 
-    await dbConnect();
+    const [lessons, previousLesson] = await Promise.all([
+      Lesson.find(filter)
+        .sort({ scheduledStart: -1 })
+        .limit(20)
+        .lean<PendingRawLesson[]>(),
+      Lesson.findOne(previousLessonFilter)
+        .sort({ scheduledStart: -1 })
+        .select("title scheduledStart nextLessonFocus")
+        .lean<PendingRawLesson>(),
+    ]);
 
-    const lessons = await Lesson.find(filter)
-      .sort({ scheduledStart: -1 })
-      .limit(20)
-      .lean<PendingRawLesson[]>();
+    const previousFocusText = previousLesson?.nextLessonFocus?.trim();
+    const focusNote = previousLesson && previousFocusText
+      ? {
+          text: previousFocusText,
+          sourceLessonId: previousLesson._id.toString(),
+          sourceLessonTitle: previousLesson.title,
+          sourceLessonDate: new Date(
+            previousLesson.scheduledStart,
+          ).toISOString(),
+        }
+      : null;
 
     const identityToLineage = new Map<string, string>();
     const latestBlockByLineage = new Map<string, PendingBlockItem>();
@@ -279,6 +351,7 @@ export async function POST(req: NextRequest) {
     }));
 
     return NextResponse.json({
+      focusNote,
       items: responseItems,
       meta: {
         total: items.length,

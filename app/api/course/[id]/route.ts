@@ -1,31 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Types } from "mongoose";
+import { QueryFilter, Types } from "mongoose";
 import { z } from "zod";
 
+import { requireAuth, requireRole, type Role } from "@/lib/auth/apiAuth";
+import { toCourseProfileDetailDTO } from "@/lib/utils/course-profile.mapper";
+import { updateCourseProfileSchema } from "@/lib/validators/courseProfile.validator";
 import dbConnect from "@/lib/mongo";
-import { requireAuth } from "@/lib/auth/apiAuth";
-import { CourseProfile } from "@/models/CourseProfile";
-import { createCourseProfileSchema } from "@/lib/validators/course.validator";
+import {
+  CourseProfile,
+  type CourseProfileDocument,
+  type CourseType,
+  type ICourseProfile,
+} from "@/models/CourseProfile";
+import { StudentProfile, type ClassType } from "@/models/StudentProfile";
 
 export const runtime = "nodejs";
-
-type AuthUser = {
-  id?: string;
-  _id?: string;
-  role?: string;
-};
 
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-function getCurrentUserId(user: AuthUser) {
-  return String(user.id ?? user._id ?? "");
-}
-
-function isManager(user: AuthUser) {
-  return user.role === "teacher" || user.role === "admin";
-}
+type CurrentUser = {
+  id: string;
+  role: Role;
+};
 
 function formatZodError(error: z.ZodError) {
   return error.issues.map((issue) => ({
@@ -34,321 +32,261 @@ function formatZodError(error: z.ZodError) {
   }));
 }
 
-function isMongoDuplicateKeyError(
-  error: unknown
-): error is { code: number; keyPattern?: Record<string, 1>; keyValue?: Record<string, unknown> } {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: number }).code === 11000
-  );
+function toLegacyCourseType(classType: ClassType): CourseType {
+  if (classType === "group_regular") return "regular_group";
+  if (classType === "semi_intensive") return "semi-intensive_group";
+  if (classType === "intensive") return "intensive_group";
+  return "private_flexible";
 }
 
-function normalizePayloadByCourseType<T extends { courseType: string; regularPolicy?: unknown; privateFlexiblePolicy?: unknown }>(
-  payload: T
-): T {
-  const isRegular =
-    payload.courseType === "regular_group" || payload.courseType === "intensive_group";
+function getCourseQuery(
+  id: string,
+  user: CurrentUser,
+): QueryFilter<ICourseProfile> {
+  const query: QueryFilter<ICourseProfile> = {
+    _id: new Types.ObjectId(id),
+  };
 
-  if (isRegular) {
-    return {
-      ...payload,
-      privateFlexiblePolicy: undefined,
-    };
+  if (user.role !== "admin") {
+    query.ownerTeacherId = new Types.ObjectId(user.id);
   }
 
-  return {
-    ...payload,
-    regularPolicy: undefined,
-  };
+  return query;
 }
 
-function toCourseProfileDetailDTO(course: {
-  _id: Types.ObjectId;
-  ownerTeacherId: Types.ObjectId;
-  templateId: Types.ObjectId;
-  templateVersion: number;
-  code: string;
-  internalName: string;
-  description?: string;
-  status: string;
-  visibility: string;
-  courseType: string;
-  regularPolicy?: unknown;
-  privateFlexiblePolicy?: unknown;
-  consumptionPolicies: unknown;
-  storefront: unknown;
-  publicationMeta: unknown;
-  stats: unknown;
-  createdAt: Date;
-  updatedAt: Date;
-}) {
-  return {
-    id: String(course._id),
-    ownerTeacherId: String(course.ownerTeacherId),
-    templateId: String(course.templateId),
-    templateVersion: course.templateVersion,
+async function getAuthorizedUser(request: NextRequest) {
+  const user = await requireAuth(request);
 
-    code: course.code,
-    internalName: course.internalName,
-    description: course.description,
-
-    status: course.status,
-    visibility: course.visibility,
-    courseType: course.courseType,
-
-    regularPolicy: course.regularPolicy,
-    privateFlexiblePolicy: course.privateFlexiblePolicy,
-    consumptionPolicies: course.consumptionPolicies,
-
-    storefront: course.storefront,
-    publicationMeta: course.publicationMeta,
-    stats: course.stats,
-
-    createdAt: course.createdAt.toISOString(),
-    updatedAt: course.updatedAt.toISOString(),
-  };
-}
-
-function toMutableCoursePayload(doc: InstanceType<typeof CourseProfile>) {
-  const plain = doc.toObject();
-
-  return {
-    templateId: String(plain.templateId),
-    templateVersion: plain.templateVersion,
-
-    code: plain.code,
-    internalName: plain.internalName,
-    description: plain.description,
-
-    status: plain.status,
-    visibility: plain.visibility,
-    courseType: plain.courseType,
-
-    regularPolicy: plain.regularPolicy,
-    privateFlexiblePolicy: plain.privateFlexiblePolicy,
-    consumptionPolicies: plain.consumptionPolicies,
-
-    storefront: plain.storefront,
-    publicationMeta: plain.publicationMeta,
-    stats: plain.stats,
-  };
-}
-
-function mergeCourseProfilePatch(
-  current: ReturnType<typeof toMutableCoursePayload>,
-  patch: Partial<ReturnType<typeof toMutableCoursePayload>>
-) {
-  return {
-    ...current,
-    ...patch,
-
-    regularPolicy:
-      patch.regularPolicy === undefined ? current.regularPolicy : patch.regularPolicy,
-
-    privateFlexiblePolicy:
-      patch.privateFlexiblePolicy === undefined
-        ? current.privateFlexiblePolicy
-        : patch.privateFlexiblePolicy,
-
-    consumptionPolicies: patch.consumptionPolicies
-      ? {
-          ...current.consumptionPolicies,
-          ...patch.consumptionPolicies,
-          attendance:
-            patch.consumptionPolicies.attendance ?? current.consumptionPolicies.attendance,
-          noShow: patch.consumptionPolicies.noShow ?? current.consumptionPolicies.noShow,
-          teacherCancellation:
-            patch.consumptionPolicies.teacherCancellation ??
-            current.consumptionPolicies.teacherCancellation,
-          studentCancellationRules:
-            patch.consumptionPolicies.studentCancellationRules ??
-            current.consumptionPolicies.studentCancellationRules,
-        }
-      : current.consumptionPolicies,
-
-    storefront: patch.storefront
-      ? {
-          ...current.storefront,
-          ...patch.storefront,
-          priceOptions: patch.storefront.priceOptions ?? current.storefront.priceOptions,
-          benefits: patch.storefront.benefits ?? current.storefront.benefits,
-        }
-      : current.storefront,
-
-    publicationMeta: patch.publicationMeta
-      ? {
-          ...current.publicationMeta,
-          ...patch.publicationMeta,
-        }
-      : current.publicationMeta,
-
-    stats: patch.stats
-      ? {
-          ...current.stats,
-          ...patch.stats,
-        }
-      : current.stats,
-  };
-}
-
-async function findOwnedCourseOrNull(id: string, user: AuthUser) {
-  if (!Types.ObjectId.isValid(id)) {
+  if (!requireRole(user, ["admin", "teacher"])) {
     return null;
   }
 
-  return CourseProfile.findOne({
-    _id: new Types.ObjectId(id),
-    ownerTeacherId: new Types.ObjectId(getCurrentUserId(user)),
-  });
+  return user;
 }
 
-export async function GET(_: NextRequest, context: RouteContext) {
-  try {
-    const user = (await requireAuth(_)) as AuthUser;
+async function findCourse(
+  id: string,
+  user: CurrentUser,
+): Promise<CourseProfileDocument | null> {
+  return CourseProfile.findOne(getCourseQuery(id, user));
+}
 
-    if (!isManager(user)) {
-      return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+function validateCapacity(classType: ClassType, studentIds: string[]) {
+  if (studentIds.length === 0) {
+    return "Selecciona al menos un alumno";
+  }
+  if (classType === "private" && studentIds.length > 1) {
+    return "Un curso privado admite como máximo un alumno";
+  }
+  if (classType === "pair" && studentIds.length > 2) {
+    return "Un curso en pareja admite como máximo dos alumnos";
+  }
+  return null;
+}
+
+export async function GET(request: NextRequest, context: RouteContext) {
+  try {
+    const user = await getAuthorizedUser(request);
+
+    if (!user) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const { id } = await context.params;
+    if (!Types.ObjectId.isValid(id) || !Types.ObjectId.isValid(user.id)) {
+      return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     }
 
     await dbConnect();
-
-    const { id } = await context.params;
-
-    if (!Types.ObjectId.isValid(id)) {
-      return NextResponse.json({ message: "Invalid course id" }, { status: 400 });
-    }
-
-    const course = await findOwnedCourseOrNull(id, user);
+    const course = await CourseProfile.findOne(getCourseQuery(id, user))
+      .populate({
+        path: "studentIds",
+        select: "fullName contactEmail level isActive",
+      })
+      .lean();
 
     if (!course) {
-      return NextResponse.json({ message: "Course not found" }, { status: 404 });
+      return NextResponse.json({ error: "Course not found" }, { status: 404 });
     }
 
     return NextResponse.json({
-      item: toCourseProfileDetailDTO(course.toObject()),
+      item: toCourseProfileDetailDTO(course),
     });
   } catch (error) {
-    console.error("GET /api/courses/[id] error:", error);
+    console.error("GET /api/course/[id] error:", error);
     return NextResponse.json(
-      { message: "Failed to fetch course" },
-      { status: 500 }
+      { error: "Failed to fetch course" },
+      { status: 500 },
     );
   }
 }
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
-    const user = (await requireAuth(request)) as AuthUser;
+    const user = await getAuthorizedUser(request);
 
-    if (!isManager(user)) {
-      return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+    if (!user) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-
-    await dbConnect();
 
     const { id } = await context.params;
-
-    if (!Types.ObjectId.isValid(id)) {
-      return NextResponse.json({ message: "Invalid course id" }, { status: 400 });
+    if (!Types.ObjectId.isValid(id) || !Types.ObjectId.isValid(user.id)) {
+      return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     }
 
-    const patch = await request.json();
-
-    if (!patch || typeof patch !== "object" || Array.isArray(patch)) {
-      return NextResponse.json(
-        { message: "PATCH body must be an object" },
-        { status: 400 }
-      );
-    }
-
-    const course = await findOwnedCourseOrNull(id, user);
-
-    if (!course) {
-      return NextResponse.json({ message: "Course not found" }, { status: 404 });
-    }
-
-    const currentPayload = toMutableCoursePayload(course);
-    const mergedPayload = mergeCourseProfilePatch(currentPayload, patch);
-    const normalizedPayload = normalizePayloadByCourseType(mergedPayload);
-
-    const parsed = createCourseProfileSchema.safeParse(normalizedPayload);
+    const body: unknown = await request.json();
+    const parsed = updateCourseProfileSchema.safeParse(body);
 
     if (!parsed.success) {
       return NextResponse.json(
         {
-          message: "Invalid request body",
-          errors: formatZodError(parsed.error),
+          error: "Invalid request body",
+          details: formatZodError(parsed.error),
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    course.set(parsed.data);
+    await dbConnect();
+    const course = await findCourse(id, user);
+
+    if (!course) {
+      return NextResponse.json({ error: "Course not found" }, { status: 404 });
+    }
+
+    const classType = parsed.data.classType ?? course.classType ?? "private";
+    const studentIds =
+      parsed.data.studentIds ?? (course.studentIds ?? []).map(String);
+    const capacityError = validateCapacity(classType, studentIds);
+
+    if (capacityError) {
+      return NextResponse.json({ error: capacityError }, { status: 400 });
+    }
+
+    if (parsed.data.studentIds) {
+      const studentsCount = await StudentProfile.countDocuments({
+        _id: {
+          $in: parsed.data.studentIds.map(
+            (studentId) => new Types.ObjectId(studentId),
+          ),
+        },
+      });
+
+      if (studentsCount !== parsed.data.studentIds.length) {
+        return NextResponse.json(
+          { error: "One or more students do not exist" },
+          { status: 400 },
+        );
+      }
+
+      course.studentIds = parsed.data.studentIds.map(
+        (studentId) => new Types.ObjectId(studentId),
+      );
+      course.stats.activeEnrollmentCount = parsed.data.studentIds.length;
+    }
+
+    if (parsed.data.name !== undefined) {
+      course.name = parsed.data.name;
+      course.internalName = parsed.data.name;
+      course.storefront.publicTitle = parsed.data.name;
+    }
+    if (parsed.data.status !== undefined) course.status = parsed.data.status;
+    if (parsed.data.classType !== undefined) {
+      course.classType = parsed.data.classType;
+      course.courseType = toLegacyCourseType(parsed.data.classType);
+    }
+    if (parsed.data.scheduleNotes !== undefined) {
+      course.scheduleNotes = parsed.data.scheduleNotes;
+    }
+    if (parsed.data.internalNotes !== undefined) {
+      course.internalNotes = parsed.data.internalNotes;
+    }
+    if (
+      typeof body === "object" &&
+      body !== null &&
+      "startDate" in body
+    ) {
+      course.startDate = parsed.data.startDate
+        ? new Date(parsed.data.startDate)
+        : undefined;
+    }
+    if (
+      typeof body === "object" &&
+      body !== null &&
+      "targetEndDate" in body
+    ) {
+      course.targetEndDate = parsed.data.targetEndDate
+        ? new Date(parsed.data.targetEndDate)
+        : undefined;
+    }
+    if (parsed.data.progress) {
+      course.progress = {
+        currentModuleOrder:
+          parsed.data.progress.currentModuleOrder ??
+          course.progress?.currentModuleOrder ??
+          0,
+        currentLessonOrder:
+          parsed.data.progress.currentLessonOrder ??
+          course.progress?.currentLessonOrder ??
+          0,
+        completedLessonsCount:
+          parsed.data.progress.completedLessonsCount ??
+          course.progress?.completedLessonsCount ??
+          0,
+      };
+    }
+
     await course.save();
+    await course.populate({
+      path: "studentIds",
+      select: "fullName contactEmail level isActive",
+    });
 
     return NextResponse.json({
       item: toCourseProfileDetailDTO(course.toObject()),
     });
   } catch (error) {
-    console.error("PATCH /api/courses/[id] error:", error);
-
-    if (isMongoDuplicateKeyError(error)) {
-      return NextResponse.json(
-        {
-          message: "Duplicate value",
-          fields: Object.keys(error.keyPattern ?? {}),
-          keyValue: error.keyValue ?? {},
-        },
-        { status: 409 }
-      );
-    }
-
+    console.error("PATCH /api/course/[id] error:", error);
     return NextResponse.json(
-      { message: "Failed to update course" },
-      { status: 500 }
+      { error: "Failed to update course" },
+      { status: 500 },
     );
   }
 }
 
-export async function DELETE(_: NextRequest, context: RouteContext) {
+export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
-    const user = (await requireAuth(_)) as AuthUser;
+    const user = await getAuthorizedUser(request);
 
-    if (!isManager(user)) {
-      return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+    if (!user) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const { id } = await context.params;
+    if (!Types.ObjectId.isValid(id) || !Types.ObjectId.isValid(user.id)) {
+      return NextResponse.json({ error: "Invalid id" }, { status: 400 });
     }
 
     await dbConnect();
-
-    const { id } = await context.params;
-
-    if (!Types.ObjectId.isValid(id)) {
-      return NextResponse.json({ message: "Invalid course id" }, { status: 400 });
-    }
-
-    const deleted = await CourseProfile.findOneAndDelete({
-      _id: new Types.ObjectId(id),
-      ownerTeacherId: new Types.ObjectId(getCurrentUserId(user)),
-    });
-
-    if (!deleted) {
-      return NextResponse.json({ message: "Course not found" }, { status: 404 });
-    }
-
-    return NextResponse.json(
-      {
-        message: "Course deleted successfully",
-        id,
-      },
-      { status: 200 }
+    const course = await CourseProfile.findOneAndUpdate(
+      getCourseQuery(id, user),
+      { $set: { status: "archived" } },
+      { new: true, runValidators: true },
     );
+
+    if (!course) {
+      return NextResponse.json({ error: "Course not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      message: "Course archived successfully",
+      id,
+    });
   } catch (error) {
-    console.error("DELETE /api/courses/[id] error:", error);
+    console.error("DELETE /api/course/[id] error:", error);
     return NextResponse.json(
-      { message: "Failed to delete course" },
-      { status: 500 }
+      { error: "Failed to archive course" },
+      { status: 500 },
     );
   }
 }

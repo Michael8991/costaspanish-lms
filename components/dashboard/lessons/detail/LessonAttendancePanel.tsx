@@ -114,11 +114,15 @@ function mapBlocksToPatchPayload(blocks: ReviewLessonBlock[]) {
     studentDifficultiesText: block.studentDifficultiesText,
     teacherReflection: block.teacherReflection,
     nextStepSuggestion: block.nextStepSuggestion,
-    origin: block.origin?.sourceLessonId
+    origin: block.origin
       ? {
+          sourceType: block.origin.sourceType,
           sourceLessonId: block.origin.sourceLessonId,
           sourceBlockId: block.origin.sourceBlockId,
           sourceCourseId: block.origin.sourceCourseId,
+          sourceTemplateId: block.origin.sourceTemplateId,
+          sourceModuleOrder: block.origin.sourceModuleOrder,
+          sourceLessonOrder: block.origin.sourceLessonOrder,
           sourceStudentIds: block.origin.sourceStudentIds ?? [],
           sourceLessonTitle: block.origin.sourceLessonTitle,
           sourceLessonDate: block.origin.sourceLessonDate,
@@ -510,14 +514,14 @@ export default function LessonAttendancePanel({
 
           <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3">
             <label className="text-xs font-medium uppercase tracking-wide text-gray-400">
-              Foco de la próxima clase
+              Foco para la siguiente clase
             </label>
 
             <textarea
               value={nextLessonFocusDraft}
               onChange={(event) => setNextLessonFocusDraft(event.target.value)}
               rows={4}
-              placeholder="Ej: Reforzar pasados, terminar la actividad de conversación y preparar deberes de verbos irregulares..."
+              placeholder="Ej. Repasar diferencia entre muy/mucho y practicarlo oralmente."
               className="mt-2 w-full resize-none rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition placeholder:text-gray-400 focus:border-[#9e2727] focus:ring-2 focus:ring-[#9e2727]/10"
             />
 

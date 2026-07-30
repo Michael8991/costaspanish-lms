@@ -1,4 +1,7 @@
 import type {
+  CourseProfileStatus,
+  ICourseProgress,
+  ICourseTemplateSnapshot,
   ICourseProfile,
   IWeeklySlot,
   IRegularPolicy,
@@ -12,6 +15,7 @@ import type {
   IPublicationMeta,
   ICourseStats,
 } from "@/models/CourseProfile";
+import type { ClassType } from "@/models/StudentProfile";
 
 export type WeeklySlotDTO = IWeeklySlot;
 
@@ -50,17 +54,34 @@ export interface CourseStorefrontDTO
 // export interface CourseStatsDTO extends ICourseStats {}
 export type PublicationMetaDTO = IPublicationMeta; 
 export type CourseStatsDTO = ICourseStats;
+export type CourseProfileProgressDTO = ICourseProgress;
+export type CourseTemplateSnapshotDTO = ICourseTemplateSnapshot;
 
 
 export interface CourseProfileListItemDTO {
   id: string;
+  teacherId: string;
   ownerTeacherId: string;
   templateId: string;
   templateVersion: number;
 
+  name: string;
+  classType: ClassType;
+  studentsCount: number;
+  studentNames: string[];
+  templateName: string;
+  level: string;
+  category: string;
+  modulesCount: number;
+  lessonsCount: number;
+  blocksCount: number;
+  resourcesCount: number;
+  startDate: string | null;
+  targetEndDate: string | null;
+
   code: string;
   internalName: string;
-  status: ICourseProfile["status"];
+  status: CourseProfileStatus;
   visibility: ICourseProfile["visibility"];
   courseType: ICourseProfile["courseType"];
 
@@ -76,19 +97,12 @@ export interface CourseProfileListItemDTO {
   updatedAt: string;
 }
 
-export interface CourseProfileDetailDTO {
-  id: string;
-  ownerTeacherId: string;
-  templateId: string;
-  templateVersion: number;
-
-  code: string;
-  internalName: string;
+export interface CourseProfileDetailDTO extends CourseProfileListItemDTO {
   description?: string;
-
-  status: ICourseProfile["status"];
-  visibility: ICourseProfile["visibility"];
-  courseType: ICourseProfile["courseType"];
+  scheduleNotes: string;
+  internalNotes: string;
+  progress: CourseProfileProgressDTO;
+  templateSnapshot: CourseTemplateSnapshotDTO | null;
 
   regularPolicy?: RegularPolicyDTO;
   privateFlexiblePolicy?: PrivateFlexiblePolicyDTO;
@@ -98,6 +112,4 @@ export interface CourseProfileDetailDTO {
   publicationMeta: PublicationMetaDTO;
   stats: CourseStatsDTO;
 
-  createdAt: string;
-  updatedAt: string;
 }

@@ -1,5 +1,6 @@
 import { GoogleConnected, Hello } from "@/components";
 import TeacherTodaySchedule from "@/components/dashboard/teacher/TeacherTodaySchedule";
+import TeacherTaskStatsCard from "@/components/dashboard/tasks/TeacherTaskStatsCard";
 import { OnProgressPage } from "@/components/ui/onProgressPage/OnProgressPage";
 import { authOptions } from "@/lib/auth";
 import { getServerSession } from "next-auth";
@@ -31,6 +32,8 @@ export default async function TeacherHome({ locale }: { locale: string }) {
           {formattedDate}
         </p>
       </div>
+
+      <TeacherTaskStatsCard />
 
       {/* Card del horario */}
       <div className="w-full rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">

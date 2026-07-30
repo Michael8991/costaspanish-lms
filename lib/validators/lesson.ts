@@ -28,9 +28,13 @@ const optionalObjectIdSchema = z.preprocess(
 );
 
 const lessonBlockOriginSchema = z.object({
-  sourceLessonId: objectIdSchema,
+  sourceType: z.enum(["lesson", "course_template"]).optional(),
+  sourceLessonId: objectIdSchema.optional(),
   sourceBlockId: objectIdSchema.optional(),
   sourceCourseId: objectIdSchema.optional(),
+  sourceTemplateId: objectIdSchema.optional(),
+  sourceModuleOrder: z.coerce.number().int().min(0).optional(),
+  sourceLessonOrder: z.coerce.number().int().min(0).optional(),
   sourceStudentIds: z.array(objectIdSchema).default([]),
   sourceLessonTitle: z.string().trim().optional(),
   sourceLessonDate: z.string().datetime().optional(),

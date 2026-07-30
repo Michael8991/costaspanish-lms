@@ -54,10 +54,38 @@ export interface ISubModule {
   durationLabel?: string;
 }
 
+export interface ITemplateBlock {
+  title: string;
+  type: string;
+  categories?: string[];
+  plannedContent?: string;
+  plannedObjectives?: string[];
+  estimatedMinutes?: number;
+  cefrLevels?: CEFRLevel[];
+  skills?: string[];
+  tags?: string[];
+  resources?: Types.ObjectId[];
+  order?: number;
+}
+
+export interface ITemplateLesson {
+  title: string;
+  description?: string;
+  order: number;
+  estimatedMinutes?: number;
+  objectives?: string[];
+  blocks?: ITemplateBlock[];
+  teacherNotes?: string;
+}
+
 export interface IModuleData {
   title: string;
+  description?: string;
   durationLabel?: string;
   type?: string;
+  order?: number;
+  objectives?: string[];
+  lessons?: ITemplateLesson[];
   submodules?: ISubModule[];
 }
 
@@ -261,11 +289,112 @@ const SubModuleSchema = new Schema<ISubModule>(
   { _id: false }
 );
 
+const TemplateBlockSchema = new Schema<ITemplateBlock>(
+  {
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 140,
+    },
+    type: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 80,
+    },
+    categories: {
+      type: [String],
+      default: [],
+    },
+    plannedContent: {
+      type: String,
+      trim: true,
+    },
+    plannedObjectives: {
+      type: [String],
+      default: [],
+    },
+    estimatedMinutes: {
+      type: Number,
+      min: 0,
+    },
+    cefrLevels: {
+      type: [String],
+      default: [],
+    },
+    skills: {
+      type: [String],
+      default: [],
+    },
+    tags: {
+      type: [String],
+      default: [],
+    },
+    resources: {
+      type: [
+        {
+          type: Schema.Types.ObjectId,
+          ref: "Resource",
+        },
+      ],
+      default: [],
+    },
+    order: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+  },
+  { _id: false },
+);
+
+const TemplateLessonSchema = new Schema<ITemplateLesson>(
+  {
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 140,
+    },
+    description: {
+      type: String,
+      trim: true,
+    },
+    order: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    estimatedMinutes: {
+      type: Number,
+      min: 0,
+    },
+    objectives: {
+      type: [String],
+      default: [],
+    },
+    blocks: {
+      type: [TemplateBlockSchema],
+      default: [],
+    },
+    teacherNotes: {
+      type: String,
+      trim: true,
+    },
+  },
+  { _id: false },
+);
+
 const ModuleDataSchema = new Schema<IModuleData>(
   {
     title: {
       type: String,
       required: true,
+      trim: true,
+    },
+    description: {
+      type: String,
       trim: true,
     },
     durationLabel: {
@@ -275,6 +404,19 @@ const ModuleDataSchema = new Schema<IModuleData>(
     type: {
       type: String,
       trim: true,
+    },
+    order: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    objectives: {
+      type: [String],
+      default: [],
+    },
+    lessons: {
+      type: [TemplateLessonSchema],
+      default: [],
     },
     submodules: {
       type: [SubModuleSchema],

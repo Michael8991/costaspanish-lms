@@ -37,9 +37,13 @@ export interface LessonAttendeeDTO {
 }
 
 export interface LessonBlockOriginDTO {
-  sourceLessonId: string;
+  sourceType?: "lesson" | "course_template";
+  sourceLessonId?: string;
   sourceBlockId?: string;
   sourceCourseId?: string;
+  sourceTemplateId?: string;
+  sourceModuleOrder?: number;
+  sourceLessonOrder?: number;
   sourceStudentIds: string[];
   sourceLessonTitle?: string;
   sourceLessonDate?: string;
@@ -87,6 +91,15 @@ export interface LessonBlockDTO {
 
 export interface LessonListDTO {
   id: string;
+  courseId?: string;
+  courseTemplateId?: string;
+  courseTemplateVersion?: number;
+  sourceTemplateLesson?: {
+    moduleOrder: number;
+    lessonOrder: number;
+    moduleTitle?: string;
+    lessonTitle?: string;
+  };
   title: string;
   status: LessonStatus;
   preparationStatus: LessonPreparationStatus;
@@ -101,7 +114,6 @@ export interface LessonListDTO {
 
 export interface LessonDetailDTO extends LessonListDTO {
   teacherId: string;
-  courseId?: string;
 
   totalEstimatedMinutes: number;
   totalActualMinutes: number;

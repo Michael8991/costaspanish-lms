@@ -2,13 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   useForm,
   useFieldArray,
+  useWatch,
   type Control,
   type FieldErrors,
   type UseFormRegister,
+  type UseFormSetValue,
 } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -20,9 +21,20 @@ import {
   BadgeInfo,
   LayoutTemplate,
   ListTree,
+  ChevronDown,
 } from "lucide-react";
 
 import type { CourseTemplateDetailDTO } from "@/lib/dto/course-template.dto";
+import CourseTemplateLessonsEditor, {
+  createEditableCourseTemplateModule,
+  createEditableCourseTemplateModules,
+  removeLessonClientIds,
+  type EditableModuleData,
+} from "@/components/dashboard/courses/templates/CourseTemplateLessonsEditor";
+import {
+  useResourcesByIds,
+  type ResourceMap,
+} from "@/lib/hooks/useResourcesByIds";
 import { createCourseTemplateSchema } from "@/lib/validators/courseTemplate.validator";
 import {
   COURSETEMPLATE_STATUS,
@@ -31,6 +43,12 @@ import {
   STORE_FRONT_PRICE_MODE,
 } from "@/lib/constants/courseTemplate.constants";
 import { CEFR_LEVELS } from "@/lib/constants/resource.constants";
+import {
+  getCourseTemplatePriceModeLabel,
+  getCourseTemplateStatusVisual,
+  getParticipantModeLabel,
+} from "@/lib/utils/course-template-visuals";
+import { normalizeBlockCategories } from "@/lib/utils/lesson-block-categories";
 import z from "zod";
 
 type CourseTemplateFormProps = {
@@ -78,8 +96,12 @@ function getEmptyPriceOption(): CourseTemplateSubmitValues["storefront"]["priceO
 function getEmptyModule(): CourseTemplateSubmitValues["curriculum"]["modules"][number] {
   return {
     title: "",
+    description: "",
     durationLabel: "",
     type: "",
+    order: 0,
+    objectives: [],
+    lessons: [],
     submodules: [],
   };
 }
@@ -181,8 +203,38 @@ function getDefaultValues(
     curriculum: {
       modules: (initialData.curriculum?.modules ?? []).map((module) => ({
         title: module.title,
+        description: module.description ?? "",
         durationLabel: module.durationLabel ?? "",
         type: module.type ?? "",
+        order: module.order ?? 0,
+        objectives: module.objectives ?? [],
+        lessons: (module.lessons ?? []).map((lesson) => ({
+          title: lesson.title,
+          description: lesson.description ?? "",
+          order: lesson.order ?? 0,
+          estimatedMinutes: lesson.estimatedMinutes,
+          objectives: lesson.objectives ?? [],
+          teacherNotes: lesson.teacherNotes ?? "",
+          blocks: (lesson.blocks ?? []).map((block) => ({
+            title: block.title,
+            type: block.type,
+            categories: block.categories ?? [],
+            plannedContent: block.plannedContent ?? "",
+            plannedObjectives: block.plannedObjectives ?? [],
+            estimatedMinutes: block.estimatedMinutes,
+            cefrLevels: block.cefrLevels ?? [],
+            skills: block.skills ?? [],
+            tags: block.tags ?? [],
+            resources: Array.from(
+              new Set(
+                (block.resources ?? [])
+                  .map((resourceId) => String(resourceId).trim())
+                  .filter(Boolean),
+              ),
+            ),
+            order: block.order ?? 0,
+          })),
+        })),
         submodules: (module.submodules ?? []).map((submodule) => ({
           title: submodule.title,
           type: submodule.type ?? "",
@@ -192,6 +244,100 @@ function getDefaultValues(
       units: initialData.curriculum?.units ?? [],
     },
   };
+}
+
+function normalizeCourseTemplateCurriculumForSubmit(
+  curriculum: CourseTemplateFormValues["curriculum"],
+): CourseTemplateSubmitValues["curriculum"] {
+  const normalizeTextItems = (items?: string[]) =>
+    Array.from(
+      new Set((items ?? []).map((item) => item.trim()).filter(Boolean)),
+    );
+
+  return {
+    modules: (curriculum?.modules ?? []).map((module, moduleIndex) => ({
+      title: (module.title ?? "").trim(),
+      description: module.description,
+      durationLabel: module.durationLabel,
+      type: module.type,
+      order: moduleIndex,
+      objectives: normalizeTextItems(module.objectives),
+      lessons: (module.lessons ?? []).map((lesson, lessonIndex) => ({
+        title: (lesson.title ?? "").trim(),
+        description: lesson.description?.trim() || undefined,
+        order: lessonIndex,
+        estimatedMinutes: lesson.estimatedMinutes,
+        objectives: normalizeTextItems(lesson.objectives),
+        teacherNotes: lesson.teacherNotes?.trim() || undefined,
+        blocks: (lesson.blocks ?? []).map((block, blockIndex) => {
+          const type = (block.type ?? "").trim() || "custom";
+          const estimatedMinutes =
+            typeof block.estimatedMinutes === "number" &&
+            Number.isFinite(block.estimatedMinutes)
+              ? block.estimatedMinutes
+              : undefined;
+
+          return {
+            title: (block.title ?? "").trim(),
+            type,
+            categories: normalizeBlockCategories(
+              type,
+              normalizeTextItems(block.categories),
+            ),
+            plannedContent: block.plannedContent?.trim() || undefined,
+            plannedObjectives: normalizeTextItems(block.plannedObjectives),
+            estimatedMinutes,
+            cefrLevels: Array.from(new Set(block.cefrLevels ?? [])),
+            skills: normalizeTextItems(block.skills),
+            tags: normalizeTextItems(block.tags),
+            resources: block.resources ?? [],
+            order: blockIndex,
+          };
+        }),
+      })),
+      submodules: (module.submodules ?? []).map((submodule) => ({
+        title: (submodule.title ?? "").trim(),
+        type: submodule.type,
+        durationLabel: submodule.durationLabel,
+      })),
+    })),
+    units: curriculum?.units ?? [],
+  };
+}
+
+function getCurriculumEditorValidationMessage(
+  curriculum: CourseTemplateFormValues["curriculum"],
+  editableModules: EditableModuleData[],
+) {
+  const formModules = curriculum?.modules ?? [];
+
+  for (const [moduleIndex, module] of formModules.entries()) {
+    if (!(module.title ?? "").trim()) {
+      return `El módulo ${moduleIndex + 1} necesita título.`;
+    }
+
+    const lessons = editableModules[moduleIndex]?.lessons ?? [];
+    for (const [lessonIndex, lesson] of lessons.entries()) {
+      if (!lesson.title.trim()) {
+        return `La clase modelo ${lessonIndex + 1} del módulo ${moduleIndex + 1} necesita título.`;
+      }
+
+      for (const [blockIndex, block] of lesson.blocks.entries()) {
+        if (!block.title.trim()) {
+          return `El bloque modelo ${blockIndex + 1} de la clase modelo “${lesson.title}” necesita título.`;
+        }
+
+        if (
+          block.estimatedMinutes !== undefined &&
+          block.estimatedMinutes < 0
+        ) {
+          return `El bloque modelo ${blockIndex + 1} de la clase modelo “${lesson.title}” tiene una duración no válida.`;
+        }
+      }
+    }
+  }
+
+  return null;
 }
 
 function normalizeBeforeSubmit(
@@ -245,19 +391,7 @@ function normalizeBeforeSubmit(
       ctaText: values.storefront?.ctaText,
     },
 
-    curriculum: {
-      modules: (values.curriculum?.modules ?? []).map((module) => ({
-        title: (module.title ?? "").trim(),
-        durationLabel: module.durationLabel,
-        type: module.type,
-        submodules: (module.submodules ?? []).map((submodule) => ({
-          title: (submodule.title ?? "").trim(),
-          type: submodule.type,
-          durationLabel: submodule.durationLabel,
-        })),
-      })),
-      units: values.curriculum?.units ?? [],
-    },
+    curriculum: normalizeCourseTemplateCurriculumForSubmit(values.curriculum),
   };
 }
 
@@ -271,24 +405,50 @@ function SectionCard({
   description,
   icon: Icon,
   children,
+  className = "",
+  collapsible = false,
 }: {
   title: string;
   description?: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
   children: React.ReactNode;
+  className?: string;
+  collapsible?: boolean;
 }) {
+  const header = (
+    <div className="flex items-start gap-3">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50 text-[#9e2727]">
+        <Icon size={18} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+        {description ? (
+          <p className="mt-0.5 text-sm text-gray-500">{description}</p>
+        ) : null}
+      </div>
+    </div>
+  );
+
+  if (collapsible) {
+    return (
+      <details
+        className={`group overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm ${className}`}
+      >
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-gray-50/60 px-5 py-4">
+          {header}
+          <ChevronDown className="h-4 w-4 shrink-0 text-gray-400 transition group-open:rotate-180" />
+        </summary>
+        <div className="border-t border-gray-200 p-5">{children}</div>
+      </details>
+    );
+  }
+
   return (
-    <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      <div className="px-5 py-4 border-b border-gray-200 bg-gray-50/60 flex items-start gap-3">
-        <div className="w-10 h-10 rounded-lg bg-red-50 text-[#9e2727] flex items-center justify-center shrink-0">
-          <Icon size={18} />
-        </div>
-        <div>
-          <h2 className="text-base font-semibold text-gray-900">{title}</h2>
-          {description ? (
-            <p className="text-sm text-gray-500 mt-0.5">{description}</p>
-          ) : null}
-        </div>
+    <section
+      className={`overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm ${className}`}
+    >
+      <div className="border-b border-gray-200 bg-gray-50/60 px-5 py-4">
+        {header}
       </div>
       <div className="p-5">{children}</div>
     </section>
@@ -299,14 +459,26 @@ function ModuleFields({
   moduleIndex,
   control,
   register,
+  setValue,
   errors,
   removeModule,
+  editableModules,
+  onEditableModulesChange,
+  resourceMap,
+  isResourcesLoading,
+  resourcesError,
 }: {
   moduleIndex: number;
   control: Control<CourseTemplateFormValues>;
   register: UseFormRegister<CourseTemplateFormValues>;
+  setValue: UseFormSetValue<CourseTemplateFormValues>;
   errors: FieldErrors<CourseTemplateFormValues>;
   removeModule: (index: number) => void;
+  editableModules: EditableModuleData[];
+  onEditableModulesChange: (nextModules: EditableModuleData[]) => void;
+  resourceMap: ResourceMap;
+  isResourcesLoading: boolean;
+  resourcesError: string | null;
 }) {
   const {
     fields: submoduleFields,
@@ -316,30 +488,50 @@ function ModuleFields({
     control,
     name: `curriculum.modules.${moduleIndex}.submodules`,
   });
+  const moduleValues = useWatch({
+    control,
+    name: `curriculum.modules.${moduleIndex}`,
+  });
+  const moduleObjectives = moduleValues?.objectives ?? [];
+  const modelLessons = editableModules[moduleIndex]?.lessons ?? [];
+  const modelBlocksCount = modelLessons.reduce(
+    (total, lesson) => total + (lesson.blocks?.length ?? 0),
+    0,
+  );
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-4 space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <h4 className="font-medium text-gray-900">Module {moduleIndex + 1}</h4>
+    <div className="space-y-5 rounded-xl border border-gray-200 bg-gray-50/50 p-4">
+      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+        <div>
+          <h4 className="font-medium text-gray-900">
+            Módulo {moduleIndex + 1}
+          </h4>
+          <p className="mt-0.5 text-xs text-gray-500">
+            {modelLessons.length}{" "}
+            {modelLessons.length === 1 ? "clase modelo" : "clases modelo"} ·{" "}
+            {modelBlocksCount}{" "}
+            {modelBlocksCount === 1 ? "bloque modelo" : "bloques modelo"}
+          </p>
+        </div>
         <button
           type="button"
           onClick={() => removeModule(moduleIndex)}
           className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors text-sm"
         >
           <Trash2 size={16} />
-          Remove module
+          Eliminar módulo
         </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">
-            Module title
+            Título del módulo
           </label>
           <input
             {...register(`curriculum.modules.${moduleIndex}.title`)}
             className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9e2727] focus:border-transparent"
-            placeholder="Module title"
+            placeholder="Por ejemplo: Hablar de experiencias"
           />
           <FieldError
             message={
@@ -352,12 +544,12 @@ function ModuleFields({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">
-            Duration label
+            Duración
           </label>
           <input
             {...register(`curriculum.modules.${moduleIndex}.durationLabel`)}
             className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9e2727] focus:border-transparent"
-            placeholder="8 weeks / 12h / 1 month"
+            placeholder="4 semanas / 8 horas"
           />
           <FieldError
             message={
@@ -369,12 +561,12 @@ function ModuleFields({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">
-            Type
+            Tipo o enfoque
           </label>
           <input
             {...register(`curriculum.modules.${moduleIndex}.type`)}
             className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9e2727] focus:border-transparent"
-            placeholder="Grammar / Speaking / Exam prep"
+            placeholder="Conversación / Gramática / Preparación DELE"
           />
           <FieldError
             message={
@@ -386,112 +578,209 @@ function ModuleFields({
         </div>
       </div>
 
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          Descripción
+        </label>
+        <textarea
+          {...register(`curriculum.modules.${moduleIndex}.description`)}
+          rows={3}
+          className="w-full resize-y rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#9e2727]"
+          placeholder="Resume qué aprenderá la alumna y cómo se trabajará."
+        />
+        <FieldError
+          message={
+            errors.curriculum?.modules?.[moduleIndex]?.description?.message as
+              | string
+              | undefined
+          }
+        />
+      </div>
+
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-3">
-          <h5 className="text-sm font-medium text-gray-800">Submodules</h5>
+          <div>
+            <h5 className="text-sm font-medium text-gray-800">
+              Objetivos del módulo
+            </h5>
+            <p className="mt-0.5 text-xs text-gray-500">
+              Resultados concretos que se esperan al terminarlo.
+            </p>
+          </div>
           <button
             type="button"
-            onClick={() => appendSubmodule(getEmptySubmodule())}
+            onClick={() =>
+              setValue(
+                `curriculum.modules.${moduleIndex}.objectives`,
+                [...moduleObjectives, ""],
+                { shouldDirty: true, shouldValidate: true },
+              )
+            }
             className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-white transition-colors text-sm"
           >
             <Plus size={16} />
-            Add submodule
+            Añadir objetivo
           </button>
         </div>
 
-        {submoduleFields.length === 0 ? (
+        {moduleObjectives.length === 0 ? (
           <div className="rounded-lg border border-dashed border-gray-300 bg-white px-4 py-4 text-sm text-gray-500">
-            No submodules yet.
+            Este módulo todavía no tiene objetivos.
           </div>
         ) : null}
 
-        {submoduleFields.map((submodule, subIndex) => (
+        {moduleObjectives.map((_, objectiveIndex) => (
           <div
-            key={submodule.id}
-            className="grid grid-cols-1 md:grid-cols-[1.2fr_1fr_1fr_auto] gap-3 rounded-lg border border-gray-200 bg-white p-3"
+            key={`module-${moduleIndex}-objective-${objectiveIndex}`}
+            className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]"
           >
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Title
-              </label>
               <input
                 {...register(
-                  `curriculum.modules.${moduleIndex}.submodules.${subIndex}.title`,
+                  `curriculum.modules.${moduleIndex}.objectives.${objectiveIndex}`,
                 )}
                 className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9e2727] focus:border-transparent"
-                placeholder="Submodule title"
+                placeholder={`Objetivo ${objectiveIndex + 1}`}
               />
               <FieldError
                 message={
-                  errors.curriculum?.modules?.[moduleIndex]?.submodules?.[
-                    subIndex
-                  ]?.title?.message as string | undefined
+                  errors.curriculum?.modules?.[moduleIndex]?.objectives?.[
+                    objectiveIndex
+                  ]?.message as string | undefined
                 }
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Type
-              </label>
-              <input
-                {...register(
-                  `curriculum.modules.${moduleIndex}.submodules.${subIndex}.type`,
+            <button
+              type="button"
+              onClick={() =>
+                setValue(
+                  `curriculum.modules.${moduleIndex}.objectives`,
+                  moduleObjectives.filter((_, index) => index !== objectiveIndex),
+                  { shouldDirty: true, shouldValidate: true },
                 )}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9e2727] focus:border-transparent"
-                placeholder="Listening / Review"
-              />
-            </div>
+              className="inline-flex items-center justify-center rounded-lg border border-red-200 px-3 py-2.5 text-sm text-red-600 transition-colors hover:bg-red-50"
+              aria-label={`Eliminar objetivo ${objectiveIndex + 1}`}
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+        ))}
+      </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Duration
-              </label>
-              <input
-                {...register(
-                  `curriculum.modules.${moduleIndex}.submodules.${subIndex}.durationLabel`,
-                )}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9e2727] focus:border-transparent"
-                placeholder="45 min"
-              />
-            </div>
+      <CourseTemplateLessonsEditor
+        modules={editableModules}
+        moduleIndex={moduleIndex}
+        onChange={onEditableModulesChange}
+        resourceMap={resourceMap}
+        isResourcesLoading={isResourcesLoading}
+        resourcesError={resourcesError}
+      />
 
-            <div className="flex items-end">
+      <details className="group rounded-lg border border-gray-200 bg-white">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-gray-700">
+          Estructura legacy ({submoduleFields.length}{" "}
+          {submoduleFields.length === 1 ? "submódulo" : "submódulos"})
+          <ChevronDown className="h-4 w-4 text-gray-400 transition group-open:rotate-180" />
+        </summary>
+        <div className="space-y-3 border-t border-gray-200 p-4">
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <p className="text-xs text-gray-500">
+              Compatibilidad con plantillas antiguas.
+            </p>
+            <button
+              type="button"
+              onClick={() => appendSubmodule(getEmptySubmodule())}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50"
+            >
+              <Plus size={16} />
+              Añadir submódulo
+            </button>
+          </div>
+
+          {submoduleFields.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-gray-300 px-4 py-4 text-sm text-gray-500">
+              No hay submódulos legacy.
+            </div>
+          ) : null}
+
+          {submoduleFields.map((submodule, subIndex) => (
+            <div
+              key={submodule.id}
+              className="grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50/50 p-3 md:grid-cols-[1.2fr_1fr_1fr_auto]"
+            >
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                  Título
+                </label>
+                <input
+                  {...register(
+                    `curriculum.modules.${moduleIndex}.submodules.${subIndex}.title`,
+                  )}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#9e2727]"
+                  placeholder="Título del submódulo"
+                />
+                <FieldError
+                  message={
+                    errors.curriculum?.modules?.[moduleIndex]?.submodules?.[
+                      subIndex
+                    ]?.title?.message as string | undefined
+                  }
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                  Tipo
+                </label>
+                <input
+                  {...register(
+                    `curriculum.modules.${moduleIndex}.submodules.${subIndex}.type`,
+                  )}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#9e2727]"
+                  placeholder="Comprensión / Repaso"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                  Duración
+                </label>
+                <input
+                  {...register(
+                    `curriculum.modules.${moduleIndex}.submodules.${subIndex}.durationLabel`,
+                  )}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[#9e2727]"
+                  placeholder="45 min"
+                />
+              </div>
+
+              <div className="flex items-end">
               <button
                 type="button"
                 onClick={() => removeSubmodule(subIndex)}
-                className="w-full md:w-auto inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors text-sm"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-3 py-2.5 text-sm text-red-600 transition-colors hover:bg-red-50 md:w-auto"
+                  aria-label={`Eliminar submódulo ${subIndex + 1}`}
               >
                 <Trash2 size={16} />
               </button>
             </div>
           </div>
         ))}
-      </div>
+        </div>
+      </details>
     </div>
   );
-}
-
-function addStringItem(
-  items: string[] | undefined,
-  setter: (next: string[]) => void,
-) {
-  setter([...(items ?? []), ""]);
-}
-
-function removeStringItem(
-  items: string[] | undefined,
-  index: number,
-  setter: (next: string[]) => void,
-) {
-  setter((items ?? []).filter((_, i) => i !== index));
 }
 
 export default function CourseTemplateForm({
   locale,
   initialData,
-  submitLabel = "Create template",
+  submitLabel = "Crear plantilla",
   endpoint = "/api/course-template",
+  method = "POST",
+  redirectTo,
+  cancleHref,
 }: CourseTemplateFormProps) {
   const router = useRouter();
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -500,14 +789,36 @@ export default function CourseTemplateForm({
     () => getDefaultValues(initialData),
     [initialData],
   );
+  const [editableModules, setEditableModules] = useState<EditableModuleData[]>(
+    () =>
+      createEditableCourseTemplateModules(
+        defaultValues.curriculum?.modules ?? [],
+      ),
+  );
+  const [areLessonsDirty, setAreLessonsDirty] = useState(false);
+  const allTemplateResourceIds = useMemo(
+    () =>
+      editableModules.flatMap((module) =>
+        module.lessons.flatMap((lesson) =>
+          lesson.blocks.flatMap((block) => block.resources ?? []),
+        ),
+      ),
+    [editableModules],
+  );
+  const {
+    resourceMap,
+    isLoading: isResourcesLoading,
+    error: resourcesError,
+  } = useResourcesByIds(allTemplateResourceIds);
 
   const {
     register,
     control,
     handleSubmit,
+    reset,
     watch,
     setValue,
-    formState: { errors, isSubmitting },
+    formState: { errors, isDirty: isFormDirty, isSubmitting },
   } = useForm<CourseTemplateFormValues>({
     resolver: zodResolver(createCourseTemplateSchema),
     defaultValues,
@@ -529,18 +840,78 @@ export default function CourseTemplateForm({
   });
 
   const priceMode = watch("storefront.priceMode");
+  const hasUnsavedChanges = isFormDirty || areLessonsDirty;
+  const detailUrl =
+    redirectTo ??
+    (initialData
+      ? `/${locale}/dashboard/courses/templates/${initialData.id}`
+      : `/${locale}/dashboard/courses`);
+  const exitUrl = cancleHref ?? detailUrl;
+  const isEditMode = method === "PATCH" && Boolean(initialData);
+  const shouldSave = !isEditMode || hasUnsavedChanges;
+
+  const leaveEditor = () => {
+    if (
+      hasUnsavedChanges &&
+      !window.confirm("Hay cambios sin guardar. ¿Salir igualmente?")
+    ) {
+      return;
+    }
+
+    router.push(exitUrl);
+  };
+
+  const addModule = () => {
+    const nextModule = getEmptyModule();
+    modulesArray.append(nextModule);
+    setEditableModules((currentModules) => [
+      ...currentModules,
+      createEditableCourseTemplateModule(nextModule),
+    ]);
+  };
+
+  const removeModule = (moduleIndex: number) => {
+    modulesArray.remove(moduleIndex);
+    setEditableModules((currentModules) =>
+      currentModules.filter((_, index) => index !== moduleIndex),
+    );
+  };
 
   const onSubmit = async (rawValues: CourseTemplateFormValues) => {
     setSubmitError(null);
 
     try {
-      const payload: CourseTemplateSubmitValues =
-        createCourseTemplateSchema.parse(normalizeBeforeSubmit(rawValues));
+      const curriculumValidationMessage =
+        getCurriculumEditorValidationMessage(
+          rawValues.curriculum,
+          editableModules,
+        );
+      if (curriculumValidationMessage) {
+        setSubmitError(curriculumValidationMessage);
+        return;
+      }
 
-      console.log("SUBMIT PAYLOAD", payload);
+      const valuesWithEditedLessons: CourseTemplateFormValues = {
+        ...rawValues,
+        curriculum: {
+          modules: (rawValues.curriculum?.modules ?? []).map(
+            (module, moduleIndex) => ({
+              ...module,
+              lessons: removeLessonClientIds(
+                editableModules[moduleIndex]?.lessons ?? [],
+              ),
+            }),
+          ),
+          units: rawValues.curriculum?.units ?? [],
+        },
+      };
+      const payload: CourseTemplateSubmitValues =
+        createCourseTemplateSchema.parse(
+          normalizeBeforeSubmit(valuesWithEditedLessons),
+        );
 
       const response = await fetch(endpoint, {
-        method: "POST",
+        method,
         headers: {
           "Content-Type": "application/json",
         },
@@ -548,7 +919,6 @@ export default function CourseTemplateForm({
       });
 
       const data = await response.json().catch(() => null);
-      console.log("SERVER RESPONSE", data);
 
       if (!response.ok) {
         throw new Error(
@@ -556,7 +926,36 @@ export default function CourseTemplateForm({
         );
       }
 
-      router.push(`/${locale}/dashboard/courses`);
+      if (method === "PATCH") {
+        reset(payload);
+        setEditableModules((currentModules) =>
+          payload.curriculum.modules.map((module, moduleIndex) => ({
+            ...module,
+            clientId:
+              currentModules[moduleIndex]?.clientId ??
+              `module-saved-${moduleIndex}`,
+            lessons: module.lessons.map((lesson, lessonIndex) => ({
+              ...lesson,
+              clientId:
+                currentModules[moduleIndex]?.lessons[lessonIndex]?.clientId ??
+                `lesson-saved-${moduleIndex}-${lessonIndex}`,
+              blocks: lesson.blocks.map((block, blockIndex) => ({
+                ...block,
+                clientId:
+                  currentModules[moduleIndex]?.lessons[lessonIndex]?.blocks[
+                    blockIndex
+                  ]?.clientId ??
+                  `block-saved-${moduleIndex}-${lessonIndex}-${blockIndex}`,
+              })),
+            })),
+          })),
+        );
+        setAreLessonsDirty(false);
+        router.push(detailUrl);
+        return;
+      }
+
+      router.push(detailUrl);
       router.refresh();
     } catch (error) {
       setSubmitError(
@@ -567,16 +966,32 @@ export default function CourseTemplateForm({
     }
   };
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 mt-4">
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      onChange={() => {
+        if (submitError) setSubmitError(null);
+      }}
+      className="mt-4 flex flex-col gap-6"
+    >
+      {submitError && (
+        <p
+          role="alert"
+          className="order-none rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
+          {submitError}
+        </p>
+      )}
+
       <SectionCard
-        title="Basic Information"
-        description="Internal identity and lifecycle status of the template."
+        title="Información básica"
+        description="Nombre, código interno y estado de esta guía reutilizable."
         icon={LayoutTemplate}
+        className="order-1"
       >
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Code
+              Código interno
             </label>
             <input
               {...register("code")}
@@ -588,7 +1003,7 @@ export default function CourseTemplateForm({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Internal name
+              Nombre interno
             </label>
             <input
               {...register("internalName")}
@@ -600,7 +1015,7 @@ export default function CourseTemplateForm({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Status
+              Estado
             </label>
             <select
               {...register("status")}
@@ -608,7 +1023,7 @@ export default function CourseTemplateForm({
             >
               {COURSETEMPLATE_STATUS.map((status) => (
                 <option key={status} value={status}>
-                  {status}
+                  {getCourseTemplateStatusVisual(status).label}
                 </option>
               ))}
             </select>
@@ -617,7 +1032,7 @@ export default function CourseTemplateForm({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Version
+              Versión
             </label>
             <input
               type="number"
@@ -631,14 +1046,15 @@ export default function CourseTemplateForm({
       </SectionCard>
 
       <SectionCard
-        title="Pedagogical Meta"
-        description="Academic framing, objectives and instructional context."
+        title="Datos pedagógicos"
+        description="Nivel, objetivos y enfoque académico de la plantilla."
         icon={BadgeInfo}
+        className="order-2"
       >
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Level
+              Nivel
             </label>
             <select
               {...register("pedagogicalMeta.level")}
@@ -655,24 +1071,24 @@ export default function CourseTemplateForm({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Category
+              Categoría
             </label>
             <input
               {...register("pedagogicalMeta.category")}
               className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9e2727] focus:border-transparent"
-              placeholder="General Spanish / Exam prep / Business"
+              placeholder="Español general / Preparación DELE / Negocios"
             />
             <FieldError message={errors.pedagogicalMeta?.category?.message} />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Estimated duration
+              Duración estimada
             </label>
             <input
               {...register("pedagogicalMeta.estimatedDurationLabel")}
               className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9e2727] focus:border-transparent"
-              placeholder="12 weeks / 24 sessions"
+              placeholder="12 semanas / 24 sesiones"
             />
             <FieldError
               message={errors.pedagogicalMeta?.estimatedDurationLabel?.message}
@@ -681,12 +1097,12 @@ export default function CourseTemplateForm({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Target audience
+              Público objetivo
             </label>
             <input
               {...register("pedagogicalMeta.targetAudience")}
               className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9e2727] focus:border-transparent"
-              placeholder="Adults / Teenagers / Professionals"
+              placeholder="Adultos / Adolescentes / Profesionales"
             />
             <FieldError
               message={errors.pedagogicalMeta?.targetAudience?.message}
@@ -696,13 +1112,13 @@ export default function CourseTemplateForm({
 
         <div className="mt-4">
           <label className="block text-sm font-medium text-gray-700 mb-1.5">
-            Methodology
+            Metodología
           </label>
           <textarea
             {...register("pedagogicalMeta.methodology")}
             rows={4}
             className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-[#9e2727] focus:border-transparent"
-            placeholder="Describe communicative approach, task-based learning, flipped classroom, etc."
+            placeholder="Describe el enfoque comunicativo, trabajo por tareas, aula invertida, etc."
           />
           <FieldError message={errors.pedagogicalMeta?.methodology?.message} />
         </div>
@@ -710,9 +1126,9 @@ export default function CourseTemplateForm({
         <div className="mt-5 space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-medium text-gray-800">Objectives</h3>
+              <h3 className="text-sm font-medium text-gray-800">Objetivos</h3>
               <p className="text-xs text-gray-500 mt-0.5">
-                Add each objective as a separate item.
+                Añade cada resultado de aprendizaje por separado.
               </p>
             </div>
 
@@ -727,13 +1143,13 @@ export default function CourseTemplateForm({
               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors text-sm"
             >
               <Plus size={16} />
-              Add objective
+              Añadir objetivo
             </button>
           </div>
 
           {objectives.length === 0 ? (
             <div className="rounded-lg border border-dashed border-gray-300 px-4 py-4 text-sm text-gray-500">
-              No objectives added yet.
+              Todavía no hay objetivos pedagógicos.
             </div>
           ) : null}
 
@@ -746,7 +1162,7 @@ export default function CourseTemplateForm({
                 <input
                   {...register(`pedagogicalMeta.objectives.${index}`)}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9e2727] focus:border-transparent"
-                  placeholder={`Objective ${index + 1}`}
+                  placeholder={`Objetivo ${index + 1}`}
                 />
                 <FieldError
                   message={
@@ -779,9 +1195,11 @@ export default function CourseTemplateForm({
       </SectionCard>
 
       <SectionCard
-        title="Storefront"
-        description="Public-facing copy, positioning, pricing and media."
+        title="Publicación comercial avanzada"
+        description="Estos campos servirán si esta plantilla se usa también para mostrar cursos en la web pública."
         icon={BookOpen}
+        className="order-4"
+        collapsible
       >
         <div className="mb-4">
           <label className="inline-flex items-center gap-2 text-sm text-gray-700">
@@ -790,7 +1208,7 @@ export default function CourseTemplateForm({
               {...register("storefront.isPublished")}
               className="rounded border-gray-300 text-[#9e2727] focus:ring-[#9e2727]"
             />
-            Published in storefront
+            Publicada en la web
           </label>
           <FieldError message={errors.storefront?.isPublished?.message} />
         </div>
@@ -798,19 +1216,19 @@ export default function CourseTemplateForm({
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Public title
+              Título público
             </label>
             <input
               {...register("storefront.publicTitle")}
               className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9e2727] focus:border-transparent"
-              placeholder="Learn Spanish B2 with confidence"
+              placeholder="Aprende español B2 con confianza"
             />
             <FieldError message={errors.storefront?.publicTitle?.message} />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Price mode
+              Modalidad de precio
             </label>
             <select
               {...register("storefront.priceMode")}
@@ -818,7 +1236,7 @@ export default function CourseTemplateForm({
             >
               {STORE_FRONT_PRICE_MODE.map((mode) => (
                 <option key={mode} value={mode}>
-                  {mode}
+                  {getCourseTemplatePriceModeLabel(mode)}
                 </option>
               ))}
             </select>
@@ -827,7 +1245,7 @@ export default function CourseTemplateForm({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Currency
+              Moneda
             </label>
             <select
               {...register("storefront.currency")}
@@ -846,13 +1264,13 @@ export default function CourseTemplateForm({
         <div className="mt-4 grid grid-cols-1 xl:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Short description
+              Descripción breve
             </label>
             <textarea
               {...register("storefront.shortDescription")}
               rows={4}
               className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-[#9e2727] focus:border-transparent"
-              placeholder="Concise overview for cards, lists and hero sections."
+              placeholder="Resumen para tarjetas y cabeceras de la web."
             />
             <FieldError
               message={errors.storefront?.shortDescription?.message}
@@ -861,13 +1279,13 @@ export default function CourseTemplateForm({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Long description
+              Descripción ampliada
             </label>
             <textarea
               {...register("storefront.longDescription")}
               rows={4}
               className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-[#9e2727] focus:border-transparent"
-              placeholder="Extended positioning and promise of the program."
+              placeholder="Presentación completa y propuesta del programa."
             />
             <FieldError message={errors.storefront?.longDescription?.message} />
           </div>
@@ -876,7 +1294,7 @@ export default function CourseTemplateForm({
         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              SEO title
+              Título SEO
             </label>
             <input
               {...register("storefront.seoTitle")}
@@ -888,7 +1306,7 @@ export default function CourseTemplateForm({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              SEO description
+              Descripción SEO
             </label>
             <input
               {...register("storefront.seoDescription")}
@@ -900,7 +1318,7 @@ export default function CourseTemplateForm({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Promo video URL
+              URL del vídeo promocional
             </label>
             <input
               {...register("storefront.promoVideoUrl")}
@@ -912,12 +1330,12 @@ export default function CourseTemplateForm({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              CTA text
+              Texto del botón
             </label>
             <input
               {...register("storefront.ctaText")}
               className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9e2727] focus:border-transparent"
-              placeholder="Book now / Reserve your spot"
+              placeholder="Reserva ahora / Solicita información"
             />
             <FieldError message={errors.storefront?.ctaText?.message} />
           </div>
@@ -926,7 +1344,7 @@ export default function CourseTemplateForm({
         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Hero image URL
+              URL de imagen principal
             </label>
             <input
               {...register("storefront.heroImageUrl")}
@@ -938,7 +1356,7 @@ export default function CourseTemplateForm({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Thumbnail URL
+              URL de miniatura
             </label>
             <input
               {...register("storefront.thumbnailUrl")}
@@ -952,9 +1370,9 @@ export default function CourseTemplateForm({
         <div className="mt-5 space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-medium text-gray-800">Benefits</h3>
+              <h3 className="text-sm font-medium text-gray-800">Beneficios</h3>
               <p className="text-xs text-gray-500 mt-0.5">
-                Public bullet points for the landing/storefront.
+                Puntos destacados que se mostrarán en la página pública.
               </p>
             </div>
 
@@ -969,13 +1387,13 @@ export default function CourseTemplateForm({
               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors text-sm"
             >
               <Plus size={16} />
-              Add benefit
+              Añadir beneficio
             </button>
           </div>
 
           {benefits.length === 0 ? (
             <div className="rounded-lg border border-dashed border-gray-300 px-4 py-4 text-sm text-gray-500">
-              No benefits added yet.
+              Todavía no hay beneficios públicos.
             </div>
           ) : null}
 
@@ -988,7 +1406,7 @@ export default function CourseTemplateForm({
                 <input
                   {...register(`storefront.benefits.${index}`)}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9e2727] focus:border-transparent"
-                  placeholder={`Benefit ${index + 1}`}
+                  placeholder={`Beneficio ${index + 1}`}
                 />
                 <FieldError
                   message={
@@ -1023,10 +1441,10 @@ export default function CourseTemplateForm({
           <div className="flex items-center justify-between gap-3">
             <div>
               <h3 className="text-sm font-medium text-gray-800">
-                Price options
+                Opciones de precio
               </h3>
               <p className="text-xs text-gray-500 mt-0.5">
-                Supports monthly, package, free or custom label logic.
+                Tarifas mensuales, por paquete, gratuitas o personalizadas.
               </p>
             </div>
 
@@ -1036,13 +1454,13 @@ export default function CourseTemplateForm({
               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors text-sm"
             >
               <Plus size={16} />
-              Add price option
+              Añadir opción
             </button>
           </div>
 
           {priceOptionsArray.fields.length === 0 ? (
             <div className="rounded-lg border border-dashed border-gray-300 px-4 py-4 text-sm text-gray-500">
-              No price options yet.
+              Todavía no hay opciones de precio.
             </div>
           ) : null}
 
@@ -1053,7 +1471,7 @@ export default function CourseTemplateForm({
             >
               <div className="flex items-center justify-between gap-3">
                 <h4 className="font-medium text-gray-900">
-                  Price option {index + 1}
+                  Opción de precio {index + 1}
                 </h4>
                 <button
                   type="button"
@@ -1061,19 +1479,19 @@ export default function CourseTemplateForm({
                   className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors text-sm"
                 >
                   <Trash2 size={16} />
-                  Remove
+                  Eliminar
                 </button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Label
+                    Nombre
                   </label>
                   <input
                     {...register(`storefront.priceOptions.${index}.label`)}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9e2727] focus:border-transparent"
-                    placeholder="8 classes pack"
+                    placeholder="Bono de 8 clases"
                   />
                   <FieldError
                     message={
@@ -1085,7 +1503,7 @@ export default function CourseTemplateForm({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Amount
+                    Importe
                   </label>
                   <input
                     type="number"
@@ -1109,7 +1527,7 @@ export default function CourseTemplateForm({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Participant mode
+                    Modalidad
                   </label>
                   <select
                     {...register(
@@ -1120,7 +1538,7 @@ export default function CourseTemplateForm({
                     <option value="">—</option>
                     {PARTICIPANT_MODES.map((mode) => (
                       <option key={mode} value={mode}>
-                        {mode}
+                        {getParticipantModeLabel(mode)}
                       </option>
                     ))}
                   </select>
@@ -1128,7 +1546,7 @@ export default function CourseTemplateForm({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Participant count
+                    Nº de participantes
                   </label>
                   <input
                     type="number"
@@ -1144,7 +1562,7 @@ export default function CourseTemplateForm({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Package classes
+                    Clases del paquete
                   </label>
                   <input
                     type="number"
@@ -1160,7 +1578,7 @@ export default function CourseTemplateForm({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Monthly classes
+                    Clases al mes
                   </label>
                   <input
                     type="number"
@@ -1183,7 +1601,7 @@ export default function CourseTemplateForm({
                       )}
                       className="rounded border-gray-300 text-[#9e2727] focus:ring-[#9e2727]"
                     />
-                    Featured
+                    Destacada
                   </label>
                 </div>
 
@@ -1194,12 +1612,12 @@ export default function CourseTemplateForm({
                       {...register(`storefront.priceOptions.${index}.isActive`)}
                       className="rounded border-gray-300 text-[#9e2727] focus:ring-[#9e2727]"
                     />
-                    Active
+                    Activa
                   </label>
 
                   <div className="w-full max-w-[140px]">
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                      Sort order
+                      Orden
                     </label>
                     <input
                       type="number"
@@ -1219,17 +1637,20 @@ export default function CourseTemplateForm({
       </SectionCard>
 
       <SectionCard
-        title="Curriculum"
-        description="Program structure: units, modules and optional submodules."
+        title="Estructura del curso"
+        description="Módulos, clases modelo y estructura legacy de la guía."
         icon={ListTree}
+        className="order-3"
       >
-        <div className="space-y-5">
-          <div className="space-y-3">
+        <div className="flex flex-col gap-5">
+          <div className="order-2 space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-medium text-gray-800">Units</h3>
+                <h3 className="text-sm font-medium text-gray-800">
+                  Unidades legacy
+                </h3>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  High-level milestones or chapters.
+                  Campo de compatibilidad con plantillas antiguas.
                 </p>
               </div>
 
@@ -1244,13 +1665,13 @@ export default function CourseTemplateForm({
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors text-sm"
               >
                 <Plus size={16} />
-                Add unit
+                Añadir unidad
               </button>
             </div>
 
             {units.length === 0 ? (
               <div className="rounded-lg border border-dashed border-gray-300 px-4 py-4 text-sm text-gray-500">
-                No units added yet.
+                No hay unidades legacy.
               </div>
             ) : null}
 
@@ -1263,7 +1684,7 @@ export default function CourseTemplateForm({
                   <input
                     {...register(`curriculum.units.${index}`)}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#9e2727] focus:border-transparent"
-                    placeholder={`Unit ${index + 1}`}
+                    placeholder={`Unidad ${index + 1}`}
                   />
                   <FieldError
                     message={
@@ -1294,40 +1715,50 @@ export default function CourseTemplateForm({
             ))}
           </div>
 
-          <div className="space-y-3">
+          <div className="order-1 space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-medium text-gray-800">Modules</h3>
+                <h3 className="text-sm font-medium text-gray-800">Módulos</h3>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Detailed program blocks with optional submodules.
+                  Estructura pedagógica principal de la plantilla.
                 </p>
               </div>
 
               <button
                 type="button"
-                onClick={() => modulesArray.append(getEmptyModule())}
+                onClick={addModule}
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors text-sm"
               >
                 <Plus size={16} />
-                Add module
+                Añadir módulo
               </button>
             </div>
 
             {modulesArray.fields.length === 0 ? (
               <div className="rounded-lg border border-dashed border-gray-300 px-4 py-4 text-sm text-gray-500">
-                No modules added yet.
+                Aún no hay módulos. Añade el primero para empezar a organizar el
+                recorrido del curso.
               </div>
             ) : null}
 
             <div className="space-y-4">
               {modulesArray.fields.map((field, moduleIndex) => (
                 <ModuleFields
-                  key={field.id}
+                  key={editableModules[moduleIndex]?.clientId ?? field.id}
                   moduleIndex={moduleIndex}
                   control={control}
                   register={register}
+                  setValue={setValue}
                   errors={errors}
-                  removeModule={modulesArray.remove}
+                  removeModule={removeModule}
+                  editableModules={editableModules}
+                  resourceMap={resourceMap}
+                  isResourcesLoading={isResourcesLoading}
+                  resourcesError={resourcesError}
+                  onEditableModulesChange={(nextModules) => {
+                    setEditableModules(nextModules);
+                    setAreLessonsDirty(true);
+                  }}
                 />
               ))}
             </div>
@@ -1335,22 +1766,35 @@ export default function CourseTemplateForm({
         </div>
       </SectionCard>
 
-      <div className="sticky bottom-4 z-10">
+      <div className="order-5 sticky bottom-4 z-10">
         <div className="bg-white/95 backdrop-blur rounded-xl shadow-lg border border-gray-200 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-sm text-gray-500">
-            Validate internally with Zod before sending the payload to the API.
+          <p
+            role="status"
+            className={`text-sm font-medium ${
+              hasUnsavedChanges ? "text-amber-700" : "text-emerald-700"
+            }`}
+          >
+            {hasUnsavedChanges
+              ? "Cambios sin guardar"
+              : initialData
+                ? "Guardado"
+                : "Sin cambios pendientes"}
           </p>
 
           <div className="flex items-center gap-3">
-            <Link
-              href={`/${locale}/dashboard/courses`}
+            <button
+              type="button"
+              onClick={leaveEditor}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors text-sm font-medium"
             >
-              Cancel
-            </Link>
+              {isEditMode ? "Volver al detalle" : "Cancelar"}
+            </button>
 
             <button
-              type="submit"
+              type={shouldSave ? "submit" : "button"}
+              onClick={
+                shouldSave ? undefined : () => router.push(detailUrl)
+              }
               disabled={isSubmitting}
               className="cursor-pointer inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#9e2727] text-white hover:bg-[#8d2121] disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-sm font-medium shadow-sm"
             >
@@ -1359,7 +1803,11 @@ export default function CourseTemplateForm({
               ) : (
                 <Save size={16} />
               )}
-              {isSubmitting ? "Saving..." : submitLabel}
+              {isSubmitting
+                ? "Guardando..."
+                : shouldSave
+                  ? submitLabel
+                  : "Volver al detalle"}
             </button>
           </div>
         </div>

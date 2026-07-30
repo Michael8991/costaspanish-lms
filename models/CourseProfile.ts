@@ -2,8 +2,14 @@ import { Schema, model, models } from "mongoose";
 import { Types, HydratedDocument } from "mongoose";
 import { CurrencyCode, ParticipantMode } from "./CourseTemplate";
 import { COURSE_STATUSES } from "@/lib/constants/course.constants";
+import type { ClassType } from "./StudentProfile";
 
-export type CourseProfileStatus = "draft" | "active" | "paused" | "archived";
+export type CourseProfileStatus =
+  | "draft"
+  | "active"
+  | "paused"
+  | "completed"
+  | "archived";
 export type CourseVisibility = "private" | "unlisted" | "public";
 export type CourseType = "regular_group" | "intensive_group" | "private_flexible" | "semi-intensive_group";
 export type StorefrontPriceMode = "monthly" | "package" | "free" | "custom_label";
@@ -101,8 +107,30 @@ export interface ICourseStats {
   lessonCount: number;
 }
 
+export interface ICourseProgress {
+  currentModuleOrder: number;
+  currentLessonOrder: number;
+  completedLessonsCount: number;
+}
+
+export interface ICourseTemplateSnapshot {
+  templateId: string;
+  code: string;
+  internalName: string;
+  version: number;
+  level: string;
+  category: string;
+  curriculumStats: {
+    modulesCount: number;
+    lessonsCount: number;
+    blocksCount: number;
+    resourcesCount: number;
+  };
+}
+
 export interface ICourseProfile {
   ownerTeacherId: Types.ObjectId;
+  teacherId?: Types.ObjectId;
 
   templateId: Types.ObjectId;
   templateVersion: number;
@@ -123,6 +151,16 @@ export interface ICourseProfile {
   publicationMeta: IPublicationMeta;
 
   stats: ICourseStats;
+
+  name?: string;
+  classType?: ClassType;
+  studentIds?: Types.ObjectId[];
+  startDate?: Date;
+  targetEndDate?: Date;
+  scheduleNotes?: string;
+  internalNotes?: string;
+  progress?: ICourseProgress;
+  templateSnapshot?: ICourseTemplateSnapshot;
 
   createdAt: Date;
   updatedAt: Date;
@@ -489,6 +527,68 @@ const CourseStatsSchema = new Schema<ICourseStats>(
   { _id: false }
 );
 
+const CourseProgressSchema = new Schema<ICourseProgress>(
+  {
+    currentModuleOrder: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    currentLessonOrder: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    completedLessonsCount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+  },
+  { _id: false },
+);
+
+const CourseTemplateSnapshotSchema = new Schema<ICourseTemplateSnapshot>(
+  {
+    templateId: {
+      type: String,
+      required: true,
+    },
+    code: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    internalName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    version: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+    level: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    category: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    curriculumStats: {
+      modulesCount: { type: Number, min: 0, default: 0 },
+      lessonsCount: { type: Number, min: 0, default: 0 },
+      blocksCount: { type: Number, min: 0, default: 0 },
+      resourcesCount: { type: Number, min: 0, default: 0 },
+    },
+  },
+  { _id: false },
+);
+
 
 
 const CourseProfileSchema = new Schema<ICourseProfile>(
@@ -498,6 +598,15 @@ const CourseProfileSchema = new Schema<ICourseProfile>(
       ref: "User",
       required: true,
       index: true,
+    },
+
+    teacherId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      index: true,
+      required: function (this: ICourseProfile) {
+        return Boolean(this.templateSnapshot);
+      },
     },
 
     templateId: {
@@ -550,7 +659,12 @@ const CourseProfileSchema = new Schema<ICourseProfile>(
 
     courseType: {
       type: String,
-      enum: ["regular_group", "intensive_group", "private_flexible"],
+      enum: [
+        "regular_group",
+        "intensive_group",
+        "private_flexible",
+        "semi-intensive_group",
+      ],
       required: true,
       index: true,
     },
@@ -589,6 +703,73 @@ const CourseProfileSchema = new Schema<ICourseProfile>(
         lessonCount: 0,
       }),
     },
+
+    name: {
+      type: String,
+      trim: true,
+      maxlength: 140,
+      required: function (this: ICourseProfile) {
+        return Boolean(this.templateSnapshot);
+      },
+    },
+
+    classType: {
+      type: String,
+      enum: [
+        "private",
+        "pair",
+        "group_regular",
+        "semi_intensive",
+        "intensive",
+      ],
+      index: true,
+      required: function (this: ICourseProfile) {
+        return Boolean(this.templateSnapshot);
+      },
+    },
+
+    studentIds: {
+      type: [
+        {
+          type: Schema.Types.ObjectId,
+          ref: "StudentProfile",
+        },
+      ],
+      default: [],
+    },
+
+    startDate: {
+      type: Date,
+    },
+
+    targetEndDate: {
+      type: Date,
+    },
+
+    scheduleNotes: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
+    },
+
+    internalNotes: {
+      type: String,
+      trim: true,
+      maxlength: 2000,
+    },
+
+    progress: {
+      type: CourseProgressSchema,
+      default: () => ({
+        currentModuleOrder: 0,
+        currentLessonOrder: 0,
+        completedLessonsCount: 0,
+      }),
+    },
+
+    templateSnapshot: {
+      type: CourseTemplateSnapshotSchema,
+    },
   },
   {
     timestamps: true,
@@ -599,8 +780,9 @@ const CourseProfileSchema = new Schema<ICourseProfile>(
 CourseProfileSchema.pre("validate", function () {
   const isRegular =
     this.courseType === "regular_group" || this.courseType === "intensive_group";
+  const isActiveCourseInstance = Boolean(this.classType);
 
-  if (isRegular && !this.regularPolicy) {
+  if (!isActiveCourseInstance && isRegular && !this.regularPolicy) {
     throw new Error("regularPolicy is required for regular_group and intensive_group");
   }
 
@@ -608,7 +790,11 @@ CourseProfileSchema.pre("validate", function () {
     this.regularPolicy = undefined;
   }
 
-  if (this.courseType === "private_flexible" && !this.privateFlexiblePolicy) {
+  if (
+    !isActiveCourseInstance &&
+    this.courseType === "private_flexible" &&
+    !this.privateFlexiblePolicy
+  ) {
     throw new Error("privateFlexiblePolicy is required for private_flexible");
   }
 
@@ -653,6 +839,12 @@ CourseProfileSchema.index(
 CourseProfileSchema.index({ templateId: 1, templateVersion: 1 });
 CourseProfileSchema.index({ courseType: 1, status: 1 });
 CourseProfileSchema.index({ ownerTeacherId: 1, status: 1 });
+CourseProfileSchema.index({ ownerTeacherId: 1, status: 1, createdAt: -1 });
+CourseProfileSchema.index({ ownerTeacherId: 1, templateId: 1 });
+CourseProfileSchema.index({ ownerTeacherId: 1, studentIds: 1 });
+CourseProfileSchema.index({ teacherId: 1, status: 1, createdAt: -1 });
+CourseProfileSchema.index({ teacherId: 1, templateId: 1 });
+CourseProfileSchema.index({ teacherId: 1, studentIds: 1 });
 CourseProfileSchema.index({ "publicationMeta.enrollmentOpen": 1, visibility: 1, status: 1 });
 
 export const CourseProfile =

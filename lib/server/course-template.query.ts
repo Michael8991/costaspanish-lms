@@ -40,7 +40,17 @@ export function buildCourseTemplateListQuery({
     ownerTeacherId,
   };
 
-  if (status) query.status = status;
+  if (status === "all") {
+    // Explicitly include every status.
+  } else if (
+    status === "draft" ||
+    status === "ready" ||
+    status === "archived"
+  ) {
+    query.status = status;
+  } else {
+    query.status = { $ne: "archived" };
+  }
   if (level) query["pedagogicalMeta.level"] = level;
   if (category) query["pedagogicalMeta.category"] = category;
 

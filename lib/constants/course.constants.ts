@@ -1,5 +1,11 @@
 
-export const COURSE_STATUSES = ["draft", "active", "paused", "archived"] as const;
+export const COURSE_STATUSES = [
+  "draft",
+  "active",
+  "paused",
+  "completed",
+  "archived",
+] as const;
 export type CourseStatuses = (typeof COURSE_STATUSES)[number]
 export const COURSE_VISIBILITIES = ["private", "unlisted", "public"] as const;
 export type CourseVisibilityes = (typeof COURSE_STATUSES)[number]

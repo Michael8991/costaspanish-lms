@@ -15,6 +15,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import TeacherTasksLauncher from "./tasks/TeacherTasksLauncher";
 
 type TopbarProps = {
   userName: string;
@@ -232,6 +233,10 @@ export const Topbar = ({ userName, locale, role }: TopbarProps) => {
         </nav>
 
         <div className="flex min-w-32 flex-1 items-center justify-end gap-1 sm:min-w-40 sm:gap-2 lg:min-w-56">
+          {(role === "teacher" || role === "admin") && (
+            <TeacherTasksLauncher />
+          )}
+
           <button
             type="button"
             aria-label="Notificaciones"

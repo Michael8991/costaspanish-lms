@@ -409,11 +409,15 @@ function mapBlocksToPatchPayload(blocks: LessonBlockItem[]) {
     studentDifficultiesText: block.studentDifficultiesText,
     teacherReflection: block.teacherReflection,
     nextStepSuggestion: block.nextStepSuggestion,
-    origin: block.origin?.sourceLessonId
+    origin: block.origin
       ? {
+          sourceType: block.origin.sourceType,
           sourceLessonId: block.origin.sourceLessonId,
           sourceBlockId: block.origin.sourceBlockId,
           sourceCourseId: block.origin.sourceCourseId,
+          sourceTemplateId: block.origin.sourceTemplateId,
+          sourceModuleOrder: block.origin.sourceModuleOrder,
+          sourceLessonOrder: block.origin.sourceLessonOrder,
           sourceStudentIds: block.origin.sourceStudentIds ?? [],
           sourceLessonTitle: block.origin.sourceLessonTitle,
           sourceLessonDate: block.origin.sourceLessonDate,

@@ -67,9 +67,13 @@ interface RawLessonBlock {
   teacherReflection?: string;
   nextStepSuggestion?: string;
   origin?: {
+    sourceType?: "lesson" | "course_template";
     sourceLessonId?: Types.ObjectId | string;
     sourceBlockId?: Types.ObjectId | string;
     sourceCourseId?: Types.ObjectId | string;
+    sourceTemplateId?: Types.ObjectId | string;
+    sourceModuleOrder?: number;
+    sourceLessonOrder?: number;
     sourceStudentIds?: Array<Types.ObjectId | string>;
     sourceLessonTitle?: string;
     sourceLessonDate?: Date | string;
@@ -88,6 +92,14 @@ interface RawMongoLesson {
 
   teacherId: Types.ObjectId;
   courseId?: Types.ObjectId;
+  courseTemplateId?: Types.ObjectId;
+  courseTemplateVersion?: number;
+  sourceTemplateLesson?: {
+    moduleOrder: number;
+    lessonOrder: number;
+    moduleTitle?: string;
+    lessonTitle?: string;
+  };
 
   title: string;
   status: LessonStatus;
@@ -127,6 +139,17 @@ const toISOString = (value: unknown): string => {
 export function toLessonListDTO(lesson: RawMongoLesson): LessonListDTO {
   return {
     id: String(lesson._id),
+    courseId: toId(lesson.courseId),
+    courseTemplateId: toId(lesson.courseTemplateId),
+    courseTemplateVersion: lesson.courseTemplateVersion,
+    sourceTemplateLesson: lesson.sourceTemplateLesson
+      ? {
+          moduleOrder: lesson.sourceTemplateLesson.moduleOrder,
+          lessonOrder: lesson.sourceTemplateLesson.lessonOrder,
+          moduleTitle: lesson.sourceTemplateLesson.moduleTitle,
+          lessonTitle: lesson.sourceTemplateLesson.lessonTitle,
+        }
+      : undefined,
     title: lesson.title,
     status: lesson.status,
     preparationStatus: lesson.preparationStatus ?? "needs_preparation",
@@ -190,11 +213,15 @@ export function toLessonDetailDTO(lesson: RawMongoLesson): LessonDetailDTO {
       studentDifficultiesText: block.studentDifficultiesText,
       teacherReflection: block.teacherReflection,
       nextStepSuggestion: block.nextStepSuggestion,
-      origin: block.origin?.sourceLessonId
+      origin: block.origin
         ? {
-            sourceLessonId: String(block.origin.sourceLessonId),
+            sourceType: block.origin.sourceType,
+            sourceLessonId: toId(block.origin.sourceLessonId),
             sourceBlockId: toId(block.origin.sourceBlockId),
             sourceCourseId: toId(block.origin.sourceCourseId),
+            sourceTemplateId: toId(block.origin.sourceTemplateId),
+            sourceModuleOrder: block.origin.sourceModuleOrder,
+            sourceLessonOrder: block.origin.sourceLessonOrder,
             sourceStudentIds: (block.origin.sourceStudentIds ?? []).map(String),
             sourceLessonTitle: block.origin.sourceLessonTitle,
             sourceLessonDate: block.origin.sourceLessonDate
@@ -219,7 +246,6 @@ export function toLessonDetailDTO(lesson: RawMongoLesson): LessonDetailDTO {
     ...toLessonListDTO(lesson),
 
     teacherId: String(lesson.teacherId),
-    courseId: toId(lesson.courseId),
 
     attendees,
     blocks,

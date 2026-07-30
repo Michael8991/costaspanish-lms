@@ -18,7 +18,7 @@ export default async function CourseTemplateDetailsPage({
   const session = await getServerSession(authOptions);
   if (!session?.user) return null;
 
-  if (!session?.user || session.user.role === "student") {
+  if (session.user.role === "student") {
     redirect(`/${locale}/dashboard`);
   }
 
@@ -27,7 +27,16 @@ export default async function CourseTemplateDetailsPage({
   }
 
   await dbConnect();
-  const rawCourseTemplate = await CourseTemplate.findById(id).lean();
+  const templateId = new Types.ObjectId(id);
+  const templateFilter =
+    session.user.role === "admin"
+      ? { _id: templateId }
+      : {
+          _id: templateId,
+          ownerTeacherId: session.user.id,
+        };
+  const rawCourseTemplate =
+    await CourseTemplate.findOne(templateFilter).lean();
 
   if (!rawCourseTemplate) {
     notFound();
@@ -36,13 +45,12 @@ export default async function CourseTemplateDetailsPage({
   const courseTemplate = toCourseTemplateDetailDTO(rawCourseTemplate);
 
   const breadcrumbItems = [
-    { label: "Courses", href: `/${locale}/dashboard/courses` },
-    { label: `Details Course Template ${courseTemplate.code}` },
+    { label: "Cursos", href: `/${locale}/dashboard/courses` },
+    { label: `Plantilla ${courseTemplate.code}` },
   ];
   return (
     <div className="container mx-auto py-8 px-4 md:px-8 text-gray-800 max-w-6xl">
       <Breadcrumbs items={breadcrumbItems} locale={locale} />
-      <h1 className="text-2xl">Detalles de plantilla de curso</h1>
       <div className="flex flex-col">
         <CourseTemplateDetailView
           courseTemplate={courseTemplate}

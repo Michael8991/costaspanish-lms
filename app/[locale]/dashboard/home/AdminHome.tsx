@@ -1,4 +1,5 @@
 import { Hello } from "@/components";
+import TeacherTaskStatsCard from "@/components/dashboard/tasks/TeacherTaskStatsCard";
 import { authOptions } from "@/lib/auth";
 import { getServerSession } from "next-auth";
 
@@ -25,6 +26,9 @@ export default async function AdminHome({ locale }: { locale: string }) {
           <Hello />
         </h1>
         <p className="text-sm text-gray-500 italic">{formattedDate}</p>
+      </div>
+      <div className="mt-6">
+        <TeacherTaskStatsCard />
       </div>
     </div>
   );

@@ -91,9 +91,13 @@ export type AddLessonFormValues = {
       | "skipped";
     carryOverToNextLesson?: boolean;
     origin?: {
-      sourceLessonId: string;
+      sourceType?: "lesson" | "course_template";
+      sourceLessonId?: string;
       sourceBlockId?: string;
       sourceCourseId?: string;
+      sourceTemplateId?: string;
+      sourceModuleOrder?: number;
+      sourceLessonOrder?: number;
       sourceStudentIds: string[];
       sourceLessonTitle?: string;
       sourceLessonDate?: string;
@@ -413,11 +417,15 @@ export default function AddLessonWizard({
           nextStepSuggestion: block.nextStepSuggestion,
           completionStatus: block.completionStatus ?? "not_completed",
           carryOverToNextLesson: block.carryOverToNextLesson ?? false,
-          origin: block.origin?.sourceLessonId
+          origin: block.origin
             ? {
+                sourceType: block.origin.sourceType,
                 sourceLessonId: block.origin.sourceLessonId,
                 sourceBlockId: block.origin.sourceBlockId,
                 sourceCourseId: block.origin.sourceCourseId,
+                sourceTemplateId: block.origin.sourceTemplateId,
+                sourceModuleOrder: block.origin.sourceModuleOrder,
+                sourceLessonOrder: block.origin.sourceLessonOrder,
                 sourceStudentIds: block.origin.sourceStudentIds ?? [],
                 sourceLessonTitle: block.origin.sourceLessonTitle,
                 sourceLessonDate: block.origin.sourceLessonDate,

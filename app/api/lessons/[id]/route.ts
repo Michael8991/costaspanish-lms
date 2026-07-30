@@ -57,7 +57,24 @@ export async function GET(
 
     await dbConnect();
 
-    const lesson = await Lesson.findById(id).lean();
+    const currentUserObjectId = getCurrentUserObjectId(user);
+
+    if (user.role !== "admin" && !currentUserObjectId) {
+      return NextResponse.json(
+        { error: "Invalid current user id" },
+        { status: 500 },
+      );
+    }
+
+    const lessonFilter =
+      user.role === "admin"
+        ? { _id: new Types.ObjectId(id) }
+        : {
+            _id: new Types.ObjectId(id),
+            teacherId: currentUserObjectId,
+          };
+
+    const lesson = await Lesson.findOne(lessonFilter).lean();
 
     if (!lesson) {
       return NextResponse.json(

@@ -43,10 +43,15 @@ const LessonAttendeeSchema = new Schema(
 
 const LessonBlockOriginSchema = new Schema(
   {
+    sourceType: {
+      type: String,
+      enum: ["lesson", "course_template"],
+      required: false,
+    },
     sourceLessonId: {
       type: Schema.Types.ObjectId,
       ref: "Lesson",
-      required: true,
+      required: false,
     },
     sourceBlockId: {
       type: Schema.Types.ObjectId,
@@ -55,6 +60,21 @@ const LessonBlockOriginSchema = new Schema(
     sourceCourseId: {
       type: Schema.Types.ObjectId,
       ref: "CourseProfile",
+      required: false,
+    },
+    sourceTemplateId: {
+      type: Schema.Types.ObjectId,
+      ref: "CourseTemplate",
+      required: false,
+    },
+    sourceModuleOrder: {
+      type: Number,
+      min: 0,
+      required: false,
+    },
+    sourceLessonOrder: {
+      type: Number,
+      min: 0,
       required: false,
     },
     sourceStudentIds: [
@@ -207,6 +227,30 @@ const LessonBlockSchema = new Schema(
   { timestamps: false },
 );
 
+const SourceTemplateLessonSchema = new Schema(
+  {
+    moduleOrder: {
+      type: Number,
+      min: 0,
+      required: true,
+    },
+    lessonOrder: {
+      type: Number,
+      min: 0,
+      required: true,
+    },
+    moduleTitle: {
+      type: String,
+      trim: true,
+    },
+    lessonTitle: {
+      type: String,
+      trim: true,
+    },
+  },
+  { _id: false },
+);
+
 const LessonSchema = new Schema(
   {
     teacherId: {
@@ -218,8 +262,27 @@ const LessonSchema = new Schema(
 
     courseId: {
       type: Schema.Types.ObjectId,
+      ref: "CourseProfile",
       required: false,
       index: true,
+    },
+
+    courseTemplateId: {
+      type: Schema.Types.ObjectId,
+      ref: "CourseTemplate",
+      required: false,
+      index: true,
+    },
+
+    courseTemplateVersion: {
+      type: Number,
+      min: 1,
+      required: false,
+    },
+
+    sourceTemplateLesson: {
+      type: SourceTemplateLessonSchema,
+      required: false,
     },
 
     title: {
@@ -300,6 +363,7 @@ const LessonSchema = new Schema(
     nextLessonFocus: {
       type: String,
       trim: true,
+      default: "",
     },
 
     creationSource: {
@@ -323,6 +387,11 @@ const LessonSchema = new Schema(
 
 LessonSchema.index({ teacherId: 1, scheduledStart: 1 });
 LessonSchema.index({ "attendees.studentId": 1, scheduledStart: -1 });
+LessonSchema.index({
+  courseId: 1,
+  "sourceTemplateLesson.moduleOrder": 1,
+  "sourceTemplateLesson.lessonOrder": 1,
+});
 LessonSchema.index({"attendees.voucherId":1})
 
 const Lesson = mongoose.models.Lesson || mongoose.model("Lesson", LessonSchema);

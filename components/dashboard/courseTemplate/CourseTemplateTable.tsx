@@ -1,16 +1,22 @@
 "use client";
 
-import Link from "next/link";
-import { CourseTemplateListItemDTO } from "@/lib/dto/course-template.dto";
+import CourseTemplateStatusBadge from "@/components/dashboard/courses/templates/CourseTemplateStatusBadge";
+import type { CourseTemplateListItemDTO } from "@/lib/dto/course-template.dto";
 import {
-  AlertCircle,
-  ChevronRight,
-  Search,
-  Plus,
-  Info,
-  Eye,
+  getCourseTemplateLevelLabel,
+  getCourseTemplateStatsLabel,
+} from "@/lib/utils/course-template-visuals";
+import {
   Archive,
+  BookOpenCheck,
+  Eye,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Search,
 } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 
 interface CourseTemplateTableProps {
   courseTemplates: CourseTemplateListItemDTO[];
@@ -18,42 +24,10 @@ interface CourseTemplateTableProps {
   isLoading?: boolean;
   error?: string | null;
   onClose: () => void;
-}
-
-function getStatusBadge(status: CourseTemplateListItemDTO["status"]) {
-  switch (status) {
-    case "ready":
-      return "bg-green-50 text-green-700 border-green-200";
-    case "draft":
-      return "bg-amber-50 text-amber-700 border-amber-200";
-    case "archived":
-      return "bg-gray-100 text-gray-600 border-gray-200";
-    default:
-      return "bg-gray-100 text-gray-600 border-gray-200";
-  }
-}
-
-function getPriceModeLabel(priceMode: CourseTemplateListItemDTO["priceMode"]) {
-  switch (priceMode) {
-    case "monthly":
-      return "Monthly";
-    case "package":
-      return "Package";
-    case "free":
-      return "Free";
-    case "custom_label":
-      return "Custom";
-    default:
-      return priceMode;
-  }
-}
-
-function formatDate(date: string) {
-  return new Intl.DateTimeFormat("es-ES", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(date));
+  onTemplateStatusChange?: (
+    templateId: string,
+    status: CourseTemplateListItemDTO["status"],
+  ) => void;
 }
 
 export default function CourseTemplateTable({
@@ -62,164 +36,358 @@ export default function CourseTemplateTable({
   isLoading = false,
   error = null,
   onClose,
+  onTemplateStatusChange,
 }: CourseTemplateTableProps) {
-  console.log(courseTemplates);
+  const [templates, setTemplates] = useState(courseTemplates);
+  const [view, setView] = useState<"active" | "archived">("active");
+  const [search, setSearch] = useState("");
+  const [archivingId, setArchivingId] = useState<string | null>(null);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  useEffect(() => {
+    setTemplates(courseTemplates);
+  }, [courseTemplates]);
+
+  const activeCount = templates.filter(
+    (template) => template.status !== "archived",
+  ).length;
+  const archivedCount = templates.length - activeCount;
+
+  const filteredTemplates = useMemo(() => {
+    const normalizedSearch = search.trim().toLocaleLowerCase("es");
+    const templatesForView = templates.filter((template) =>
+      view === "archived"
+        ? template.status === "archived"
+        : template.status !== "archived",
+    );
+
+    if (!normalizedSearch) return templatesForView;
+
+    return templatesForView.filter((template) =>
+      [
+        template.internalName,
+        template.publicTitle,
+        template.code,
+        template.level,
+        template.category,
+      ].some((value) =>
+        value.toLocaleLowerCase("es").includes(normalizedSearch),
+      ),
+    );
+  }, [search, templates, view]);
+
+  const archiveTemplate = async (templateId: string) => {
+    if (!window.confirm("¿Archivar esta plantilla de curso?")) return;
+
+    try {
+      setArchivingId(templateId);
+      setActionError(null);
+      setFeedback(null);
+      const response = await fetch(`/api/course-template/${templateId}`, {
+        method: "DELETE",
+      });
+      const data = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+
+      if (!response.ok) {
+        throw new Error(data?.error ?? "No se pudo archivar la plantilla.");
+      }
+
+      setTemplates((currentTemplates) =>
+        currentTemplates.map((template) =>
+          template.id === templateId
+            ? { ...template, status: "archived" }
+            : template,
+        ),
+      );
+      onTemplateStatusChange?.(templateId, "archived");
+    } catch (archiveError) {
+      setActionError(
+        archiveError instanceof Error
+          ? archiveError.message
+          : "No se pudo archivar la plantilla.",
+      );
+    } finally {
+      setArchivingId(null);
+    }
+  };
+
+  const restoreTemplate = async (templateId: string) => {
+    if (
+      !window.confirm("¿Restaurar esta plantilla? Volverá como borrador.")
+    ) {
+      return;
+    }
+
+    try {
+      setRestoringId(templateId);
+      setActionError(null);
+      setFeedback(null);
+      const response = await fetch(
+        `/api/course-template/${templateId}/restore`,
+        { method: "POST" },
+      );
+      const data = (await response.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+
+      if (!response.ok) {
+        throw new Error(data?.error ?? "No se pudo restaurar la plantilla.");
+      }
+
+      setTemplates((currentTemplates) =>
+        currentTemplates.map((template) =>
+          template.id === templateId
+            ? { ...template, status: "draft" }
+            : template,
+        ),
+      );
+      onTemplateStatusChange?.(templateId, "draft");
+      setFeedback("Plantilla restaurada como borrador.");
+    } catch (restoreError) {
+      setActionError(
+        restoreError instanceof Error
+          ? restoreError.message
+          : "No se pudo restaurar la plantilla.",
+      );
+    } finally {
+      setRestoringId(null);
+    }
+  };
+
   return (
-    <div className="">
-      <div className="p-1 flex flex-col sm:flex-row justify-between items-center">
-        <h2 className="font-medium text-white text-md">
-          Plantillas de cursos existentes
-        </h2>
-
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-          <div className="relative w-full sm:w-72">
-            <Search
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-              size={18}
-            />
-            <input
-              type="text"
-              placeholder="Buscar plantilla..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#9e2727] focus:border-transparent transition-shadow"
-            />
-          </div>
-
-          <Link
-            href={`/${locale}/dashboard/courses/addTemplate`}
-            className="w-full sm:w-auto bg-[#9e2727] hover:bg-[#a85d5d] text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-all shadow-sm font-medium text-sm"
-          >
-            <Plus size={18} />
-            <span>Nueva Plantilla</span>
-          </Link>
+    <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-950">
+            Biblioteca de cursos
+          </h2>
+          <p className="mt-1 max-w-2xl text-sm text-slate-500">
+            Guías reutilizables sin alumnos ni fechas reales. Úsalas para
+            mantener una estructura pedagógica consistente.
+          </p>
         </div>
+        <Link
+          href={`/${locale}/dashboard/courses/addTemplate`}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#9e2727] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#8d2121] sm:w-auto"
+        >
+          <Plus className="h-4 w-4" />
+          Nueva plantilla
+        </Link>
       </div>
 
-      {isLoading && (
-        <div className="p-8 text-center text-gray-500">
-          <p className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#9e2727] mx-auto mb-4"></p>
-          Loading templates...
-        </div>
-      )}
-
-      {error && (
-        <div className="w-full flex items-center justify-center py-4 gap-2 text-red-500">
-          <AlertCircle size={16} />
-          Ocurrió un error {error}
-        </div>
-      )}
-
-      {!isLoading &&
-        !error &&
-        (courseTemplates.length === 0 ||
-          courseTemplates.length === undefined) && (
-          <div className="flex flex-col items-center justify-center my-5">
-            <div className="rounded-lg shadow-lm flex flex-col items-center justify-center gap-2 text-white">
-              <p>No hay plantillas registradas.</p>
-            </div>
-            <div className="rounded-lg mt-4 shadow-lm flex flex-col items-center justify-center px-4 py-2 gap-2 text-gray-800 bg-amber-500">
-              <p className="flex items-center justify-center gap-2">
-                <Info size={14} />
-                Crea una nueva. Esto te permitirá ir más rápido y mantener la
-                consistencia entre cursos en el futuro.
-              </p>
-            </div>
-          </div>
-        )}
-
-      {!isLoading && !error && courseTemplates.length > 0 && (
-        <div className="overflow-x-auto bg-white my-4 rounded-lg">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 text-xs uppercase tracking-wider">
-                <th className="px-6 py-4 font-medium">Plantilla</th>
-                <th className="px-6 py-4 font-medium">Nivel</th>
-                <th className="px-6 py-4 font-medium">Precio</th>
-                <th className="px-6 py-4 font-medium">Estado</th>
-                <th className="px-6 py-4 font-medium">Actualizado</th>
-                <th className="px-6 py-4 font-medium text-right">Opciones</th>
-              </tr>
-            </thead>
-
-            <tbody className="divide-y divide-gray-200">
-              {courseTemplates.map((template) => (
-                <tr
-                  key={template.id}
-                  className="hover:bg-gray-50/50 transition-colors group"
-                >
-                  <td className="px-6 py-4">
-                    <div>
-                      <p className="font-semibold text-gray-900">
-                        {template.internalName}
-                      </p>
-                      <p className="text-sm text-gray-500 mt-0.5">
-                        {template.code}
-                      </p>
-                    </div>
-                  </td>
-
-                  <td className="px-6 py-4">
-                    <span className="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full border bg-blue-50 text-blue-700 border-blue-200">
-                      {template.level}
-                    </span>
-                  </td>
-
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col gap-1 items-center justify-center">
-                      <span className="inline-flex w-fit items-center px-2.5 py-1 rounded-full text-xs font-medium border bg-purple-50 text-purple-700 border-purple-200">
-                        {getPriceModeLabel(template.priceMode)}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {template.currency}
-                      </span>
-                    </div>
-                  </td>
-
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col gap-1 items-center justify-center">
-                      <span
-                        className={`inline-flex w-fit items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${getStatusBadge(template.status)}`}
-                      >
-                        {template.status}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        Version {template.version}
-                      </span>
-                    </div>
-                  </td>
-
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {formatDate(template.updatedAt)}
-                  </td>
-
-                  <td className="px-6 py-4 flex items-center justify-center gap-1">
-                    <Link
-                      href={`/${locale}/dashboard/courses/templates/${template.id}`}
-                      className="bg-blue-400 text-white inline-flex items-center justify-center p-2 rounded-lg  hover:bg-blue-600 transition-colors"
-                    >
-                      <Eye size={18} />
-                    </Link>
-                    <button className="cursor-pointer bg-gray-400 text-white inline-flex items-center justify-center p-2 rounded-lg  hover:bg-red-600 transition-colors">
-                      <Archive size={18} />
-                    </button>
-                    <Link
-                      href={`/${locale}/dashboard/courses/addCourse/${template.id}`}
-                      className="ms-4 bg-green-600 text-white inline-flex items-center justify-center p-2 rounded-lg  hover:bg-green-800 transition-colors"
-                    >
-                      <ChevronRight size={18} />
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      <div className="w-full flex items-center justify-end">
+      <div className="mt-5 flex gap-1 rounded-xl bg-slate-100 p-1">
         <button
-          onClick={onClose}
-          className="text-md px-4 py-2 bg-white text-gray-700 rounded-lg cursor-pointer hover:bg-gray-200 hover:text-gray-600 transition-all duration-150 ease-in-out"
+          type="button"
+          onClick={() => {
+            setView("active");
+            setFeedback(null);
+          }}
+          className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition ${
+            view === "active"
+              ? "bg-white text-slate-900 shadow-sm"
+              : "text-slate-500 hover:text-slate-800"
+          }`}
         >
-          Cancelar
+          Plantillas activas ({activeCount})
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setView("archived");
+            setFeedback(null);
+          }}
+          className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition ${
+            view === "archived"
+              ? "bg-white text-slate-900 shadow-sm"
+              : "text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          Archivadas ({archivedCount})
+        </button>
+      </div>
+
+      <div className="relative mt-4">
+        <label htmlFor="course-template-search" className="sr-only">
+          Buscar plantillas de curso
+        </label>
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <input
+          id="course-template-search"
+          type="search"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Buscar por nombre, nivel o categoría..."
+          className="w-full rounded-xl border border-slate-200 bg-white px-10 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#9e2727] focus:ring-2 focus:ring-[#9e2727]/10"
+        />
+      </div>
+
+      {actionError && (
+        <p
+          role="alert"
+          className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
+          {actionError}
+        </p>
+      )}
+      {feedback && (
+        <p
+          role="status"
+          className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
+        >
+          {feedback}
+        </p>
+      )}
+
+      {isLoading && (
+        <p className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-10 text-center text-sm text-slate-500">
+          Cargando plantillas...
+        </p>
+      )}
+      {error && (
+        <p
+          role="alert"
+          className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700"
+        >
+          No se pudieron cargar las plantillas. {error}
+        </p>
+      )}
+
+      {!isLoading && !error && filteredTemplates.length === 0 && (
+        <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center">
+          <BookOpenCheck className="mx-auto h-8 w-8 text-slate-300" />
+          <p className="mt-3 text-sm font-medium text-slate-700">
+            {search
+              ? "No hay plantillas que coincidan con la búsqueda."
+              : view === "archived"
+                ? "No hay plantillas archivadas."
+                : "No hay plantillas de curso todavía."}
+          </p>
+          {!search && view === "active" && (
+            <Link
+              href={`/${locale}/dashboard/courses/addTemplate`}
+              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#9e2727] px-4 py-2 text-sm font-medium text-white"
+            >
+              <Plus className="h-4 w-4" />
+              Crear primera plantilla
+            </Link>
+          )}
+        </div>
+      )}
+
+      {!isLoading && !error && filteredTemplates.length > 0 && (
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          {filteredTemplates.map((template) => {
+            const isArchived = template.status === "archived";
+            const isArchiving = archivingId === template.id;
+            const isRestoring = restoringId === template.id;
+            const statsLabel = getCourseTemplateStatsLabel({
+              modulesCount: template.modulesCount,
+              lessonsCount: template.lessonsCount,
+              blocksCount: template.blocksCount,
+              resourcesCount: template.resourcesCount,
+            });
+
+            return (
+              <article
+                key={template.id}
+                className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                  isArchived ? "opacity-80" : ""
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-base font-semibold text-slate-950">
+                      {template.internalName}
+                    </h3>
+                    {template.publicTitle &&
+                      template.publicTitle !== template.internalName && (
+                        <p className="mt-1 truncate text-sm text-slate-500">
+                          {template.publicTitle}
+                        </p>
+                      )}
+                  </div>
+                  <CourseTemplateStatusBadge status={template.status} />
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
+                  <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 font-semibold text-blue-700">
+                    {getCourseTemplateLevelLabel(template.level)}
+                  </span>
+                  <span className="text-slate-500">{template.category}</span>
+                  <span className="text-slate-300">·</span>
+                  <span className="text-slate-400">{template.code}</span>
+                </div>
+
+                <p className="mt-4 rounded-xl bg-slate-50 px-3 py-3 text-xs leading-5 text-slate-600">
+                  {statsLabel}
+                </p>
+
+                <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+                  <Link
+                    href={`/${locale}/dashboard/courses/templates/${template.id}`}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    Ver
+                  </Link>
+
+                  {isArchived ? (
+                    <>
+                      <button
+                        type="button"
+                        disabled={isRestoring}
+                        onClick={() => void restoreTemplate(template.id)}
+                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <RotateCcw
+                          className={`h-3.5 w-3.5 ${
+                            isRestoring ? "animate-spin" : ""
+                          }`}
+                        />
+                        {isRestoring ? "Restaurando..." : "Restaurar"}
+                      </button>
+                      <span className="self-center text-xs text-slate-400">
+                        Restaura la plantilla para editarla.
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Link
+                        href={`/${locale}/dashboard/courses/templates/${template.id}/edit`}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Editar
+                      </Link>
+                      <button
+                        type="button"
+                        disabled={isArchiving}
+                        onClick={() => void archiveTemplate(template.id)}
+                        className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Archive className="h-3.5 w-3.5" />
+                        {isArchiving ? "Archivando..." : "Archivar"}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="mt-5 flex justify-end">
+        <button
+          type="button"
+          onClick={onClose}
+          className="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+        >
+          Cerrar
         </button>
       </div>
     </div>

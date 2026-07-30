@@ -38,11 +38,14 @@ import {
   Ban,
   Check,
   ChevronDown,
+  Clipboard,
   Clock3,
+  FilePlus2,
   GripVertical,
   Paperclip,
   Plus,
   Star,
+  Target,
   Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -195,6 +198,19 @@ function formatPendingLessonDate(value: string) {
   }).format(date);
 }
 
+function addFocusToPreparationNotes(currentValue: string, focusText: string) {
+  const currentNotes = currentValue.trim();
+  const normalizedFocus = focusText.trim();
+
+  if (!normalizedFocus || currentNotes.includes(normalizedFocus)) {
+    return currentValue;
+  }
+
+  const focusSection = `Foco clase anterior:\n${normalizedFocus}`;
+
+  return currentNotes ? `${currentNotes}\n\n${focusSection}` : focusSection;
+}
+
 function getPendingReferenceDate(value?: string, timezone?: string) {
   if (!value || !timezone) return undefined;
 
@@ -210,8 +226,7 @@ function getPendingCompletionStatusVisual(status: string) {
     case "completed":
       return {
         label: "Completado",
-        className:
-          "bg-emerald-500/10 text-emerald-200 ring-emerald-400/20",
+        className: "bg-emerald-500/10 text-emerald-200 ring-emerald-400/20",
       };
     case "partially_completed":
       return {
@@ -250,6 +265,11 @@ export default function SecondStepAddLesson({
   const [discardPendingBlockError, setDiscardPendingBlockError] = useState<
     string | null
   >(null);
+  const [isInsertingFocus, setIsInsertingFocus] = useState(false);
+  const [focusActionMessage, setFocusActionMessage] = useState<string | null>(
+    null,
+  );
+  const [focusActionError, setFocusActionError] = useState<string | null>(null);
   const [expandedBlockKeys, setExpandedBlockKeys] = useState<Set<string>>(
     () => {
       if (blockFields.length !== 1) return new Set();
@@ -329,6 +349,7 @@ export default function SecondStepAddLesson({
       ? (blocks?.[resourceBlockIndex]?.resources ?? [])
       : [];
   const {
+    focusNote,
     items: pendingBlocks,
     meta: pendingBlocksMeta,
     isLoading: isLoadingPendingBlocks,
@@ -365,6 +386,11 @@ export default function SecondStepAddLesson({
     () => blockFields.map((field) => field.id),
     [blockFields],
   );
+
+  useEffect(() => {
+    setFocusActionMessage(null);
+    setFocusActionError(null);
+  }, [focusNote?.sourceLessonId]);
 
   useEffect(() => {
     const newFields = blockFields.filter(
@@ -482,9 +508,7 @@ export default function SecondStepAddLesson({
     });
   }
 
-  async function handleDiscardPendingBlock(
-    pendingBlock: PendingLessonBlock,
-  ) {
+  async function handleDiscardPendingBlock(pendingBlock: PendingLessonBlock) {
     const confirmed = window.confirm(
       "Este bloque dejará de aparecer como pendiente. No se borrará del historial. ¿Quieres descartarlo?",
     );
@@ -497,21 +521,18 @@ export default function SecondStepAddLesson({
       setDiscardingBlockKey(pendingBlockKey);
       setDiscardPendingBlockError(null);
 
-      const response = await fetch(
-        "/api/lessons/pending-blocks/discard",
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sourceLessonId: pendingBlock.sourceLessonId,
-            sourceBlockId: pendingBlock.sourceBlockId,
-            lineageId: pendingBlock.block.lineageId,
-          }),
-        },
-      );
-      const data = (await response.json().catch(() => null)) as
-        | { ok?: boolean }
-        | null;
+      const response = await fetch("/api/lessons/pending-blocks/discard", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceLessonId: pendingBlock.sourceLessonId,
+          sourceBlockId: pendingBlock.sourceBlockId,
+          lineageId: pendingBlock.block.lineageId,
+        }),
+      });
+      const data = (await response.json().catch(() => null)) as {
+        ok?: boolean;
+      } | null;
 
       if (!response.ok || !data?.ok) {
         throw new Error("Pending block discard failed");
@@ -519,11 +540,73 @@ export default function SecondStepAddLesson({
 
       refetchPendingBlocks();
     } catch {
-      setDiscardPendingBlockError(
-        "No se pudo descartar el bloque pendiente.",
-      );
+      setDiscardPendingBlockError("No se pudo descartar el bloque pendiente.");
     } finally {
       setDiscardingBlockKey(null);
+    }
+  }
+
+  async function handleInsertFocus() {
+    if (!focusNote) return;
+
+    const currentNotes = getValues("preparationNotes") ?? "";
+    const nextNotes = addFocusToPreparationNotes(currentNotes, focusNote.text);
+
+    setFocusActionError(null);
+
+    if (nextNotes === currentNotes) {
+      setFocusActionMessage("Este foco ya está en las notas de preparación.");
+      return;
+    }
+
+    try {
+      setIsInsertingFocus(true);
+      setFocusActionMessage(null);
+
+      if (lessonId) {
+        const response = await fetch(`/api/lessons/${lessonId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ preparationNotes: nextNotes }),
+        });
+        const data = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+
+        if (!response.ok) {
+          throw new Error(
+            data?.error ?? "No se pudo actualizar la preparación.",
+          );
+        }
+      }
+
+      setValue("preparationNotes", nextNotes, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+      setFocusActionMessage("Foco insertado en las notas de preparación.");
+    } catch (error) {
+      setFocusActionError(
+        error instanceof Error
+          ? error.message
+          : "No se pudo insertar el foco en la preparación.",
+      );
+    } finally {
+      setIsInsertingFocus(false);
+    }
+  }
+
+  async function handleCopyFocus() {
+    if (!focusNote) return;
+
+    setFocusActionError(null);
+
+    try {
+      await navigator.clipboard.writeText(focusNote.text);
+      setFocusActionMessage("Foco copiado al portapapeles.");
+    } catch {
+      setFocusActionMessage(null);
+      setFocusActionError("No se pudo copiar el foco.");
     }
   }
 
@@ -539,19 +622,21 @@ export default function SecondStepAddLesson({
         </p>
       </div>
 
-      {pendingBlocks.length > 0 && (
+      {(focusNote || pendingBlocks.length > 0) && (
         <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-amber-800">
-            {pendingBlocksMeta.previousLessonPendingCount > 0
-              ? `Hay ${pendingBlocksMeta.previousLessonPendingCount} bloque(s) sin completar de la sesión anterior.`
-              : "Hay pendientes anteriores relacionados."}
+            {focusNote && pendingBlocks
+              ? "Hay un foco de la clase anterior y bloques pendientes"
+              : pendingBlocksMeta.previousLessonPendingCount > 0
+                ? `Hay ${pendingBlocksMeta.previousLessonPendingCount} bloque(s) sin completar de la sesión anterior.`
+                : "Hay bloques pendientes anteriores relacionados."}
           </p>
           <button
             type="button"
             onClick={() => setIsPendingModalOpen(true)}
             className="shrink-0 cursor-pointer text-sm font-medium text-[#9e2727] underline underline-offset-2"
           >
-            Ver pendientes
+            Ver recursos
           </button>
         </div>
       )}
@@ -949,14 +1034,80 @@ export default function SecondStepAddLesson({
       <CustomModal
         isOpen={isPendingModalOpen}
         onClose={() => setIsPendingModalOpen(false)}
-        title="Pendientes anteriores"
+        title="Toolbox de preparación"
         maxWidth="4xl"
       >
         <div className="flex w-full flex-col pt-3 text-left">
           <p className="text-sm text-white/45">
-            Bloques sin completar de clases anteriores que puedes recuperar o
-            descartar.
+            Reutiliza el foco y los bloques relevantes de clases anteriores.
           </p>
+
+          {!isLoadingPendingBlocks && !pendingBlocksError && (
+            <div className="mt-5">
+              {focusNote ? (
+                <article className="rounded-2xl border border-amber-300/20 bg-amber-400/10 p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-300/10">
+                      <Target className="h-4 w-4 text-amber-200" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-sm font-semibold text-white">
+                        Foco de la clase anterior
+                      </h3>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-white/75">
+                        {focusNote.text}
+                      </p>
+                      <p className="mt-3 text-xs text-white/40">
+                        Desde: {focusNote.sourceLessonTitle}
+                        {formatPendingLessonDate(focusNote.sourceLessonDate)
+                          ? ` · ${formatPendingLessonDate(
+                              focusNote.sourceLessonDate,
+                            )}`
+                          : ""}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={isInsertingFocus}
+                      onClick={() => void handleInsertFocus()}
+                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-[#9e2727] px-3 py-2 text-xs font-medium text-white transition hover:bg-[#8d2323] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <FilePlus2 className="h-3.5 w-3.5" />
+                      {isInsertingFocus
+                        ? "Insertando..."
+                        : "Insertar en preparación"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleCopyFocus()}
+                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-white/15 bg-white/[0.08] px-3 py-2 text-xs font-medium text-white/80 transition hover:bg-white/15 hover:text-white"
+                    >
+                      <Clipboard className="h-3.5 w-3.5" />
+                      Copiar
+                    </button>
+                  </div>
+
+                  {focusActionMessage && (
+                    <p className="mt-3 text-xs text-emerald-200">
+                      {focusActionMessage}
+                    </p>
+                  )}
+                  {focusActionError && (
+                    <p role="alert" className="mt-3 text-xs text-rose-200">
+                      {focusActionError}
+                    </p>
+                  )}
+                </article>
+              ) : (
+                <p className="rounded-xl border border-dashed border-white/10 bg-white/[0.03] px-4 py-3 text-xs text-white/35">
+                  No hay foco pendiente de la clase anterior.
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="mt-5 flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#9e2727]/20">
@@ -1025,8 +1176,7 @@ export default function SecondStepAddLesson({
                 {pendingBlocks.map((pendingBlock) => {
                   const pendingBlockKey = getPendingBlockKey(pendingBlock);
                   const isAdded = addedPendingBlockKeys.has(pendingBlockKey);
-                  const isDiscarding =
-                    discardingBlockKey === pendingBlockKey;
+                  const isDiscarding = discardingBlockKey === pendingBlockKey;
                   const formattedDate = formatPendingLessonDate(
                     pendingBlock.sourceLessonDate,
                   );

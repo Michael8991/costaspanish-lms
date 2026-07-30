@@ -34,6 +34,13 @@ export type PendingLessonBlock = {
   };
 };
 
+export type PreviousLessonFocusNote = {
+  text: string;
+  sourceLessonId: string;
+  sourceLessonTitle: string;
+  sourceLessonDate: string;
+};
+
 interface UsePendingLessonBlocksInput {
   courseId?: string;
   studentIds: string[];
@@ -43,6 +50,7 @@ interface UsePendingLessonBlocksInput {
 }
 
 type PendingBlocksApiResponse = {
+  focusNote?: PreviousLessonFocusNote | null;
   items?: PendingLessonBlock[];
   meta?: PendingBlocksMeta;
   error?: string;
@@ -65,6 +73,8 @@ export function usePendingLessonBlocks({
   referenceDate,
   enabled,
 }: UsePendingLessonBlocksInput) {
+  const [focusNote, setFocusNote] =
+    useState<PreviousLessonFocusNote | null>(null);
   const [items, setItems] = useState<PendingLessonBlock[]>([]);
   const [meta, setMeta] = useState<PendingBlocksMeta>(emptyMeta);
   const [isLoading, setIsLoading] = useState(false);
@@ -82,6 +92,7 @@ export function usePendingLessonBlocks({
       : [];
 
     if (!enabled || (!courseId && normalizedStudentIds.length === 0)) {
+      setFocusNote(null);
       setItems([]);
       setMeta(emptyMeta);
       setIsLoading(false);
@@ -95,6 +106,7 @@ export function usePendingLessonBlocks({
       try {
         setIsLoading(true);
         setError(null);
+        setFocusNote(null);
 
         const response = await fetch("/api/lessons/pending-blocks", {
           method: "POST",
@@ -117,11 +129,13 @@ export function usePendingLessonBlocks({
           );
         }
 
+        setFocusNote(data?.focusNote ?? null);
         setItems(data?.items ?? []);
         setMeta(data?.meta ?? emptyMeta);
       } catch (error) {
         if (controller.signal.aborted) return;
 
+        setFocusNote(null);
         setItems([]);
         setMeta(emptyMeta);
         setError(error instanceof Error ? error.message : "Error desconocido");
@@ -144,5 +158,5 @@ export function usePendingLessonBlocks({
     studentIdsKey,
   ]);
 
-  return { items, meta, isLoading, error, refetch };
+  return { focusNote, items, meta, isLoading, error, refetch };
 }

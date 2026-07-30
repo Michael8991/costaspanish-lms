@@ -35,9 +35,13 @@ export interface LessonAttendee {
 }
 
 export interface LessonBlockOrigin {
-  sourceLessonId: Types.ObjectId;
+  sourceType?: "lesson" | "course_template";
+  sourceLessonId?: Types.ObjectId;
   sourceBlockId?: Types.ObjectId;
   sourceCourseId?: Types.ObjectId;
+  sourceTemplateId?: Types.ObjectId;
+  sourceModuleOrder?: number;
+  sourceLessonOrder?: number;
   sourceStudentIds: Types.ObjectId[];
   sourceLessonTitle?: string;
   sourceLessonDate?: Date;
@@ -84,6 +88,14 @@ export interface Lesson{
 
     teacherId: Types.ObjectId;
     courseId: Types.ObjectId;
+    courseTemplateId?: Types.ObjectId;
+    courseTemplateVersion?: number;
+    sourceTemplateLesson?: {
+      moduleOrder: number;
+      lessonOrder: number;
+      moduleTitle?: string;
+      lessonTitle?: string;
+    };
 
     title: string;
     status: LessonStatus;

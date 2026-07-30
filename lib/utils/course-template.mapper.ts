@@ -1,14 +1,23 @@
 import type {
   CourseTemplateDetailDTO,
   CourseTemplateListItemDTO,
+  CourseTemplateStatsDTO,
   CurriculumDTO,
   DefaultStorefrontDTO,
   ModuleDataDTO,
   PedagogicalMetaDTO,
   PriceOptionDTO,
   SubModuleDTO,
+  TemplateBlockDTO,
+  TemplateLessonDTO,
 } from "../dto/course-template.dto";
-import type { ICourseTemplate, CourseTemplateDocument } from "@/models/CourseTemplate";
+import type {
+  ICourseTemplate,
+  CourseTemplateDocument,
+  IModuleData,
+  ITemplateBlock,
+  ITemplateLesson,
+} from "@/models/CourseTemplate";
 
 type CourseTemplateSource =
   | ICourseTemplate
@@ -39,20 +48,45 @@ function toSubModuleDTO(submodule: {
   };
 }
 
-function toModuleDataDTO(module: {
-  title: string;
-  durationLabel?: string;
-  type?: string;
-  submodules?: {
-    title: string;
-    type?: string;
-    durationLabel?: string;
-  }[];
-}): ModuleDataDTO {
+function toTemplateBlockDTO(block: ITemplateBlock): TemplateBlockDTO {
+  return {
+    title: block.title,
+    type: block.type,
+    categories: block.categories ?? [],
+    plannedContent: block.plannedContent,
+    plannedObjectives: block.plannedObjectives ?? [],
+    estimatedMinutes: block.estimatedMinutes,
+    cefrLevels: block.cefrLevels ?? [],
+    skills: block.skills ?? [],
+    tags: block.tags ?? [],
+    resources: (block.resources ?? []).map(toIdString),
+    order: block.order ?? 0,
+  };
+}
+
+function toTemplateLessonDTO(
+  lesson: ITemplateLesson,
+): TemplateLessonDTO {
+  return {
+    title: lesson.title,
+    description: lesson.description,
+    order: lesson.order ?? 0,
+    estimatedMinutes: lesson.estimatedMinutes,
+    objectives: lesson.objectives ?? [],
+    blocks: (lesson.blocks ?? []).map(toTemplateBlockDTO),
+    teacherNotes: lesson.teacherNotes,
+  };
+}
+
+function toModuleDataDTO(module: IModuleData): ModuleDataDTO {
   return {
     title: module.title,
+    description: module.description,
     durationLabel: module.durationLabel,
     type: module.type,
+    order: module.order ?? 0,
+    objectives: module.objectives ?? [],
+    lessons: (module.lessons ?? []).map(toTemplateLessonDTO),
     submodules: (module.submodules ?? []).map(toSubModuleDTO),
   };
 }
@@ -61,6 +95,23 @@ function toCurriculumDTO(curriculum?: ICourseTemplate["curriculum"]): Curriculum
   return {
     modules: (curriculum?.modules ?? []).map(toModuleDataDTO),
     units: curriculum?.units ?? [],
+  };
+}
+
+function getCourseTemplateStats(
+  curriculum: CurriculumDTO,
+): CourseTemplateStatsDTO {
+  const lessons = curriculum.modules.flatMap((module) => module.lessons);
+  const blocks = lessons.flatMap((lesson) => lesson.blocks);
+  const resourceIds = new Set(
+    blocks.flatMap((block) => block.resources).filter(Boolean),
+  );
+
+  return {
+    modulesCount: curriculum.modules.length,
+    lessonsCount: lessons.length,
+    blocksCount: blocks.length,
+    resourcesCount: resourceIds.size,
   };
 }
 
@@ -131,6 +182,8 @@ function toPedagogicalMetaDTO(
 export function toCourseTemplateListItemDTO(
   source: CourseTemplateSource
 ): CourseTemplateListItemDTO {
+  const stats = getCourseTemplateStats(toCurriculumDTO(source.curriculum));
+
   return {
     id: toIdString((source as { _id?: unknown })._id),
     ownerTeacherId: toIdString(source.ownerTeacherId),
@@ -146,6 +199,10 @@ export function toCourseTemplateListItemDTO(
     priceMode: source.storefront.priceMode,
     currency: source.storefront.currency,
     priceOptionsCount: source.storefront.priceOptions?.length ?? 0,
+    modulesCount: stats.modulesCount,
+    lessonsCount: stats.lessonsCount,
+    blocksCount: stats.blocksCount,
+    resourcesCount: stats.resourcesCount,
 
     createdAt: toIsoDate(source.createdAt),
     updatedAt: toIsoDate(source.updatedAt),
@@ -155,6 +212,8 @@ export function toCourseTemplateListItemDTO(
 export function toCourseTemplateDetailDTO(
   source: CourseTemplateSource
 ): CourseTemplateDetailDTO {
+  const curriculum = toCurriculumDTO(source.curriculum);
+
   return {
     id: toIdString((source as { _id?: unknown })._id),
     ownerTeacherId: toIdString(source.ownerTeacherId),
@@ -165,7 +224,8 @@ export function toCourseTemplateDetailDTO(
 
     pedagogicalMeta: toPedagogicalMetaDTO(source.pedagogicalMeta),
     storefront: toDefaultStorefrontDTO(source.storefront),
-    curriculum: toCurriculumDTO(source.curriculum),
+    curriculum,
+    stats: getCourseTemplateStats(curriculum),
 
     createdAt: toIsoDate(source.createdAt),
     updatedAt: toIsoDate(source.updatedAt),
