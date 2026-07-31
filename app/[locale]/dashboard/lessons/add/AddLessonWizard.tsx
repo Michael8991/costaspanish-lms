@@ -39,10 +39,12 @@ function getBlockTypeFromResource(
 }
 
 export type AddLessonFormValues = {
+  creationMode: "course" | "free";
   title: string;
   classType: LessonClassType | "";
   scheduledStart: string;
   scheduledEnd: string;
+  durationMinutes: number;
   timezone: string;
   courseId?: string;
 
@@ -113,10 +115,13 @@ export type AddLessonFormValues = {
 };
 
 const defaultValues: AddLessonFormValues = {
+  creationMode: "course",
+  courseId: "",
   title: "",
   classType: "",
   scheduledStart: "",
   scheduledEnd: "",
+  durationMinutes: 60,
   timezone: "Europe/Madrid",
 
   recurrence: {
@@ -323,21 +328,24 @@ export default function AddLessonWizard({
         return;
       }
 
-      const invalidVoucherIndexes = values.attendees.flatMap(
-        (attendee, index) => {
-          if (attendee.isTrial) return [];
+      const invalidVoucherIndexes =
+        values.creationMode === "course"
+          ? []
+          : values.attendees.flatMap(
+              (attendee, index) => {
+                if (attendee.isTrial) return [];
 
-          const student = students.find(
-            (candidate) => candidate._id === attendee.studentId,
-          );
-          const hasCompatibleVoucher = getCompatiblePlans(
-            student,
-            classType,
-          ).some((plan) => plan._id === attendee.voucherId);
+                const student = students.find(
+                  (candidate) => candidate._id === attendee.studentId,
+                );
+                const hasCompatibleVoucher = getCompatiblePlans(
+                  student,
+                  classType,
+                ).some((plan) => plan._id === attendee.voucherId);
 
-          return hasCompatibleVoucher ? [] : [index];
-        },
-      );
+                return hasCompatibleVoucher ? [] : [index];
+              },
+            );
 
       if (invalidVoucherIndexes.length > 0) {
         invalidVoucherIndexes.forEach((index) => {
@@ -355,7 +363,9 @@ export default function AddLessonWizard({
       }
 
       const payload = {
-        courseId: values.courseId,
+        creationMode: mode === "edit" ? undefined : values.creationMode,
+        courseId:
+          values.creationMode === "course" ? values.courseId : undefined,
         title: values.title.trim(),
         classType,
         scheduledStart: zonedDateTimeToISOString(
@@ -377,13 +387,16 @@ export default function AddLessonWizard({
               }
             : undefined,
 
-        attendees: values.attendees.map((attendee) => ({
-          ...attendee,
-          voucherId: attendee.isTrial
+        attendees:
+          values.creationMode === "course"
             ? undefined
-            : attendee.voucherId || undefined,
-          creditsToConsume: attendee.isTrial ? 0 : 1,
-        })),
+            : values.attendees.map((attendee) => ({
+                ...attendee,
+                voucherId: attendee.isTrial
+                  ? undefined
+                  : attendee.voucherId || undefined,
+                creditsToConsume: attendee.isTrial ? 0 : 1,
+              })),
 
         preparationNotes: values.preparationNotes,
         homeworkAssigned: values.homeworkAssigned,
@@ -511,6 +524,8 @@ export default function AddLessonWizard({
               error={studentsError}
               onRefetchStudents={refetchStudents}
               allowRecurrence={mode !== "edit"}
+              locale={locale}
+              isEditing={mode === "edit"}
             />
           )}
 
@@ -580,17 +595,19 @@ function getStepValidationFields(
   if (step === 0) {
     return [
       ...FIRST_STEP_FIELDS,
-      ...values.attendees.flatMap((attendee, index) => {
-        const fields: FieldPath<AddLessonFormValues>[] = [
-          `attendees.${index}.studentId`,
-        ];
+      ...(values.creationMode === "course"
+        ? (["courseId"] satisfies FieldPath<AddLessonFormValues>[])
+        : values.attendees.flatMap((attendee, index) => {
+            const fields: FieldPath<AddLessonFormValues>[] = [
+              `attendees.${index}.studentId`,
+            ];
 
-        if (!attendee.isTrial && values.classType) {
-          fields.push(`attendees.${index}.voucherId`);
-        }
+            if (!attendee.isTrial && values.classType) {
+              fields.push(`attendees.${index}.voucherId`);
+            }
 
-        return fields;
-      }),
+            return fields;
+          })),
       ...(values.recurrence.enabled
         ? ([
             "recurrence.daysOfWeek",
@@ -638,6 +655,7 @@ function getStepFromErrors(errors: FieldErrors<AddLessonFormValues>) {
     errors.scheduledStart ||
     errors.scheduledEnd ||
     errors.timezone ||
+    errors.courseId ||
     errors.attendees ||
     errors.recurrence
   ) {

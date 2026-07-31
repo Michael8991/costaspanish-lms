@@ -87,13 +87,50 @@ interface IntegrationDetail {
   meetUrl?: string;
 }
 
+interface RawCourseReference {
+  _id: Types.ObjectId;
+  name?: string;
+  internalName?: string;
+}
+
 interface RawMongoLesson {
   _id: Types.ObjectId;
 
   teacherId: Types.ObjectId;
-  courseId?: Types.ObjectId;
+  courseId?: Types.ObjectId | RawCourseReference;
   courseTemplateId?: Types.ObjectId;
   courseTemplateVersion?: number;
+  courseLink?: {
+    relationType:
+      | "course_free_lesson"
+      | "template_based"
+      | "review"
+      | "makeup"
+      | "extra"
+      | "legacy_free";
+    linkedAt?: Date | string;
+    linkedBy?: Types.ObjectId | string;
+    notes?: string;
+  };
+  policySnapshot?: {
+    lessonDefaults: {
+      durationMinutes: number;
+      timezone: string;
+      defaultClassType: LessonClassType;
+    };
+    creditPolicy: {
+      creditsPerLesson: number;
+      consumeOn: "completion" | "scheduled";
+      trialConsumesCredit: boolean;
+      cancellationConsumesCredit: boolean;
+      noShowConsumesCredit: boolean;
+    };
+    preparationPolicy: {
+      copyTemplateBlocksToLesson: boolean;
+      copyTemplateResourcesToLesson: boolean;
+      defaultPreparationStatus: LessonPreparationStatus;
+    };
+  };
   sourceTemplateLesson?: {
     moduleOrder: number;
     lessonOrder: number;
@@ -128,7 +165,20 @@ interface RawMongoLesson {
 
 const toId = (value: unknown): string | undefined => {
   if (!value) return undefined;
+
+  if (typeof value === "object" && "_id" in value) {
+    return String(value._id);
+  }
+
   return String(value);
+};
+
+const getCourseName = (
+  value: Types.ObjectId | RawCourseReference | undefined,
+): string | null => {
+  if (!value || value instanceof Types.ObjectId) return null;
+
+  return value.name?.trim() || value.internalName?.trim() || null;
 };
 
 const toISOString = (value: unknown): string => {
@@ -140,8 +190,26 @@ export function toLessonListDTO(lesson: RawMongoLesson): LessonListDTO {
   return {
     id: String(lesson._id),
     courseId: toId(lesson.courseId),
+    courseName: getCourseName(lesson.courseId),
     courseTemplateId: toId(lesson.courseTemplateId),
     courseTemplateVersion: lesson.courseTemplateVersion,
+    courseLink: lesson.courseLink
+      ? {
+          relationType: lesson.courseLink.relationType,
+          linkedAt: lesson.courseLink.linkedAt
+            ? toISOString(lesson.courseLink.linkedAt)
+            : null,
+          linkedBy: toId(lesson.courseLink.linkedBy) ?? null,
+          notes: lesson.courseLink.notes ?? "",
+        }
+      : null,
+    policySnapshot: lesson.policySnapshot
+      ? {
+          lessonDefaults: { ...lesson.policySnapshot.lessonDefaults },
+          creditPolicy: { ...lesson.policySnapshot.creditPolicy },
+          preparationPolicy: { ...lesson.policySnapshot.preparationPolicy },
+        }
+      : undefined,
     sourceTemplateLesson: lesson.sourceTemplateLesson
       ? {
           moduleOrder: lesson.sourceTemplateLesson.moduleOrder,

@@ -8,7 +8,6 @@ import {
   formatLocalDateValue,
   getDatetimeLocalDateValue,
   getDatetimeLocalTimeValue,
-  getDurationMinutesFromStartEnd,
   getMonthDays,
 } from "@/lib/utils/lesson-datetime";
 import { useMemo, useState } from "react";
@@ -32,15 +31,12 @@ export default function LessonDateTimePicker() {
   const scheduledStart =
     useWatch({ control, name: "scheduledStart" }) ?? "";
   const scheduledEnd = useWatch({ control, name: "scheduledEnd" }) ?? "";
+  const durationMinutes =
+    useWatch({ control, name: "durationMinutes" }) ?? 60;
   const selectedDateValue = getDatetimeLocalDateValue(scheduledStart);
   const selectedTimeValue = getDatetimeLocalTimeValue(scheduledStart);
   const [viewDate, setViewDate] = useState(() => {
     return dateValueToLocalDate(selectedDateValue) ?? new Date();
-  });
-  const [durationMinutes, setDurationMinutes] = useState(() => {
-    return (
-      getDurationMinutesFromStartEnd(scheduledStart, scheduledEnd) ?? 60
-    );
   });
   const monthDays = useMemo(() => getMonthDays(viewDate), [viewDate]);
   const todayValue = formatLocalDateValue(new Date());
@@ -81,7 +77,10 @@ export default function LessonDateTimePicker() {
   };
 
   const selectDuration = (minutes: number) => {
-    setDurationMinutes(minutes);
+    setValue("durationMinutes", minutes, {
+      shouldDirty: true,
+      shouldValidate: false,
+    });
 
     if (scheduledStart) {
       setValue(

@@ -26,6 +26,41 @@ export type LessonCreationSource = (typeof LESSON_CREATION_SOURCES)[number];
 export type LessonPreparationStatus =
   (typeof LESSON_PREPARATION_STATUSES)[number];
 
+export type LessonCourseRelationType =
+  | "course_free_lesson"
+  | "template_based"
+  | "review"
+  | "makeup"
+  | "extra"
+  | "legacy_free";
+
+export interface LessonCourseLink {
+  relationType: LessonCourseRelationType;
+  linkedAt?: Date;
+  linkedBy?: Types.ObjectId;
+  notes?: string;
+}
+
+export interface LessonPolicySnapshot {
+  lessonDefaults: {
+    durationMinutes: number;
+    timezone: string;
+    defaultClassType: LessonClassType;
+  };
+  creditPolicy: {
+    creditsPerLesson: number;
+    consumeOn: "completion" | "scheduled";
+    trialConsumesCredit: boolean;
+    cancellationConsumesCredit: boolean;
+    noShowConsumesCredit: boolean;
+  };
+  preparationPolicy: {
+    copyTemplateBlocksToLesson: boolean;
+    copyTemplateResourcesToLesson: boolean;
+    defaultPreparationStatus: LessonPreparationStatus;
+  };
+}
+
 export interface LessonAttendee {
   studentId: Types.ObjectId;
   voucherId?: Types.ObjectId;
@@ -87,9 +122,11 @@ export interface Lesson{
     _id: Types.ObjectId;
 
     teacherId: Types.ObjectId;
-    courseId: Types.ObjectId;
+    courseId?: Types.ObjectId;
     courseTemplateId?: Types.ObjectId;
     courseTemplateVersion?: number;
+    courseLink?: LessonCourseLink;
+    policySnapshot?: LessonPolicySnapshot;
     sourceTemplateLesson?: {
       moduleOrder: number;
       lessonOrder: number;

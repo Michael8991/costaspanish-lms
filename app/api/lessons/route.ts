@@ -1,6 +1,8 @@
 import { requireAuth, requireRole } from '@/lib/auth/apiAuth';
 import dbConnect from '@/lib/mongo';
 import { getLessonDateRange } from '@/lib/utils/lesson-date-range';
+import { normalizeCourseMembers } from '@/lib/utils/course-members';
+import { normalizeCourseOperationalPolicies } from '@/lib/utils/course-policies';
 import {
   generateWeeklyRecurringLessonDates,
   includeBaseLessonOccurrence,
@@ -14,7 +16,9 @@ import { isoToDatetimeLocalValue, zonedDateTimeToISOString } from '@/lib/utils/t
 import { getCurrentLessonNumber, isPlanCompatible } from '@/lib/utils/lesson-voucher';
 import { createLessonSchema } from '@/lib/validators/lesson';
 import Lesson from '@/models/Lesson';
+import { CourseProfile } from '@/models/CourseProfile';
 import { StudentProfile } from '@/models/StudentProfile';
+import { Types } from 'mongoose';
 import { NextRequest, NextResponse } from 'next/server';
 import z from 'zod';
 
@@ -64,7 +68,11 @@ export async function GET(req: NextRequest) {
 
         await dbConnect();
 
-        const items = await Lesson.find(filter).sort({ scheduledStart: 1 }).lean().limit(300);
+        const items = await Lesson.find(filter)
+          .populate({ path: "courseId", select: "name internalName classType" })
+          .sort({ scheduledStart: 1 })
+          .lean()
+          .limit(300);
         
         return NextResponse.json({ ok: true, view, range:{start: start.toISOString(), end: end.toISOString()}, items: items.map(toLessonListDTO)})
 
@@ -129,8 +137,152 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (!Types.ObjectId.isValid(currentUserObjectId)) {
+      return NextResponse.json(
+        { ok: false, error: "Invalid user id" },
+        { status: 400 },
+      );
+    }
+
     const payload = parsed.data;
-    const { recurrence, ...basePayload } = payload;
+    const recurrence = payload.recurrence;
+    const isCourseMode = payload.creationMode === "course";
+    let basePayload;
+    let recurringCourseAssociation: Record<string, unknown> = {};
+
+    if (isCourseMode) {
+      const courseFilter =
+        user.role === "admin"
+          ? {
+              _id: new Types.ObjectId(payload.courseId),
+              status: { $ne: "archived" },
+            }
+          : {
+              _id: new Types.ObjectId(payload.courseId),
+              ownerTeacherId: new Types.ObjectId(currentUserObjectId),
+              status: { $ne: "archived" },
+            };
+      const course = await CourseProfile.findOne(courseFilter).lean();
+
+      if (!course) {
+        return NextResponse.json(
+          { ok: false, error: "Course not found or unavailable" },
+          { status: 404 },
+        );
+      }
+
+      const activeMembers = normalizeCourseMembers({
+        members: course.members,
+        legacyStudentIds: course.studentIds,
+        fallbackJoinedAt: course.startDate ?? course.createdAt,
+      }).filter((member) => member.status === "active");
+
+      if (activeMembers.length === 0) {
+        return NextResponse.json(
+          { ok: false, error: "This course has no active members" },
+          { status: 400 },
+        );
+      }
+
+      const policies = normalizeCourseOperationalPolicies(course.policies);
+      const classType =
+        course.classType ?? policies.lessonDefaults.defaultClassType;
+      const timezone =
+        payload.timezone?.trim() ||
+        policies.lessonDefaults.timezone ||
+        "Europe/Madrid";
+      const scheduledEnd =
+        payload.scheduledEnd ??
+        new Date(
+          payload.scheduledStart.getTime() +
+            policies.lessonDefaults.durationMinutes * 60_000,
+        );
+
+      if (scheduledEnd <= payload.scheduledStart) {
+        return NextResponse.json(
+          { ok: false, error: "scheduledEnd must be after scheduledStart" },
+          { status: 400 },
+        );
+      }
+
+      const courseName =
+        course.name?.trim() || course.internalName.trim() || "Curso";
+      const linkedAt = new Date();
+      const durationMinutes = Math.max(
+        1,
+        Math.round(
+          (scheduledEnd.getTime() - payload.scheduledStart.getTime()) / 60_000,
+        ),
+      );
+
+      basePayload = {
+        courseId: course._id,
+        courseTemplateId: course.templateId,
+        courseTemplateVersion: course.templateVersion,
+        courseLink: {
+          relationType: "course_free_lesson" as const,
+          linkedAt,
+          linkedBy: new Types.ObjectId(currentUserObjectId),
+          notes: "",
+        },
+        policySnapshot: {
+          lessonDefaults: {
+            durationMinutes,
+            timezone,
+            defaultClassType: classType,
+          },
+          creditPolicy: { ...policies.creditPolicy },
+          preparationPolicy: { ...policies.preparationPolicy },
+        },
+        title: payload.title?.trim() || `${courseName} · Clase`,
+        status: payload.status,
+        preparationStatus:
+          policies.preparationPolicy.defaultPreparationStatus,
+        scheduledStart: payload.scheduledStart,
+        scheduledEnd,
+        timezone,
+        classType,
+        isTrial: false,
+        attendees: activeMembers.map((member) => ({
+          studentId: member.studentId,
+          voucherId: undefined,
+          attendanceStatus: "pending" as const,
+          creditsToConsume: policies.creditPolicy.creditsPerLesson,
+          isTrial: false,
+        })),
+        blocks: payload.blocks,
+        preparationNotes: payload.preparationNotes,
+        teacherNotes: payload.teacherNotes,
+        homeworkAssigned: payload.homeworkAssigned,
+        nextLessonFocus: payload.nextLessonFocus,
+        creationSource: payload.creationSource,
+        integration: payload.integration,
+      };
+      recurringCourseAssociation = {
+        courseTemplateId: course.templateId,
+        courseTemplateVersion: course.templateVersion,
+        courseLink: basePayload.courseLink,
+        policySnapshot: basePayload.policySnapshot,
+      };
+    } else {
+      const {
+        creationMode: ignoredCreationMode,
+        recurrence: ignoredRecurrence,
+        courseTemplateId: ignoredCourseTemplateId,
+        courseTemplateVersion: ignoredCourseTemplateVersion,
+        courseLink: ignoredCourseLink,
+        policySnapshot: ignoredPolicySnapshot,
+        ...freeBasePayload
+      } = payload;
+      void ignoredCreationMode;
+      void ignoredRecurrence;
+      void ignoredCourseTemplateId;
+      void ignoredCourseTemplateVersion;
+      void ignoredCourseLink;
+      void ignoredPolicySnapshot;
+      basePayload = freeBasePayload;
+    }
+
     const normalizedBlocks = basePayload.blocks.map((block, index) => ({
       ...block,
       order: block.order ?? index,
@@ -166,29 +318,33 @@ export async function POST(req: NextRequest) {
       titleStudents.map((student) => [student._id, student]),
     );
 
-    for (const attendee of basePayload.attendees) {
-      if (attendee.isTrial) continue;
+    if (!isCourseMode) {
+      for (const attendee of basePayload.attendees) {
+        if (attendee.isTrial) continue;
 
-      const selectedPlan = titleStudentsById
-        .get(attendee.studentId)
-        ?.activePlans?.find((plan) => plan._id === attendee.voucherId);
+        const selectedPlan = titleStudentsById
+          .get(attendee.studentId)
+          ?.activePlans?.find((plan) => plan._id === attendee.voucherId);
 
-      if (
-        !selectedPlan ||
-        !isPlanCompatible(selectedPlan, basePayload.classType)
-      ) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error:
-              "El alumno necesita un bono activo compatible o marcarse como clase de prueba.",
-          },
-          { status: 400 },
-        );
+        if (
+          !selectedPlan ||
+          !isPlanCompatible(selectedPlan, basePayload.classType)
+        ) {
+          return NextResponse.json(
+            {
+              ok: false,
+              error:
+                "El alumno necesita un bono activo compatible o marcarse como clase de prueba.",
+            },
+            { status: 400 },
+          );
+        }
       }
     }
 
-    const selectedProgressPlan = basePayload.attendees
+    const selectedProgressPlan = isCourseMode
+      ? undefined
+      : basePayload.attendees
       .filter((attendee) => !attendee.isTrial && attendee.voucherId)
       .map((attendee) =>
         titleStudentsById
@@ -253,20 +409,22 @@ export async function POST(req: NextRequest) {
           basePayload.timezone,
         ),
       ),
-      title: buildLessonTitle({
-        attendees: basePayload.attendees,
-        students: titleStudents,
-        classType: basePayload.classType,
-        scheduledStart: occurrence.scheduledStart,
-        progressOverride:
-          baseLessonNumber !== undefined &&
-          selectedProgressPlan?.creditsTotal !== undefined
-            ? {
-                currentLessonNumber: baseLessonNumber + index,
-                creditsTotal: selectedProgressPlan.creditsTotal,
-              }
-            : undefined,
-      }),
+      title: isCourseMode
+        ? basePayload.title
+        : buildLessonTitle({
+            attendees: basePayload.attendees,
+            students: titleStudents,
+            classType: basePayload.classType,
+            scheduledStart: occurrence.scheduledStart,
+            progressOverride:
+              baseLessonNumber !== undefined &&
+              selectedProgressPlan?.creditsTotal !== undefined
+                ? {
+                    currentLessonNumber: baseLessonNumber + index,
+                    creditsTotal: selectedProgressPlan.creditsTotal,
+                  }
+                : undefined,
+          }),
     }));
     const currentOccurrence =
       occurrenceData.find(
@@ -298,9 +456,10 @@ export async function POST(req: NextRequest) {
       .map((occurrence) => ({
         teacherId: currentUserObjectId,
         courseId: basePayload.courseId,
+        ...recurringCourseAssociation,
         title: occurrence.title,
         status: "scheduled" as const,
-        preparationStatus: "needs_preparation" as const,
+        preparationStatus: basePayload.preparationStatus,
         scheduledStart: occurrence.scheduledStart,
         scheduledEnd: occurrence.scheduledEnd,
         timezone: basePayload.timezone,

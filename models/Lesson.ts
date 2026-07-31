@@ -251,6 +251,98 @@ const SourceTemplateLessonSchema = new Schema(
   { _id: false },
 );
 
+const CourseLinkSchema = new Schema(
+  {
+    relationType: {
+      type: String,
+      enum: [
+        "course_free_lesson",
+        "template_based",
+        "review",
+        "makeup",
+        "extra",
+        "legacy_free",
+      ],
+      required: true,
+    },
+    linkedAt: {
+      type: Date,
+    },
+    linkedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+    },
+    notes: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+  },
+  { _id: false },
+);
+
+const LessonPolicySnapshotSchema = new Schema(
+  {
+    lessonDefaults: {
+      durationMinutes: {
+        type: Number,
+        min: 1,
+        required: true,
+      },
+      timezone: {
+        type: String,
+        trim: true,
+        required: true,
+      },
+      defaultClassType: {
+        type: String,
+        enum: LESSON_CLASS_TYPES,
+        required: true,
+      },
+    },
+    creditPolicy: {
+      creditsPerLesson: {
+        type: Number,
+        min: 0,
+        required: true,
+      },
+      consumeOn: {
+        type: String,
+        enum: ["completion", "scheduled"],
+        required: true,
+      },
+      trialConsumesCredit: {
+        type: Boolean,
+        required: true,
+      },
+      cancellationConsumesCredit: {
+        type: Boolean,
+        required: true,
+      },
+      noShowConsumesCredit: {
+        type: Boolean,
+        required: true,
+      },
+    },
+    preparationPolicy: {
+      copyTemplateBlocksToLesson: {
+        type: Boolean,
+        required: true,
+      },
+      copyTemplateResourcesToLesson: {
+        type: Boolean,
+        required: true,
+      },
+      defaultPreparationStatus: {
+        type: String,
+        enum: LESSON_PREPARATION_STATUSES,
+        required: true,
+      },
+    },
+  },
+  { _id: false },
+);
+
 const LessonSchema = new Schema(
   {
     teacherId: {
@@ -282,6 +374,16 @@ const LessonSchema = new Schema(
 
     sourceTemplateLesson: {
       type: SourceTemplateLessonSchema,
+      required: false,
+    },
+
+    courseLink: {
+      type: CourseLinkSchema,
+      required: false,
+    },
+
+    policySnapshot: {
+      type: LessonPolicySnapshotSchema,
       required: false,
     },
 
@@ -392,7 +494,7 @@ LessonSchema.index({
   "sourceTemplateLesson.moduleOrder": 1,
   "sourceTemplateLesson.lessonOrder": 1,
 });
-LessonSchema.index({"attendees.voucherId":1})
+LessonSchema.index({ "attendees.voucherId": 1 });
 
 const Lesson = mongoose.models.Lesson || mongoose.model("Lesson", LessonSchema);
 export default Lesson;

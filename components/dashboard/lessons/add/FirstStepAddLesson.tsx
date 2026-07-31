@@ -1,13 +1,16 @@
 "use client";
 
 import type { AddLessonFormValues } from "@/app/[locale]/dashboard/lessons/add/AddLessonWizard";
+import CourseProfileSelect from "@/components/dashboard/courses/CourseProfileSelect";
 import LessonDateTimePicker from "@/components/dashboard/lessons/add/LessonDateTimePicker";
 import LessonRecurrenceEditor from "@/components/dashboard/lessons/add/LessonRecurrenceEditor";
 import NewVoucherForm, {
   type NewVoucherFormData,
 } from "@/components/dashboard/teacher/forms/NewVoucherForm";
 import CustomModal from "@/components/ui/CustomModal";
+import type { CourseProfileListItemDTO } from "@/lib/dto/course-profile.dto";
 import type { LessonStudent } from "@/lib/hooks/useLessonStudents";
+import { addMinutesToDatetimeLocal } from "@/lib/utils/lesson-datetime";
 import { buildLessonTitle } from "@/lib/utils/lesson-title";
 import {
   formatAssignedVoucherLabel,
@@ -33,6 +36,8 @@ interface FirstStepAddLessonProps {
   error: string | null;
   onRefetchStudents: () => Promise<void>;
   allowRecurrence: boolean;
+  locale: string;
+  isEditing: boolean;
 }
 
 type QuickVoucherTarget = {
@@ -51,6 +56,8 @@ export default function FirstStepAddLesson({
   error,
   onRefetchStudents,
   allowRecurrence,
+  locale,
+  isEditing,
 }: FirstStepAddLessonProps) {
   const {
     control,
@@ -64,7 +71,7 @@ export default function FirstStepAddLesson({
   const [isCreatingVoucher, setIsCreatingVoucher] = useState(false);
   const [createVoucherError, setCreateVoucherError] = useState("");
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control,
     name: "attendees",
   });
@@ -81,6 +88,16 @@ export default function FirstStepAddLesson({
     control,
     name: "scheduledStart",
   });
+  const creationMode = useWatch({
+    control,
+    name: "creationMode",
+  });
+  const courseId = useWatch({
+    control,
+    name: "courseId",
+  });
+  const [selectedCourse, setSelectedCourse] =
+    useState<CourseProfileListItemDTO | null>(null);
 
   const selectedStudentIds = useMemo(() => {
     return new Set(
@@ -105,6 +122,8 @@ export default function FirstStepAddLesson({
   });
 
   useEffect(() => {
+    if (creationMode === "course") return;
+
     const currentTitle = getValues("title");
     const shouldUseGeneratedTitle =
       !currentTitle.trim() ||
@@ -118,9 +137,11 @@ export default function FirstStepAddLesson({
     }
 
     lastGeneratedTitleRef.current = generatedTitle;
-  }, [generatedTitle, getValues, setValue]);
+  }, [creationMode, generatedTitle, getValues, setValue]);
 
   useEffect(() => {
+    if (creationMode === "course") return;
+
     (attendees ?? []).forEach((attendee, index) => {
       const voucherPath = `attendees.${index}.voucherId` as const;
       const creditsPath = `attendees.${index}.creditsToConsume` as const;
@@ -183,7 +204,106 @@ export default function FirstStepAddLesson({
         });
       }
     });
-  }, [attendees, classType, isLoading, setValue, students]);
+  }, [attendees, classType, creationMode, isLoading, setValue, students]);
+
+  const selectCourse = (
+    nextCourseId: string,
+    course?: CourseProfileListItemDTO,
+  ) => {
+    setValue("courseId", nextCourseId, {
+      shouldDirty: !isEditing,
+      shouldValidate: true,
+    });
+    setSelectedCourse(course ?? null);
+
+    if (!course || isEditing) return;
+
+    const courseClassType =
+      course.classType || course.policySummary.defaultClassType;
+    setValue("classType", courseClassType, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+    setValue("timezone", course.policySummary.timezone || "Europe/Madrid", {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+    setValue("durationMinutes", course.policySummary.durationMinutes, {
+      shouldDirty: true,
+      shouldValidate: false,
+    });
+    setValue("title", `${course.name} · Clase`, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+    replace(
+      course.activeMemberIds.map((studentId) => ({
+        studentId,
+        voucherId: "",
+        attendanceStatus: "pending" as const,
+        creditsToConsume: course.policySummary.creditsPerLesson,
+        isTrial: false,
+      })),
+    );
+
+    if (scheduledStart) {
+      setValue(
+        "scheduledEnd",
+        addMinutesToDatetimeLocal(
+          scheduledStart,
+          course.policySummary.durationMinutes,
+        ),
+        { shouldDirty: true, shouldValidate: true },
+      );
+    }
+  };
+
+  const setSourceMode = (nextMode: "course" | "free") => {
+    setValue("creationMode", nextMode, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+
+    if (nextMode === "free") {
+      setSelectedCourse(null);
+      setValue("courseId", "", {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+      replace([
+        {
+          studentId: "",
+          voucherId: "",
+          attendanceStatus: "pending",
+          creditsToConsume: 1,
+          isTrial: false,
+        },
+      ]);
+      setValue("classType", "", {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+      setValue("durationMinutes", 60, {
+        shouldDirty: true,
+        shouldValidate: false,
+      });
+      setValue("timezone", "Europe/Madrid", {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+      if (scheduledStart) {
+        setValue(
+          "scheduledEnd",
+          addMinutesToDatetimeLocal(scheduledStart, 60),
+          { shouldDirty: true, shouldValidate: true },
+        );
+      }
+      setValue("title", "", {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    }
+  };
 
   const quickVoucherStudent = quickVoucherTarget
     ? students.find(
@@ -272,6 +392,125 @@ export default function FirstStepAddLesson({
         </p>
       </div>
 
+      <input type="hidden" {...register("creationMode")} />
+      <input
+        type="hidden"
+        {...register("courseId", {
+          validate: (value) =>
+            creationMode !== "course" ||
+            Boolean(value) ||
+            "Selecciona un curso activo",
+        })}
+      />
+
+      {!isEditing && (
+        <div>
+          <p className="mb-2 text-sm font-semibold text-gray-900">
+            Origen de la clase
+          </p>
+          <div className="grid gap-3 md:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => setSourceMode("course")}
+              aria-pressed={creationMode === "course"}
+              className={`rounded-2xl border p-4 text-left transition ${
+                creationMode === "course"
+                  ? "border-[#9e2727] bg-[#9e2727]/5 ring-2 ring-[#9e2727]/10"
+                  : "border-gray-200 bg-white hover:border-gray-300"
+              }`}
+            >
+              <span className="text-sm font-semibold text-gray-900">
+                Desde curso activo
+              </span>
+              <span className="mt-1 block text-xs leading-5 text-gray-500">
+                Usa un curso activo para rellenar alumnos, tipo de clase,
+                duración y reglas automáticamente.
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSourceMode("free")}
+              aria-pressed={creationMode === "free"}
+              className={`rounded-2xl border p-4 text-left transition ${
+                creationMode === "free"
+                  ? "border-[#9e2727] bg-[#9e2727]/5 ring-2 ring-[#9e2727]/10"
+                  : "border-gray-200 bg-white hover:border-gray-300"
+              }`}
+            >
+              <span className="text-sm font-semibold text-gray-900">
+                Clase libre
+              </span>
+              <span className="mt-1 block text-xs leading-5 text-gray-500">
+                Usa este modo para trials, clases sueltas o clases antiguas sin
+                curso.
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {creationMode === "course" && (
+        <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+          <CourseProfileSelect
+            value={courseId ?? ""}
+            onChange={selectCourse}
+            onAvailabilityChange={(hasActiveCourses) => {
+              if (!hasActiveCourses && !isEditing) setSourceMode("free");
+            }}
+            locale={locale}
+            disabled={isEditing}
+          />
+          {errors.courseId && (
+            <p className="mt-2 text-xs text-red-600">
+              {errors.courseId.message}
+            </p>
+          )}
+
+          {selectedCourse && (
+            <div className="mt-4 grid gap-3 rounded-xl border border-gray-200 bg-white p-4 text-sm md:grid-cols-3">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
+                  Curso seleccionado
+                </p>
+                <p className="mt-1 font-semibold text-gray-900">
+                  {selectedCourse.name}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
+                  Integrantes
+                </p>
+                <p className="mt-1 text-gray-700">
+                  {selectedCourse.studentNames.join(", ") ||
+                    "Sin integrantes activos"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
+                  Reglas
+                </p>
+                <p className="mt-1 text-gray-700">
+                  {selectedCourse.policySummary.durationMinutes} min ·{" "}
+                  {selectedCourse.classType} ·{" "}
+                  {selectedCourse.policySummary.creditsPerLesson} crédito
+                  {selectedCourse.policySummary.creditsPerLesson === 1
+                    ? ""
+                    : "s"}
+                  /clase ·{" "}
+                  {selectedCourse.policySummary.consumeOn === "completion"
+                    ? "consume al completar"
+                    : "consume al programar"}
+                </p>
+              </div>
+              <p className="md:col-span-3 text-xs text-gray-500">
+                Los alumnos vienen de los integrantes activos del curso. Los
+                créditos se aplicarán según sus reglas en una fase posterior.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="grid gap-4 md:grid-cols-2">
         <div className="md:col-span-2">
           <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -280,6 +519,7 @@ export default function FirstStepAddLesson({
           <select
             {...classTypeRegistration}
             value={classType ?? ""}
+            disabled={creationMode === "course"}
             onChange={(event) => {
               void classTypeRegistration.onChange(event);
 
@@ -306,7 +546,7 @@ export default function FirstStepAddLesson({
               {errors.classType.message}
             </p>
           )}
-          {!classType && (
+          {!classType && creationMode === "free" && (
             <p className="mt-2 text-sm text-amber-700">
               Selecciona primero un tipo de clase para asignar bonos
               compatibles.
@@ -316,16 +556,24 @@ export default function FirstStepAddLesson({
 
         <LessonDateTimePicker />
 
+        {creationMode === "course" && (
+          <p className="md:col-span-2 -mt-2 text-xs text-gray-500">
+            Esta duración solo afecta a esta clase.
+          </p>
+        )}
+
         {allowRecurrence && <LessonRecurrenceEditor students={students} />}
 
-        <div className="md:col-span-2">
-          <h4 className="text-sm font-semibold text-gray-900">
-            Alumnos y bonos
-          </h4>
-          <p className="mt-1 text-sm text-gray-500">
-            El bono compatible se asigna automáticamente.
-          </p>
-        </div>
+        {creationMode === "free" && (
+          <>
+            <div className="md:col-span-2">
+              <h4 className="text-sm font-semibold text-gray-900">
+                Alumnos y bonos
+              </h4>
+              <p className="mt-1 text-sm text-gray-500">
+                El bono compatible se asigna automáticamente.
+              </p>
+            </div>
 
         {error && (
           <div className="md:col-span-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -534,21 +782,23 @@ export default function FirstStepAddLesson({
           );
         })}
 
-        <button
-          type="button"
-          onClick={() =>
-            append({
-              studentId: "",
-              voucherId: "",
-              attendanceStatus: "pending",
-              creditsToConsume: 1,
-              isTrial: false,
-            })
-          }
-          className="md:col-span-2 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-3 text-sm font-medium text-gray-600 transition hover:border-[#9e2727] hover:text-[#9e2727]"
-        >
-          Añadir alumno
-        </button>
+            <button
+              type="button"
+              onClick={() =>
+                append({
+                  studentId: "",
+                  voucherId: "",
+                  attendanceStatus: "pending",
+                  creditsToConsume: 1,
+                  isTrial: false,
+                })
+              }
+              className="md:col-span-2 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 py-3 text-sm font-medium text-gray-600 transition hover:border-[#9e2727] hover:text-[#9e2727]"
+            >
+              Añadir alumno
+            </button>
+          </>
+        )}
 
         <div className="md:col-span-2">
           <label className="mb-1 block text-sm font-medium text-gray-700">

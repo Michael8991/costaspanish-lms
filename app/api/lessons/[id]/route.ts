@@ -4,6 +4,7 @@ import dbConnect from "@/lib/mongo";
 import { requireAuth, requireRole } from "@/lib/auth/apiAuth";
 import { toLessonDetailDTO } from "@/lib/utils/lesson.mapper";
 import Lesson from "@/models/Lesson";
+import "@/models/CourseProfile";
 import { Resource } from "@/models/ResourceProfile";
 import { z } from "zod";
 
@@ -74,7 +75,9 @@ export async function GET(
             teacherId: currentUserObjectId,
           };
 
-    const lesson = await Lesson.findOne(lessonFilter).lean();
+    const lesson = await Lesson.findOne(lessonFilter)
+      .populate({ path: "courseId", select: "name internalName classType" })
+      .lean();
 
     if (!lesson) {
       return NextResponse.json(
@@ -290,6 +293,22 @@ export async function PATCH(
 
     if (payload.courseId !== undefined) {
       set.courseId = payload.courseId;
+    }
+
+    if (payload.courseTemplateId !== undefined) {
+      set.courseTemplateId = payload.courseTemplateId;
+    }
+
+    if (payload.courseTemplateVersion !== undefined) {
+      set.courseTemplateVersion = payload.courseTemplateVersion;
+    }
+
+    if (payload.courseLink !== undefined) {
+      set.courseLink = payload.courseLink;
+    }
+
+    if (payload.policySnapshot !== undefined) {
+      set.policySnapshot = payload.policySnapshot;
     }
 
     if (payload.status !== undefined) {

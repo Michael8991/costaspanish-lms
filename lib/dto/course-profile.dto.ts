@@ -86,9 +86,11 @@ export interface CourseMemberDTO {
 
 export interface CourseProfilePolicySummaryDTO {
   durationMinutes: number;
+  timezone: string;
   defaultClassType: CourseOperationalPolicies["lessonDefaults"]["defaultClassType"];
   frequency: CourseOperationalPolicies["schedulingDefaults"]["frequency"];
   creditsPerLesson: number;
+  consumeOn: CourseOperationalPolicies["creditPolicy"]["consumeOn"];
 }
 
 export interface CourseProfileListItemDTO {
@@ -103,6 +105,7 @@ export interface CourseProfileListItemDTO {
   studentsCount: number;
   membersCount: number;
   activeMembersCount: number;
+  activeMemberIds: string[];
   studentNames: string[];
   policySummary: CourseProfilePolicySummaryDTO;
   templateName: string;

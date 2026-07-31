@@ -89,11 +89,47 @@ export interface LessonBlockDTO {
   origin?: LessonBlockOriginDTO;
 }
 
+export interface LessonCourseLinkDTO {
+  relationType:
+    | "course_free_lesson"
+    | "template_based"
+    | "review"
+    | "makeup"
+    | "extra"
+    | "legacy_free";
+  linkedAt: string | null;
+  linkedBy: string | null;
+  notes: string;
+}
+
+export interface LessonPolicySnapshotDTO {
+  lessonDefaults: {
+    durationMinutes: number;
+    timezone: string;
+    defaultClassType: LessonClassType;
+  };
+  creditPolicy: {
+    creditsPerLesson: number;
+    consumeOn: "completion" | "scheduled";
+    trialConsumesCredit: boolean;
+    cancellationConsumesCredit: boolean;
+    noShowConsumesCredit: boolean;
+  };
+  preparationPolicy: {
+    copyTemplateBlocksToLesson: boolean;
+    copyTemplateResourcesToLesson: boolean;
+    defaultPreparationStatus: LessonPreparationStatus;
+  };
+}
+
 export interface LessonListDTO {
   id: string;
   courseId?: string;
+  courseName: string | null;
   courseTemplateId?: string;
   courseTemplateVersion?: number;
+  courseLink: LessonCourseLinkDTO | null;
+  policySnapshot?: LessonPolicySnapshotDTO;
   sourceTemplateLesson?: {
     moduleOrder: number;
     lessonOrder: number;
@@ -145,6 +181,7 @@ export function mapLessonToFormValues(
   lesson: LessonDetailDTO,
 ): AddLessonFormValues {
   return {
+    creationMode: lesson.courseId ? "course" : "free",
     courseId: lesson.courseId,
     title: lesson.title,
     classType: lesson.classType,
@@ -156,6 +193,7 @@ export function mapLessonToFormValues(
       lesson.scheduledEnd,
       lesson.timezone,
     ),
+    durationMinutes: lesson.scheduledDurationMinutes,
     timezone: lesson.timezone,
     recurrence: {
       enabled: false,

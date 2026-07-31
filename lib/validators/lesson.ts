@@ -27,6 +27,40 @@ const optionalObjectIdSchema = z.preprocess(
   objectIdSchema.optional(),
 );
 
+const lessonCourseLinkSchema = z.object({
+  relationType: z.enum([
+    "course_free_lesson",
+    "template_based",
+    "review",
+    "makeup",
+    "extra",
+    "legacy_free",
+  ]),
+  linkedAt: z.coerce.date().optional(),
+  linkedBy: objectIdSchema.optional(),
+  notes: z.string().trim().optional(),
+});
+
+const lessonPolicySnapshotSchema = z.object({
+  lessonDefaults: z.object({
+    durationMinutes: z.coerce.number().int().positive(),
+    timezone: z.string().trim().min(1),
+    defaultClassType: z.enum(LESSON_CLASS_TYPES),
+  }),
+  creditPolicy: z.object({
+    creditsPerLesson: z.coerce.number().min(0),
+    consumeOn: z.enum(["completion", "scheduled"]),
+    trialConsumesCredit: z.boolean(),
+    cancellationConsumesCredit: z.boolean(),
+    noShowConsumesCredit: z.boolean(),
+  }),
+  preparationPolicy: z.object({
+    copyTemplateBlocksToLesson: z.boolean(),
+    copyTemplateResourcesToLesson: z.boolean(),
+    defaultPreparationStatus: z.enum(LESSON_PREPARATION_STATUSES),
+  }),
+});
+
 const lessonBlockOriginSchema = z.object({
   sourceType: z.enum(["lesson", "course_template"]).optional(),
   sourceLessonId: objectIdSchema.optional(),
@@ -129,6 +163,10 @@ export const lessonBlockSchema = z
 
 const lessonBaseSchema = z.object({
   courseId: objectIdSchema.optional(),
+  courseTemplateId: objectIdSchema.optional(),
+  courseTemplateVersion: z.coerce.number().int().min(1).optional(),
+  courseLink: lessonCourseLinkSchema.optional(),
+  policySnapshot: lessonPolicySnapshotSchema.optional(),
 
   title: z.string().trim().min(1),
   status: z.enum(LESSON_STATUSES).default("scheduled"),
@@ -207,8 +245,9 @@ const lessonRecurrenceSchema = z
     }
   });
 
-export const createLessonSchema = lessonBaseSchema
+const freeLessonCreationSchema = lessonBaseSchema
   .extend({
+    creationMode: z.literal("free"),
     recurrence: lessonRecurrenceSchema.optional(),
   })
   .refine(
@@ -219,8 +258,63 @@ export const createLessonSchema = lessonBaseSchema
     },
   );
 
+const courseLessonCreationSchema = lessonBaseSchema
+  .omit({
+    title: true,
+    scheduledEnd: true,
+    timezone: true,
+    classType: true,
+    isTrial: true,
+    attendees: true,
+    preparationStatus: true,
+  })
+  .extend({
+    creationMode: z.literal("course"),
+    courseId: objectIdSchema,
+    title: z.preprocess(
+      (value) =>
+        typeof value === "string" && value.trim() === "" ? undefined : value,
+      z.string().trim().min(1).optional(),
+    ),
+    scheduledEnd: z.coerce.date().optional(),
+    timezone: z.string().trim().min(1).optional(),
+    classType: z.enum(LESSON_CLASS_TYPES).optional(),
+    isTrial: z.boolean().optional(),
+    attendees: z.array(z.unknown()).optional(),
+    preparationStatus: z.enum(LESSON_PREPARATION_STATUSES).optional(),
+    recurrence: lessonRecurrenceSchema.optional(),
+  })
+  .refine(
+    (data) =>
+      data.scheduledEnd === undefined ||
+      data.scheduledEnd > data.scheduledStart,
+    {
+      message: "scheduledEnd must be after scheduledStart",
+      path: ["scheduledEnd"],
+    },
+  );
+
+export const createLessonSchema = z.preprocess(
+  (value) => {
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      !("creationMode" in value)
+    ) {
+      return { ...value, creationMode: "free" };
+    }
+
+    return value;
+  },
+  z.union([courseLessonCreationSchema, freeLessonCreationSchema]),
+);
+
 const updateLessonBaseSchema = z.object({
   courseId: objectIdSchema.optional(),
+  courseTemplateId: objectIdSchema.optional(),
+  courseTemplateVersion: z.coerce.number().int().min(1).optional(),
+  courseLink: lessonCourseLinkSchema.optional(),
+  policySnapshot: lessonPolicySnapshotSchema.optional(),
 
   title: z.string().trim().min(1).optional(),
   status: z.enum(LESSON_STATUSES).optional(),

@@ -233,6 +233,9 @@ export function toCourseProfileListItemDTO(
   const activeMembersCount = members.filter(
     (member) => member.status === "active",
   ).length;
+  const activeMemberIds = members
+    .filter((member) => member.status === "active")
+    .map((member) => member.studentId);
   const studentsCount =
     members.length > 0
       ? activeMembersCount
@@ -240,7 +243,9 @@ export function toCourseProfileListItemDTO(
   const studentNames = Array.from(
     new Set(
       members.flatMap((member) =>
-        member.studentName ? [member.studentName] : [],
+        member.status === "active" && member.studentName
+          ? [member.studentName]
+          : [],
       ),
     ),
   );
@@ -258,12 +263,15 @@ export function toCourseProfileListItemDTO(
     studentsCount,
     membersCount: members.length,
     activeMembersCount,
+    activeMemberIds,
     studentNames,
     policySummary: {
       durationMinutes: policies.lessonDefaults.durationMinutes,
+      timezone: policies.lessonDefaults.timezone,
       defaultClassType: policies.lessonDefaults.defaultClassType,
       frequency: policies.schedulingDefaults.frequency,
       creditsPerLesson: policies.creditPolicy.creditsPerLesson,
+      consumeOn: policies.creditPolicy.consumeOn,
     },
     templateName: snapshot?.internalName ?? "",
     level: snapshot?.level ?? "",
