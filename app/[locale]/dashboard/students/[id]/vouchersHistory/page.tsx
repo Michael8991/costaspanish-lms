@@ -66,9 +66,12 @@ export default async function VouchersHistory({
         paymentStatus: plan.paymentStatus,
         amountPaid: plan.amountPaid,
         paidAt: plan.paidAt,
+        paymentMethod: plan.paymentMethod,
+        paymentNotes: plan.paymentNotes,
         billingPeriodStart: plan.billingPeriodStart ?? undefined,
         billingPeriodEnd: plan.billingPeriodEnd ?? undefined,
         priceTotal: plan.priceTotal,
+        currency: plan.currency,
       }),
     ),
   };

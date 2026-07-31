@@ -3,6 +3,7 @@ import {
   DBClassType,
   DBPlanBillingType,
   DBPlanPaymentStatus,
+  DBVoucherPaymentMethod,
 } from "@/lib/types/student";
 import {
   ArrowRight,
@@ -38,6 +39,8 @@ export interface FormattedPlan {
   priceTotal?: number | null;
   amountPaid?: number;
   paidAt?: string | null;
+  paymentMethod?: DBVoucherPaymentMethod;
+  paymentNotes?: string;
   billingPeriodStart?: string | null;
   billingPeriodEnd?: string | null;
 }
