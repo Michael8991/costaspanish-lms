@@ -2,9 +2,11 @@ import { QueryFilter, Types } from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireAuth, requireRole, type Role } from "@/lib/auth/apiAuth";
+import { getCurrentUserObjectId } from "@/lib/auth/getCurrentUserObjectId";
 import { getStudentOwnershipFilter } from "@/lib/auth/studentOwnership";
 import { toStudentPlanListDTO } from "@/lib/dto/student.dto";
 import dbConnect from "@/lib/mongo";
+import { ensurePaymentLedgerForVoucher } from "@/lib/services/payment-ledger.service";
 import { normalizeCourseMembers } from "@/lib/utils/course-members";
 import { editCourseVoucherSchema } from "@/lib/validators/voucher";
 import {
@@ -268,14 +270,37 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const updatedVoucher = updated?.activePlans.find(
       (voucher) => voucher._id.toString() === voucherId,
     );
-    if (!updatedVoucher) {
+    if (!updated || !updatedVoucher) {
       return NextResponse.json(
         { error: "Voucher not found after update" },
         { status: 404 },
       );
     }
 
-    // TODO: Create PaymentLedgerEntry when a voucher is marked as paid.
+    const changedBy = getCurrentUserObjectId(user);
+    if (!changedBy) {
+      return NextResponse.json(
+        { error: "Invalid current user id" },
+        { status: 500 },
+      );
+    }
+
+    const wasPaid =
+      result.voucher.paymentStatus === "paid" ||
+      result.voucher.paymentStatus === "partial";
+    const isPaid =
+      updatedVoucher.paymentStatus === "paid" ||
+      updatedVoucher.paymentStatus === "partial";
+    await ensurePaymentLedgerForVoucher({
+      teacherId: result.course.ownerTeacherId,
+      student: updated,
+      voucher: updatedVoucher,
+      changedBy,
+      source: !wasPaid && isPaid
+        ? "voucher_marked_paid"
+        : "voucher_payment_updated",
+    });
+
     // TODO: Add full voucher history per course member.
     // TODO: Add payment reversal workflow.
     return NextResponse.json({

@@ -2,8 +2,10 @@ import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireAuth, requireRole } from "@/lib/auth/apiAuth";
+import { getCurrentUserObjectId } from "@/lib/auth/getCurrentUserObjectId";
 import { getStudentOwnershipFilter } from "@/lib/auth/studentOwnership";
 import dbConnect from "@/lib/mongo";
+import { ensurePaymentLedgerForVoucher } from "@/lib/services/payment-ledger.service";
 import { updateStudentVoucherSchema } from "@/lib/validators/voucher";
 import {
   StudentProfile,
@@ -233,7 +235,34 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       );
     }
 
-    // TODO: Create PaymentLedgerEntry when a voucher is marked as paid.
+    const updatedPlan = updated.activePlans.find(
+      (plan) => plan._id.toString() === planObjectId.toString(),
+    );
+    const changedBy = getCurrentUserObjectId(user);
+    const ledgerTeacherId = updated.teacherId ?? changedBy;
+    if (!updatedPlan || !changedBy || !ledgerTeacherId) {
+      return NextResponse.json(
+        { error: "No se pudo registrar el cambio de pago." },
+        { status: 500 },
+      );
+    }
+
+    const wasPaid =
+      currentPlan.paymentStatus === "paid" ||
+      currentPlan.paymentStatus === "partial";
+    const isPaid =
+      updatedPlan.paymentStatus === "paid" ||
+      updatedPlan.paymentStatus === "partial";
+    await ensurePaymentLedgerForVoucher({
+      teacherId: ledgerTeacherId,
+      student: updated,
+      voucher: updatedPlan,
+      changedBy,
+      source: !wasPaid && isPaid
+        ? "voucher_marked_paid"
+        : "voucher_payment_updated",
+    });
+
     return NextResponse.json(updated);
   } catch (error) {
     console.error("Error patching plan:", error);

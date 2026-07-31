@@ -5,6 +5,7 @@ import { requireAuth, requireRole } from "@/lib/auth/apiAuth";
 import { getCurrentUserObjectId } from "@/lib/auth/getCurrentUserObjectId";
 import { getStudentOwnerMatch } from "@/lib/auth/studentOwnership";
 import dbConnect from "@/lib/mongo";
+import { ensureCreditLedgerForLessonSettlement } from "@/lib/services/credit-ledger.service";
 import type { CourseOperationalPolicies } from "@/lib/types/course-policies";
 import type {
   LessonAttendanceStatus,
@@ -42,6 +43,7 @@ type LessonAttendeeForComplete = {
 type LessonForComplete = {
   _id: Types.ObjectId;
   teacherId: Types.ObjectId;
+  title: string;
   courseId?: Types.ObjectId | string | null;
   status: string;
   scheduledStart: Date;
@@ -155,6 +157,22 @@ function idempotentResponse(
   );
 }
 
+async function syncCreditLedger(args: {
+  teacherId: Types.ObjectId;
+  lesson: LessonForComplete;
+  settlement: LessonCreditSettlement;
+  changedBy: Types.ObjectId;
+}) {
+  try {
+    const result = await ensureCreditLedgerForLessonSettlement(args);
+    if (result.warnings.length > 0) {
+      console.warn("Credit ledger completed with warnings:", result.warnings);
+    }
+  } catch (error) {
+    console.error("Error creating credit ledger for lesson settlement:", error);
+  }
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -226,6 +244,15 @@ export async function POST(
       lesson.creditSettlement?.status === "settled" ||
       lesson.creditSettlement?.status === "skipped"
     ) {
+      if (lesson.creditSettlement?.status === "settled") {
+        await syncCreditLedger({
+          teacherId: lesson.teacherId,
+          lesson,
+          settlement: lesson.creditSettlement,
+          changedBy: currentUserObjectId,
+        });
+      }
+
       const currentLesson = await getResponseLesson(filter);
 
       if (!currentLesson) {
@@ -684,6 +711,7 @@ export async function POST(
 
     const appliedConsumptions: ResolvedConsumption[] = [];
     let completionCommitted = false;
+    let settlementCompletedAt: Date | null = null;
 
     try {
       for (const consumption of resolvedConsumptions) {
@@ -718,6 +746,7 @@ export async function POST(
         appliedConsumptions.push(consumption);
       }
 
+      settlementCompletedAt = new Date();
       const completedLesson = await Lesson.findOneAndUpdate(
         {
           ...filter,
@@ -727,8 +756,8 @@ export async function POST(
           $set: {
             status: "completed",
             "creditSettlement.status": "settled",
-            "creditSettlement.settledAt": new Date(),
-            updatedAt: new Date(),
+            "creditSettlement.settledAt": settlementCompletedAt,
+            updatedAt: settlementCompletedAt,
           },
         },
         { new: true },
@@ -807,6 +836,19 @@ export async function POST(
       );
     }
 
+    if (settlementCompletedAt) {
+      await syncCreditLedger({
+        teacherId: lesson.teacherId,
+        lesson,
+        settlement: {
+          ...pendingSettlement,
+          status: "settled",
+          settledAt: settlementCompletedAt,
+        },
+        changedBy: currentUserObjectId,
+      });
+    }
+
     await Promise.allSettled(
       resolvedConsumptions.map((consumption) =>
         StudentProfile.updateOne(
@@ -841,8 +883,6 @@ export async function POST(
       );
     }
 
-    // TODO: Create CreditLedgerEntry after settlement.
-    // TODO: Create PaymentLedgerEntry when a voucher is paid.
     // TODO: Support consumeOn="scheduled" during Lesson scheduling.
     // TODO: Advance CourseProfile progress after completion.
     return NextResponse.json(

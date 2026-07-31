@@ -3,8 +3,10 @@ import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireAuth, requireRole } from "@/lib/auth/apiAuth";
+import { getCurrentUserObjectId } from "@/lib/auth/getCurrentUserObjectId";
 import { getStudentOwnershipFilter } from "@/lib/auth/studentOwnership";
 import dbConnect from "@/lib/mongo";
+import { ensurePaymentLedgerForVoucher } from "@/lib/services/payment-ledger.service";
 import { createStudentVoucherSchema } from "@/lib/validators/voucher";
 import { StudentProfile, type PlanDoc } from "@/models/StudentProfile";
 
@@ -73,7 +75,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     creditsTotal !== undefined && creditsTotal > 0
       ? priceTotal / creditsTotal
       : null;
-  const plan: Omit<PlanDoc, "_id"> = {
+  const voucherObjectId = new mongoose.Types.ObjectId();
+  const plan: PlanDoc = {
+    _id: voucherObjectId,
     name: payload.name,
     billingType: payload.billingType,
     classType: payload.classType,
@@ -148,7 +152,43 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     );
   }
 
-  // TODO: Create PaymentLedgerEntry when a voucher is marked as paid.
+  const changedBy = getCurrentUserObjectId(user);
+  const updatedVoucher = updated.activePlans.find(
+    (voucher) => voucher._id.toString() === voucherObjectId.toString(),
+  );
+  const ledgerTeacherId = updated.teacherId ?? changedBy;
+
+  if (!changedBy || !ledgerTeacherId || !updatedVoucher) {
+    await StudentProfile.updateOne(
+      { _id: updated._id },
+      { $pull: { activePlans: { _id: voucherObjectId } } },
+    );
+    return NextResponse.json(
+      { error: "No se pudo registrar el pago del bono." },
+      { status: 500 },
+    );
+  }
+
+  try {
+    await ensurePaymentLedgerForVoucher({
+      teacherId: ledgerTeacherId,
+      student: updated,
+      voucher: updatedVoucher,
+      changedBy,
+      source: "voucher_created_paid",
+    });
+  } catch (ledgerError) {
+    await StudentProfile.updateOne(
+      { _id: updated._id },
+      { $pull: { activePlans: { _id: voucherObjectId } } },
+    );
+    console.error("Error creating payment ledger for voucher:", ledgerError);
+    return NextResponse.json(
+      { error: "No se pudo registrar el pago del bono." },
+      { status: 500 },
+    );
+  }
+
   revalidatePath("/", "layout");
   return NextResponse.json(updated, { status: 201 });
 }

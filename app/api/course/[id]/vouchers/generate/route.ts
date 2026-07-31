@@ -4,9 +4,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireAuth, requireRole } from "@/lib/auth/apiAuth";
+import { getCurrentUserObjectId } from "@/lib/auth/getCurrentUserObjectId";
 import { getStudentOwnershipFilter } from "@/lib/auth/studentOwnership";
 import type { GeneratedCourseVoucherDTO } from "@/lib/dto/course-voucher.dto";
 import dbConnect from "@/lib/mongo";
+import {
+  ensurePaymentLedgerForVoucher,
+  reverseActivePaymentLedgersForVouchers,
+} from "@/lib/services/payment-ledger.service";
 import {
   buildCourseVoucherContext,
   CourseVoucherRequestError,
@@ -34,15 +39,26 @@ function parseDateOnly(value?: string) {
   return value ? new Date(`${value}T00:00:00.000Z`) : null;
 }
 
-async function rollbackVouchers(appliedVouchers: AppliedVoucher[]) {
+async function rollbackVouchers(args: {
+  appliedVouchers: AppliedVoucher[];
+  teacherId: Types.ObjectId;
+  changedBy: Types.ObjectId;
+}) {
   await Promise.allSettled(
-    appliedVouchers.map(({ studentId, voucherId }) =>
+    args.appliedVouchers.map(({ studentId, voucherId }) =>
       StudentProfile.updateOne(
         { _id: studentId },
         { $pull: { activePlans: { _id: voucherId } } },
       ),
     ),
   );
+
+  await reverseActivePaymentLedgersForVouchers({
+    teacherId: args.teacherId,
+    voucherIds: args.appliedVouchers.map(({ voucherId }) => voucherId),
+    changedBy: args.changedBy,
+    reason: "voucher_generation_rolled_back",
+  });
 }
 
 export async function POST(
@@ -78,6 +94,10 @@ export async function POST(
     }
 
     await dbConnect();
+    const changedBy = getCurrentUserObjectId(user);
+    if (!changedBy) {
+      return NextResponse.json({ error: "Invalid user id" }, { status: 500 });
+    }
     const courseId = new Types.ObjectId(id);
     const context = await buildCourseVoucherContext({
       courseId,
@@ -227,6 +247,20 @@ export async function POST(
           studentId: new Types.ObjectId(studentId),
           voucherId: plan._id,
         });
+
+        const generatedItem = generatedItems.find(
+          (item) => item.studentId === studentId,
+        );
+        await ensurePaymentLedgerForVoucher({
+          teacherId: context.course.ownerTeacherId,
+          student: {
+            _id: studentId,
+            fullName: generatedItem?.studentName,
+          },
+          voucher: plan,
+          changedBy,
+          source: "voucher_created_paid",
+        });
       }
 
       const normalizedMembers = normalizeCourseMembers({
@@ -287,7 +321,11 @@ export async function POST(
       context.course.markModified("members");
       await context.course.save();
     } catch (generationError) {
-      await rollbackVouchers(appliedVouchers);
+      await rollbackVouchers({
+        appliedVouchers,
+        teacherId: context.course.ownerTeacherId,
+        changedBy,
+      });
       throw generationError;
     }
 
@@ -306,7 +344,6 @@ export async function POST(
         : { match: { teacherId: new Types.ObjectId(user.id) } }),
     });
 
-    // TODO: Create PaymentLedgerEntry when marking a voucher as paid.
     revalidatePath("/", "layout");
     return NextResponse.json(
       {
