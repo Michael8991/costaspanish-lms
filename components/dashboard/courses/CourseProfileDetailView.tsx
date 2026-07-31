@@ -16,6 +16,8 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
 import CourseProfileTemplatePlan from "@/components/dashboard/courses/CourseProfileTemplatePlan";
+import CourseProfilePoliciesSummary from "@/components/dashboard/courses/CourseProfilePoliciesSummary";
+import CourseProfileMembersSection from "@/components/dashboard/courses/CourseProfileMembersSection";
 import type { CourseProfileDetailDTO } from "@/lib/dto/course-profile.dto";
 import type { CourseTemplateDetailDTO } from "@/lib/dto/course-template.dto";
 import type { LessonListDTO } from "@/lib/dto/lesson.dto";
@@ -189,6 +191,17 @@ export default function CourseProfileDetailView({
           detail={`${course.lessonsCount} clases · ${course.blocksCount} bloques`}
         />
       </section>
+
+      <CourseProfileMembersSection members={course.members} />
+
+      <CourseProfilePoliciesSummary
+        course={course}
+        hasTemplate={Boolean(template)}
+        onCopied={(updatedCourse) => {
+          setCourse(updatedCourse);
+          router.refresh();
+        }}
+      />
 
       <section className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

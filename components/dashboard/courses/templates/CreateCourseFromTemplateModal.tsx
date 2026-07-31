@@ -373,10 +373,17 @@ export default function CreateCourseFromTemplateModal({
             </div>
 
             {selectedStudents.length > 0 && (
-              <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
-                <Users className="h-3.5 w-3.5" />
-                {selectedStudents.map((student) => student.fullName).join(", ")}
-              </p>
+              <div className="mt-2 space-y-1.5 text-xs text-slate-500">
+                <p className="flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5" />
+                  {selectedStudents
+                    .map((student) => student.fullName)
+                    .join(", ")}
+                </p>
+                <p>
+                  Los alumnos se añadirán como integrantes activos del curso.
+                </p>
+              </div>
             )}
           </section>
 

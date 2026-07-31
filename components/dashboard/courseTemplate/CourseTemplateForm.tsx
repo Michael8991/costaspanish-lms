@@ -22,6 +22,7 @@ import {
   LayoutTemplate,
   ListTree,
   ChevronDown,
+  Settings2,
 } from "lucide-react";
 
 import type { CourseTemplateDetailDTO } from "@/lib/dto/course-template.dto";
@@ -31,6 +32,7 @@ import CourseTemplateLessonsEditor, {
   removeLessonClientIds,
   type EditableModuleData,
 } from "@/components/dashboard/courses/templates/CourseTemplateLessonsEditor";
+import CourseTemplateOperationalDefaultsFields from "@/components/dashboard/courseTemplate/CourseTemplateOperationalDefaultsFields";
 import {
   useResourcesByIds,
   type ResourceMap,
@@ -50,6 +52,8 @@ import {
 } from "@/lib/utils/course-template-visuals";
 import { normalizeBlockCategories } from "@/lib/utils/lesson-block-categories";
 import z from "zod";
+import { toast } from "sonner";
+import type { ImportedLessonResult } from "@/components/dashboard/courses/templates/SaveLessonAsTemplateModal";
 
 type CourseTemplateFormProps = {
   locale: string;
@@ -147,6 +151,36 @@ function getDefaultValues(
         thumbnailUrl: "",
         ctaText: "",
       },
+      operationalDefaults: {
+        lessonDefaults: {
+          durationMinutes: 60,
+          timezone: "Europe/Madrid",
+          defaultClassType: "private",
+        },
+        schedulingDefaults: {
+          frequency: "weekly",
+          sessionsPerWeek: 1,
+          preferredWeekdays: [],
+          allowRecurringLessons: true,
+        },
+        creditPolicy: {
+          creditsPerLesson: 1,
+          consumeOn: "completion",
+          trialConsumesCredit: false,
+          cancellationConsumesCredit: false,
+          noShowConsumesCredit: true,
+        },
+        participantPolicy: {
+          participantMode: "solo",
+          minStudents: 1,
+          maxStudents: 1,
+        },
+        preparationPolicy: {
+          copyTemplateBlocksToLesson: true,
+          copyTemplateResourcesToLesson: true,
+          defaultPreparationStatus: "needs_preparation",
+        },
+      },
       curriculum: {
         modules: [],
         units: [],
@@ -199,6 +233,59 @@ function getDefaultValues(
       heroImageUrl: initialData.storefront.heroImageUrl ?? "",
       thumbnailUrl: initialData.storefront.thumbnailUrl ?? "",
       ctaText: initialData.storefront.ctaText ?? "",
+    },
+    operationalDefaults: {
+      lessonDefaults: {
+        durationMinutes:
+          initialData.operationalDefaults.lessonDefaults.durationMinutes,
+        timezone: initialData.operationalDefaults.lessonDefaults.timezone,
+        defaultClassType:
+          initialData.operationalDefaults.lessonDefaults.defaultClassType,
+      },
+      schedulingDefaults: {
+        frequency:
+          initialData.operationalDefaults.schedulingDefaults.frequency,
+        sessionsPerWeek:
+          initialData.operationalDefaults.schedulingDefaults.sessionsPerWeek,
+        preferredWeekdays: [
+          ...initialData.operationalDefaults.schedulingDefaults
+            .preferredWeekdays,
+        ],
+        allowRecurringLessons:
+          initialData.operationalDefaults.schedulingDefaults
+            .allowRecurringLessons,
+      },
+      creditPolicy: {
+        creditsPerLesson:
+          initialData.operationalDefaults.creditPolicy.creditsPerLesson,
+        consumeOn: initialData.operationalDefaults.creditPolicy.consumeOn,
+        trialConsumesCredit:
+          initialData.operationalDefaults.creditPolicy.trialConsumesCredit,
+        cancellationConsumesCredit:
+          initialData.operationalDefaults.creditPolicy
+            .cancellationConsumesCredit,
+        noShowConsumesCredit:
+          initialData.operationalDefaults.creditPolicy.noShowConsumesCredit,
+      },
+      participantPolicy: {
+        participantMode:
+          initialData.operationalDefaults.participantPolicy.participantMode,
+        minStudents:
+          initialData.operationalDefaults.participantPolicy.minStudents,
+        maxStudents:
+          initialData.operationalDefaults.participantPolicy.maxStudents,
+      },
+      preparationPolicy: {
+        copyTemplateBlocksToLesson:
+          initialData.operationalDefaults.preparationPolicy
+            .copyTemplateBlocksToLesson,
+        copyTemplateResourcesToLesson:
+          initialData.operationalDefaults.preparationPolicy
+            .copyTemplateResourcesToLesson,
+        defaultPreparationStatus:
+          initialData.operationalDefaults.preparationPolicy
+            .defaultPreparationStatus,
+      },
     },
     curriculum: {
       modules: (initialData.curriculum?.modules ?? []).map((module) => ({
@@ -391,6 +478,70 @@ function normalizeBeforeSubmit(
       ctaText: values.storefront?.ctaText,
     },
 
+    operationalDefaults: {
+      lessonDefaults: {
+        durationMinutes:
+          values.operationalDefaults?.lessonDefaults?.durationMinutes ?? 60,
+        timezone:
+          values.operationalDefaults?.lessonDefaults?.timezone?.trim() ||
+          "Europe/Madrid",
+        defaultClassType:
+          values.operationalDefaults?.lessonDefaults?.defaultClassType ??
+          "private",
+      },
+      schedulingDefaults: {
+        frequency:
+          values.operationalDefaults?.schedulingDefaults?.frequency ??
+          "weekly",
+        sessionsPerWeek:
+          values.operationalDefaults?.schedulingDefaults?.sessionsPerWeek ?? 1,
+        preferredWeekdays: Array.from(
+          new Set(
+            values.operationalDefaults?.schedulingDefaults
+              ?.preferredWeekdays ?? [],
+          ),
+        ).sort((first, second) => first - second),
+        allowRecurringLessons:
+          values.operationalDefaults?.schedulingDefaults
+            ?.allowRecurringLessons ?? true,
+      },
+      creditPolicy: {
+        creditsPerLesson:
+          values.operationalDefaults?.creditPolicy?.creditsPerLesson ?? 1,
+        consumeOn:
+          values.operationalDefaults?.creditPolicy?.consumeOn ?? "completion",
+        trialConsumesCredit:
+          values.operationalDefaults?.creditPolicy?.trialConsumesCredit ??
+          false,
+        cancellationConsumesCredit:
+          values.operationalDefaults?.creditPolicy
+            ?.cancellationConsumesCredit ?? false,
+        noShowConsumesCredit:
+          values.operationalDefaults?.creditPolicy?.noShowConsumesCredit ??
+          true,
+      },
+      participantPolicy: {
+        participantMode:
+          values.operationalDefaults?.participantPolicy?.participantMode ??
+          "solo",
+        minStudents:
+          values.operationalDefaults?.participantPolicy?.minStudents ?? 1,
+        maxStudents:
+          values.operationalDefaults?.participantPolicy?.maxStudents ?? 1,
+      },
+      preparationPolicy: {
+        copyTemplateBlocksToLesson:
+          values.operationalDefaults?.preparationPolicy
+            ?.copyTemplateBlocksToLesson ?? true,
+        copyTemplateResourcesToLesson:
+          values.operationalDefaults?.preparationPolicy
+            ?.copyTemplateResourcesToLesson ?? true,
+        defaultPreparationStatus:
+          values.operationalDefaults?.preparationPolicy
+            ?.defaultPreparationStatus ?? "needs_preparation",
+      },
+    },
+
     curriculum: normalizeCourseTemplateCurriculumForSubmit(values.curriculum),
   };
 }
@@ -467,6 +618,10 @@ function ModuleFields({
   resourceMap,
   isResourcesLoading,
   resourcesError,
+  templateId,
+  locale,
+  canImportFromLesson,
+  onImported,
 }: {
   moduleIndex: number;
   control: Control<CourseTemplateFormValues>;
@@ -479,6 +634,10 @@ function ModuleFields({
   resourceMap: ResourceMap;
   isResourcesLoading: boolean;
   resourcesError: string | null;
+  templateId?: string;
+  locale: string;
+  canImportFromLesson: boolean;
+  onImported: (result: ImportedLessonResult) => void;
 }) {
   const {
     fields: submoduleFields,
@@ -675,6 +834,10 @@ function ModuleFields({
         resourceMap={resourceMap}
         isResourcesLoading={isResourcesLoading}
         resourcesError={resourcesError}
+        templateId={templateId}
+        locale={locale}
+        canImportFromLesson={canImportFromLesson}
+        onImported={onImported}
       />
 
       <details className="group rounded-lg border border-gray-200 bg-white">
@@ -859,6 +1022,20 @@ export default function CourseTemplateForm({
     }
 
     router.push(exitUrl);
+  };
+
+  const handleImportedLesson = (result: ImportedLessonResult) => {
+    const importedValues = getDefaultValues(result.item);
+
+    reset(importedValues);
+    setEditableModules(
+      createEditableCourseTemplateModules(
+        importedValues.curriculum?.modules ?? [],
+      ),
+    );
+    setAreLessonsDirty(false);
+    setSubmitError(null);
+    toast.success("Clase real importada como clase modelo.");
   };
 
   const addModule = () => {
@@ -1195,10 +1372,24 @@ export default function CourseTemplateForm({
       </SectionCard>
 
       <SectionCard
+        title="Reglas por defecto"
+        description="Estas reglas se copiarán cuando crees un curso real desde esta plantilla. Después podrás modificarlas para cada curso."
+        icon={Settings2}
+        className="order-3"
+      >
+        <CourseTemplateOperationalDefaultsFields
+          control={control}
+          register={register}
+          setValue={setValue}
+          errors={errors}
+        />
+      </SectionCard>
+
+      <SectionCard
         title="Publicación comercial avanzada"
         description="Estos campos servirán si esta plantilla se usa también para mostrar cursos en la web pública."
         icon={BookOpen}
-        className="order-4"
+        className="order-5"
         collapsible
       >
         <div className="mb-4">
@@ -1640,7 +1831,7 @@ export default function CourseTemplateForm({
         title="Estructura del curso"
         description="Módulos, clases modelo y estructura legacy de la guía."
         icon={ListTree}
-        className="order-3"
+        className="order-4"
       >
         <div className="flex flex-col gap-5">
           <div className="order-2 space-y-3">
@@ -1755,6 +1946,10 @@ export default function CourseTemplateForm({
                   resourceMap={resourceMap}
                   isResourcesLoading={isResourcesLoading}
                   resourcesError={resourcesError}
+                  templateId={isEditMode ? initialData?.id : undefined}
+                  locale={locale}
+                  canImportFromLesson={!hasUnsavedChanges}
+                  onImported={handleImportedLesson}
                   onEditableModulesChange={(nextModules) => {
                     setEditableModules(nextModules);
                     setAreLessonsDirty(true);
@@ -1766,7 +1961,7 @@ export default function CourseTemplateForm({
         </div>
       </SectionCard>
 
-      <div className="order-5 sticky bottom-4 z-10">
+      <div className="order-6 sticky bottom-4 z-10">
         <div className="bg-white/95 backdrop-blur rounded-xl shadow-lg border border-gray-200 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p
             role="status"

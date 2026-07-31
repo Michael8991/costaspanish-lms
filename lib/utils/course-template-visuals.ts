@@ -4,8 +4,13 @@ import type {
 } from "@/lib/dto/course-template.dto";
 import type {
   ParticipantMode,
-  StoreFrontPriceMode,
 } from "@/lib/constants/courseTemplate.constants";
+import type { StoreFrontPriceMode } from "@/lib/constants/courseTemplate.constants";
+import type {
+  CourseTemplateFrequency,
+  CreditConsumeOn,
+  TemplateClassType,
+} from "@/lib/types/course-policies";
 
 export function getCourseTemplateStatusVisual(
   status: CourseTemplateListItemDTO["status"],
@@ -60,4 +65,55 @@ export function getParticipantModeLabel(mode: ParticipantMode) {
   };
 
   return labels[mode];
+}
+
+export function getClassTypeLabel(value: TemplateClassType) {
+  const labels: Record<TemplateClassType, string> = {
+    private: "Privada",
+    pair: "Pareja",
+    group_regular: "Grupo regular",
+    semi_intensive: "Semi-intensivo",
+    intensive: "Intensivo",
+  };
+
+  return labels[value];
+}
+
+export function getFrequencyLabel(value: CourseTemplateFrequency) {
+  const labels: Record<CourseTemplateFrequency, string> = {
+    once: "Una vez",
+    weekly: "Semanal",
+    twice_weekly: "Dos veces por semana",
+    custom: "Personalizada",
+  };
+
+  return labels[value];
+}
+
+export function getCreditConsumeOnLabel(value: CreditConsumeOn) {
+  return value === "completion" ? "Al completar" : "Al programar";
+}
+
+export function getPreparationStatusLabel(
+  value: "needs_preparation" | "prepared",
+) {
+  return value === "prepared" ? "Preparada" : "Necesita preparación";
+}
+
+/**
+ * Weekdays follow the JavaScript convention: Sunday is 0 and Monday is 1.
+ * The UI presents them from Monday to Sunday.
+ */
+export function getWeekdayLabel(value: number) {
+  const labels: Record<number, string> = {
+    0: "Domingo",
+    1: "Lunes",
+    2: "Martes",
+    3: "Miércoles",
+    4: "Jueves",
+    5: "Viernes",
+    6: "Sábado",
+  };
+
+  return labels[value] ?? `Día ${value}`;
 }

@@ -40,6 +40,10 @@ export default async function CourseProfilePage({
         };
   const rawCourse = await CourseProfile.findOne(courseFilter)
     .populate({
+      path: "members.studentId",
+      select: "fullName contactEmail level isActive",
+    })
+    .populate({
       path: "studentIds",
       select: "fullName contactEmail level isActive",
     })
@@ -54,10 +58,12 @@ export default async function CourseProfilePage({
       .limit(100)
       .lean(),
   ]);
-  const course = toCourseProfileDetailDTO(rawCourse);
   const template = rawTemplate
     ? toCourseTemplateDetailDTO(rawTemplate)
     : null;
+  const course = toCourseProfileDetailDTO(rawCourse, {
+    templateOperationalDefaults: template?.operationalDefaults,
+  });
   const createdLessons = rawCreatedLessons.map(toLessonListDTO);
 
   return (

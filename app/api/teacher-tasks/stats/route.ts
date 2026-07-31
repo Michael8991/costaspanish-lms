@@ -30,6 +30,13 @@ export async function GET(req: NextRequest) {
     await dbConnect();
 
     const { start, end } = getTodayRange();
+    const {
+      start: yesterdayStart,
+      end: yesterdayEnd,
+    } = getTodayRange(
+      "Europe/Madrid",
+      new Date(start.getTime() - 1),
+    );
     const activeOwnerFilter = {
       teacherId: currentUserObjectId,
       deletedAt: null,
@@ -42,6 +49,7 @@ export async function GET(req: NextRequest) {
     const [
       createdToday,
       completedToday,
+      completedYesterday,
       openTotal,
       highPriorityOpen,
       mediumPriorityOpen,
@@ -55,6 +63,11 @@ export async function GET(req: NextRequest) {
         ...activeOwnerFilter,
         status: "completed",
         completedAt: { $gte: start, $lte: end },
+      }),
+      TeacherTask.countDocuments({
+        ...activeOwnerFilter,
+        status: "completed",
+        completedAt: { $gte: yesterdayStart, $lte: yesterdayEnd },
       }),
       TeacherTask.countDocuments(openOwnerFilter),
       TeacherTask.countDocuments({
@@ -76,11 +89,18 @@ export async function GET(req: NextRequest) {
         created: createdToday,
         completed: completedToday,
       },
+      yesterday: {
+        completed: completedYesterday,
+      },
       open: {
         total: openTotal,
         highPriority: highPriorityOpen,
         mediumPriority: mediumPriorityOpen,
         lowPriority: lowPriorityOpen,
+      },
+      trend: {
+        completedDeltaVsYesterday:
+          completedToday - completedYesterday,
       },
     });
   } catch (error) {

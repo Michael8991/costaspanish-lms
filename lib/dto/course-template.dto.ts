@@ -10,12 +10,26 @@ import type {
   ITemplateLesson,
   IStorefront,
 } from "@/models/CourseTemplate";
+import type {
+  CourseCreditPolicy,
+  CourseLessonDefaults,
+  CourseOperationalPolicies,
+  CourseParticipantPolicy,
+  CoursePreparationPolicy,
+  CourseSchedulingDefaults,
+} from "@/lib/types/course-policies";
 
 export type PriceConditionDTO = IPriceCondition;
 
 export type PedagogicalMetaDTO = IPedagogicalMeta;
 
 export type SubModuleDTO = ISubModule;
+export type CourseLessonDefaultsDTO = CourseLessonDefaults;
+export type CourseSchedulingDefaultsDTO = CourseSchedulingDefaults;
+export type CourseCreditPolicyDTO = CourseCreditPolicy;
+export type CourseParticipantPolicyDTO = CourseParticipantPolicy;
+export type CoursePreparationPolicyDTO = CoursePreparationPolicy;
+export type CourseOperationalDefaultsDTO = CourseOperationalPolicies;
 
 export interface PriceOptionDTO extends Omit<IPriceOption, "condition"> {
   condition?: PriceConditionDTO;
@@ -113,6 +127,7 @@ export interface CourseTemplateDetailDTO {
   pedagogicalMeta: PedagogicalMetaDTO;
   storefront: DefaultStorefrontDTO;
   curriculum: CurriculumDTO;
+  operationalDefaults: CourseOperationalDefaultsDTO;
   stats: CourseTemplateStatsDTO;
 
   createdAt: string;

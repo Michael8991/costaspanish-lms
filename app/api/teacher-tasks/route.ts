@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { SortOrder } from "mongoose";
 import { z } from "zod";
 
 import { requireAuth, requireRole } from "@/lib/auth/apiAuth";
@@ -22,12 +23,6 @@ const teacherTasksQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(100),
 });
 
-const priorityOrder: Record<TeacherTaskDTO["priority"], number> = {
-  high: 0,
-  medium: 1,
-  low: 2,
-};
-
 const statusOrder: Record<TeacherTaskDTO["status"], number> = {
   open: 0,
   completed: 1,
@@ -39,13 +34,24 @@ function sortTeacherTasks(
 ) {
   const statusDifference =
     statusOrder[first.status] - statusOrder[second.status];
-  const priorityDifference =
-    priorityOrder[first.priority] - priorityOrder[second.priority];
-  const dateDifference =
-    new Date(second.createdAt).getTime() -
-    new Date(first.createdAt).getTime();
 
-  return statusDifference || priorityDifference || dateDifference;
+  if (statusDifference !== 0) {
+    return statusDifference;
+  }
+
+  if (first.status === "completed" && second.status === "completed") {
+    const completedAtDifference =
+      new Date(second.completedAt ?? second.updatedAt).getTime() -
+      new Date(first.completedAt ?? first.updatedAt).getTime();
+
+    return completedAtDifference || second.id.localeCompare(first.id);
+  }
+
+  const createdAtDifference =
+    new Date(first.createdAt).getTime() -
+    new Date(second.createdAt).getTime();
+
+  return createdAtDifference || first.id.localeCompare(second.id);
 }
 
 export async function GET(req: NextRequest) {
@@ -107,9 +113,17 @@ export async function GET(req: NextRequest) {
       ];
     }
 
+    const taskSort: Record<string, SortOrder> =
+      query.data.status === "open"
+        ? { createdAt: 1, _id: 1 }
+        : query.data.status === "completed" ||
+            query.data.status === "completed_today"
+          ? { completedAt: -1, _id: -1 }
+          : { status: -1, createdAt: 1, _id: 1 };
+
     const [tasks, open, completed, highPriorityOpen] = await Promise.all([
       TeacherTask.find(taskFilter)
-        .sort({ createdAt: -1 })
+        .sort(taskSort)
         .limit(query.data.limit)
         .lean<TeacherTaskDoc[]>(),
       TeacherTask.countDocuments({ ...ownerFilter, status: "open" }),

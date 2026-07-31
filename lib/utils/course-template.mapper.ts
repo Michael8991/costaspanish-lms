@@ -2,6 +2,7 @@ import type {
   CourseTemplateDetailDTO,
   CourseTemplateListItemDTO,
   CourseTemplateStatsDTO,
+  CourseOperationalDefaultsDTO,
   CurriculumDTO,
   DefaultStorefrontDTO,
   ModuleDataDTO,
@@ -18,6 +19,11 @@ import type {
   ITemplateBlock,
   ITemplateLesson,
 } from "@/models/CourseTemplate";
+import type { CourseOperationalPolicies } from "@/lib/types/course-policies";
+import {
+  getDefaultCourseOperationalPolicies,
+  normalizeCourseOperationalPolicies,
+} from "@/lib/utils/course-policies";
 
 type CourseTemplateSource =
   | ICourseTemplate
@@ -34,6 +40,16 @@ function toIdString(value: unknown): string {
 function toIsoDate(value: Date | string | undefined): string {
   if (!value) return "";
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+}
+
+export function getDefaultOperationalDefaults(): CourseOperationalDefaultsDTO {
+  return getDefaultCourseOperationalPolicies();
+}
+
+export function normalizeOperationalDefaults(
+  source?: Partial<CourseOperationalPolicies>,
+): CourseOperationalDefaultsDTO {
+  return normalizeCourseOperationalPolicies(source);
 }
 
 function toSubModuleDTO(submodule: {
@@ -225,6 +241,9 @@ export function toCourseTemplateDetailDTO(
     pedagogicalMeta: toPedagogicalMetaDTO(source.pedagogicalMeta),
     storefront: toDefaultStorefrontDTO(source.storefront),
     curriculum,
+    operationalDefaults: normalizeOperationalDefaults(
+      source.operationalDefaults,
+    ),
     stats: getCourseTemplateStats(curriculum),
 
     createdAt: toIsoDate(source.createdAt),

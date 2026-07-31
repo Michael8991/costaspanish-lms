@@ -10,6 +10,11 @@ import dbConnect from "@/lib/mongo";
 import { CourseProfile, type CourseType } from "@/models/CourseProfile";
 import { CourseTemplate } from "@/models/CourseTemplate";
 import { StudentProfile, type ClassType } from "@/models/StudentProfile";
+import { cloneCourseOperationalPolicies } from "@/lib/utils/course-policies";
+import {
+  deriveStudentIdsFromMembers,
+  normalizeCourseMembers,
+} from "@/lib/utils/course-members";
 
 export const runtime = "nodejs";
 
@@ -100,7 +105,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    const studentObjectIds = parsed.data.studentIds.map(
+    const members = normalizeCourseMembers({
+      members: parsed.data.members,
+      legacyStudentIds: parsed.data.studentIds,
+      fallbackJoinedAt: parsed.data.startDate,
+    });
+    const derivedStudentIds = deriveStudentIdsFromMembers(members);
+    const studentObjectIds = derivedStudentIds.map(
       (studentId) => new Types.ObjectId(studentId),
     );
     const students = await StudentProfile.find({
@@ -117,6 +128,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     const templateDTO = toCourseTemplateDetailDTO(template);
+    const policies = cloneCourseOperationalPolicies(
+      templateDTO.operationalDefaults,
+    );
     const courseId = new Types.ObjectId();
     const course = await CourseProfile.create({
       _id: courseId,
@@ -154,12 +168,37 @@ export async function POST(request: NextRequest, context: RouteContext) {
         enrollmentOpen: false,
       },
       stats: {
-        activeEnrollmentCount: studentObjectIds.length,
+        activeEnrollmentCount: members.filter(
+          (member) => member.status === "active",
+        ).length,
         lessonCount: 0,
       },
       name: parsed.data.name,
       classType: parsed.data.classType,
       studentIds: studentObjectIds,
+      members: members.map((member) => ({
+        studentId: new Types.ObjectId(member.studentId),
+        status: member.status,
+        joinedAt: new Date(member.joinedAt),
+        leftAt: member.leftAt ? new Date(member.leftAt) : null,
+        billing: {
+          mode: member.billing.mode,
+          billingAnchorDay: member.billing.billingAnchorDay ?? undefined,
+          billingStartedAt: member.billing.billingStartedAt
+            ? new Date(member.billing.billingStartedAt)
+            : null,
+          nextBillingDate: member.billing.nextBillingDate
+            ? new Date(member.billing.nextBillingDate)
+            : null,
+          firstVoucherId: member.billing.firstVoucherId
+            ? new Types.ObjectId(member.billing.firstVoucherId)
+            : null,
+          lastVoucherId: member.billing.lastVoucherId
+            ? new Types.ObjectId(member.billing.lastVoucherId)
+            : null,
+          notes: member.billing.notes,
+        },
+      })),
       startDate: parsed.data.startDate
         ? new Date(parsed.data.startDate)
         : undefined,
@@ -182,10 +221,15 @@ export async function POST(request: NextRequest, context: RouteContext) {
         category: templateDTO.pedagogicalMeta.category,
         curriculumStats: templateDTO.stats,
       },
+      policies,
     });
 
     await course.populate({
       path: "studentIds",
+      select: "fullName contactEmail level isActive",
+    });
+    await course.populate({
+      path: "members.studentId",
       select: "fullName contactEmail level isActive",
     });
 

@@ -4,6 +4,7 @@ import CourseTemplateCommercialPanel from "@/components/dashboard/courses/templa
 import CreateCourseFromTemplateModal from "@/components/dashboard/courses/templates/CreateCourseFromTemplateModal";
 import CourseTemplateCurriculumPreview from "@/components/dashboard/courses/templates/CourseTemplateCurriculumPreview";
 import CourseTemplatePedagogicalSummary from "@/components/dashboard/courses/templates/CourseTemplatePedagogicalSummary";
+import CourseTemplateOperationalDefaultsSummary from "@/components/dashboard/courses/templates/CourseTemplateOperationalDefaultsSummary";
 import CourseTemplateStatsGrid from "@/components/dashboard/courses/templates/CourseTemplateStatsGrid";
 import CourseTemplateStatusBadge from "@/components/dashboard/courses/templates/CourseTemplateStatusBadge";
 import type { CourseTemplateDetailDTO } from "@/lib/dto/course-template.dto";
@@ -206,6 +207,7 @@ export default function CourseTemplateDetailView({
 
       <CourseTemplateStatsGrid stats={courseTemplate.stats} />
       <CourseTemplatePedagogicalSummary template={courseTemplate} />
+      <CourseTemplateOperationalDefaultsSummary template={courseTemplate} />
       <CourseTemplateCurriculumPreview template={courseTemplate} />
 
       <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">

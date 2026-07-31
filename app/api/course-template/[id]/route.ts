@@ -175,6 +175,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (parsed.data.curriculum !== undefined) {
       set.curriculum = parsed.data.curriculum;
     }
+    if (parsed.data.operationalDefaults !== undefined) {
+      set.operationalDefaults = parsed.data.operationalDefaults;
+    }
 
     if (Object.keys(set).length === 0) {
       return NextResponse.json(

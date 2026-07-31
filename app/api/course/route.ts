@@ -80,6 +80,10 @@ export async function GET(request: NextRequest) {
     const [items, totalItems] = await Promise.all([
       CourseProfile.find(query)
         .populate({
+          path: "members.studentId",
+          select: "fullName contactEmail level isActive",
+        })
+        .populate({
           path: "studentIds",
           select: "fullName contactEmail level isActive",
         })

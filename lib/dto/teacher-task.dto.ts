@@ -30,11 +30,17 @@ export interface TeacherTaskStatsDTO {
     created: number;
     completed: number;
   };
+  yesterday?: {
+    completed: number;
+  };
   open: {
     total: number;
     highPriority: number;
     mediumPriority: number;
     lowPriority: number;
+  };
+  trend?: {
+    completedDeltaVsYesterday: number;
   };
 }
 

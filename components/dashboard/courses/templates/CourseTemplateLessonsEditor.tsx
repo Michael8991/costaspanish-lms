@@ -5,6 +5,7 @@ import {
   ArrowUp,
   ChevronDown,
   ChevronUp,
+  Import,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -18,6 +19,9 @@ import CourseTemplateBlocksEditor, {
 } from "@/components/dashboard/courses/templates/CourseTemplateBlocksEditor";
 import type { ResourceMap } from "@/lib/hooks/useResourcesByIds";
 import { createCourseTemplateSchema } from "@/lib/validators/courseTemplate.validator";
+import SaveLessonAsTemplateModal, {
+  type ImportedLessonResult,
+} from "@/components/dashboard/courses/templates/SaveLessonAsTemplateModal";
 
 type CourseTemplateFormInput = z.input<typeof createCourseTemplateSchema>;
 
@@ -56,6 +60,10 @@ interface CourseTemplateLessonsEditorProps {
   resourceMap: ResourceMap;
   isResourcesLoading: boolean;
   resourcesError: string | null;
+  templateId?: string;
+  locale: string;
+  canImportFromLesson?: boolean;
+  onImported?: (result: ImportedLessonResult) => void;
 }
 
 function createClientId(prefix: string) {
@@ -153,8 +161,13 @@ export default function CourseTemplateLessonsEditor({
   resourceMap,
   isResourcesLoading,
   resourcesError,
+  templateId,
+  locale,
+  canImportFromLesson = true,
+  onImported,
 }: CourseTemplateLessonsEditorProps) {
   const [expandedLessonId, setExpandedLessonId] = useState<string | null>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const currentModule = modules[moduleIndex];
   const lessons = currentModule?.lessons ?? [];
 
@@ -233,14 +246,32 @@ export default function CourseTemplateLessonsEditor({
             fechas reales.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={addLesson}
-          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
-        >
-          <Plus className="h-4 w-4" />
-          Añadir clase modelo
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {templateId && (
+            <button
+              type="button"
+              onClick={() => setIsImportModalOpen(true)}
+              disabled={!canImportFromLesson}
+              title={
+                canImportFromLesson
+                  ? "Buscar una clase real"
+                  : "Guarda los cambios pendientes antes de importar"
+              }
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Import className="h-4 w-4" />
+              Importar desde clase real
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={addLesson}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-50"
+          >
+            <Plus className="h-4 w-4" />
+            Añadir clase modelo
+          </button>
+        </div>
       </div>
 
       {lessons.length === 0 ? (
@@ -531,6 +562,21 @@ export default function CourseTemplateLessonsEditor({
             );
           })}
         </div>
+      )}
+
+      {templateId && (
+        <SaveLessonAsTemplateModal
+          isOpen={isImportModalOpen}
+          onClose={() => setIsImportModalOpen(false)}
+          initialTemplateId={templateId}
+          initialModuleOrder={currentModule.order ?? moduleIndex}
+          mode="from_template"
+          locale={locale}
+          onImported={(result) => {
+            onImported?.(result);
+            setIsImportModalOpen(false);
+          }}
+        />
       )}
     </section>
   );

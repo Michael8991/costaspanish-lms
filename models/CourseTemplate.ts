@@ -1,10 +1,38 @@
 import { Schema, Types, model, models, HydratedDocument } from "mongoose";
 import { CEFRLevel } from "./ResourceProfile";
+import {
+  COURSE_TEMPLATE_FREQUENCIES,
+  CREDIT_CONSUME_ON_VALUES,
+  DEFAULT_OPERATIONAL_DEFAULTS,
+  PARTICIPANT_MODES,
+} from "@/lib/constants/courseTemplate.constants";
+import { LESSON_CLASS_TYPES } from "@/lib/constants/lesson.constants";
+import type {
+  CourseCreditPolicy,
+  CourseLessonDefaults,
+  CourseOperationalPolicies,
+  CourseParticipantPolicy,
+  CoursePreparationPolicy,
+  CourseSchedulingDefaults,
+  CourseTemplateFrequency as SharedCourseTemplateFrequency,
+  CreditConsumeOn as SharedCreditConsumeOn,
+  ParticipantMode as SharedParticipantMode,
+  TemplateClassType as SharedTemplateClassType,
+} from "@/lib/types/course-policies";
 
 export type CourseTemplateStatus = "draft" | "ready" | "archived";
 export type StorefrontPriceMode = "monthly" | "package" | "free" | "custom_label";
 export type CurrencyCode = "EUR";
-export type ParticipantMode = "solo" | "pair" | "trio" | "group";
+export type ParticipantMode = SharedParticipantMode;
+export type CourseTemplateFrequency = SharedCourseTemplateFrequency;
+export type CreditConsumeOn = SharedCreditConsumeOn;
+export type TemplateClassType = SharedTemplateClassType;
+export type ICourseLessonDefaults = CourseLessonDefaults;
+export type ICourseSchedulingDefaults = CourseSchedulingDefaults;
+export type ICourseCreditPolicy = CourseCreditPolicy;
+export type ICourseParticipantPolicy = CourseParticipantPolicy;
+export type ICoursePreparationPolicy = CoursePreparationPolicy;
+export type ICourseOperationalDefaults = CourseOperationalPolicies;
 
 export interface IPedagogicalMeta {
   level: CEFRLevel;
@@ -104,12 +132,189 @@ export interface ICourseTemplate {
   pedagogicalMeta: IPedagogicalMeta;
   storefront: IStorefront;
   curriculum?: ICurriculum;
+  // TODO: Copy operationalDefaults into CourseProfile policies when creating a real course.
+  // TODO: Store a policy snapshot on Lesson when creating a real lesson.
+  operationalDefaults: ICourseOperationalDefaults;
 
   createdAt: Date;
   updatedAt: Date;
 }
 
 export type CourseTemplateDocument = HydratedDocument<ICourseTemplate>;
+
+const CourseLessonDefaultsSchema = new Schema<ICourseLessonDefaults>(
+  {
+    durationMinutes: {
+      type: Number,
+      required: true,
+      default: 60,
+      min: 1,
+    },
+    timezone: {
+      type: String,
+      required: true,
+      default: "Europe/Madrid",
+      trim: true,
+    },
+    defaultClassType: {
+      type: String,
+      enum: LESSON_CLASS_TYPES,
+      required: true,
+      default: "private",
+    },
+  },
+  { _id: false },
+);
+
+const CourseSchedulingDefaultsSchema =
+  new Schema<ICourseSchedulingDefaults>(
+    {
+      frequency: {
+        type: String,
+        enum: COURSE_TEMPLATE_FREQUENCIES,
+        required: true,
+        default: "weekly",
+      },
+      sessionsPerWeek: {
+        type: Number,
+        required: true,
+        default: 1,
+        min: 1,
+      },
+      preferredWeekdays: {
+        type: [
+          {
+            type: Number,
+            min: 0,
+            max: 6,
+          },
+        ],
+        default: [],
+      },
+      allowRecurringLessons: {
+        type: Boolean,
+        required: true,
+        default: true,
+      },
+    },
+    { _id: false },
+  );
+
+const CourseCreditPolicySchema = new Schema<ICourseCreditPolicy>(
+  {
+    creditsPerLesson: {
+      type: Number,
+      required: true,
+      default: 1,
+      min: 0,
+    },
+    consumeOn: {
+      type: String,
+      enum: CREDIT_CONSUME_ON_VALUES,
+      required: true,
+      default: "completion",
+    },
+    trialConsumesCredit: {
+      type: Boolean,
+      required: true,
+      default: false,
+    },
+    cancellationConsumesCredit: {
+      type: Boolean,
+      required: true,
+      default: false,
+    },
+    noShowConsumesCredit: {
+      type: Boolean,
+      required: true,
+      default: true,
+    },
+  },
+  { _id: false },
+);
+
+const CourseParticipantPolicySchema =
+  new Schema<ICourseParticipantPolicy>(
+    {
+      participantMode: {
+        type: String,
+        enum: PARTICIPANT_MODES,
+        required: true,
+        default: "solo",
+      },
+      minStudents: {
+        type: Number,
+        required: true,
+        default: 1,
+        min: 1,
+      },
+      maxStudents: {
+        type: Number,
+        required: true,
+        default: 1,
+        min: 1,
+      },
+    },
+    { _id: false },
+  );
+
+const CoursePreparationPolicySchema =
+  new Schema<ICoursePreparationPolicy>(
+    {
+      copyTemplateBlocksToLesson: {
+        type: Boolean,
+        required: true,
+        default: true,
+      },
+      copyTemplateResourcesToLesson: {
+        type: Boolean,
+        required: true,
+        default: true,
+      },
+      defaultPreparationStatus: {
+        type: String,
+        enum: ["needs_preparation", "prepared"],
+        required: true,
+        default: "needs_preparation",
+      },
+    },
+    { _id: false },
+  );
+
+const CourseOperationalDefaultsSchema =
+  new Schema<ICourseOperationalDefaults>(
+    {
+      lessonDefaults: {
+        type: CourseLessonDefaultsSchema,
+        required: true,
+        default: () => ({ ...DEFAULT_OPERATIONAL_DEFAULTS.lessonDefaults }),
+      },
+      schedulingDefaults: {
+        type: CourseSchedulingDefaultsSchema,
+        required: true,
+        default: () => ({
+          ...DEFAULT_OPERATIONAL_DEFAULTS.schedulingDefaults,
+          preferredWeekdays: [],
+        }),
+      },
+      creditPolicy: {
+        type: CourseCreditPolicySchema,
+        required: true,
+        default: () => ({ ...DEFAULT_OPERATIONAL_DEFAULTS.creditPolicy }),
+      },
+      participantPolicy: {
+        type: CourseParticipantPolicySchema,
+        required: true,
+        default: () => ({ ...DEFAULT_OPERATIONAL_DEFAULTS.participantPolicy }),
+      },
+      preparationPolicy: {
+        type: CoursePreparationPolicySchema,
+        required: true,
+        default: () => ({ ...DEFAULT_OPERATIONAL_DEFAULTS.preparationPolicy }),
+      },
+    },
+    { _id: false },
+  );
 
 const PriceConditionSchema = new Schema<IPriceCondition>(
   {
@@ -482,6 +687,24 @@ const CourseTemplateSchema = new Schema<ICourseTemplate>(
     curriculum: {
       type: CurriculumSchema,
       default: () => ({}),
+    },
+    operationalDefaults: {
+      type: CourseOperationalDefaultsSchema,
+      required: true,
+      default: () => ({
+        lessonDefaults: { ...DEFAULT_OPERATIONAL_DEFAULTS.lessonDefaults },
+        schedulingDefaults: {
+          ...DEFAULT_OPERATIONAL_DEFAULTS.schedulingDefaults,
+          preferredWeekdays: [],
+        },
+        creditPolicy: { ...DEFAULT_OPERATIONAL_DEFAULTS.creditPolicy },
+        participantPolicy: {
+          ...DEFAULT_OPERATIONAL_DEFAULTS.participantPolicy,
+        },
+        preparationPolicy: {
+          ...DEFAULT_OPERATIONAL_DEFAULTS.preparationPolicy,
+        },
+      }),
     },
   },
   {

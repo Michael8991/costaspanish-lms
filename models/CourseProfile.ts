@@ -1,8 +1,23 @@
 import { Schema, model, models } from "mongoose";
 import { Types, HydratedDocument } from "mongoose";
-import { CurrencyCode, ParticipantMode } from "./CourseTemplate";
+import type { CurrencyCode } from "./CourseTemplate";
 import { COURSE_STATUSES } from "@/lib/constants/course.constants";
 import type { ClassType } from "./StudentProfile";
+import {
+  COURSE_TEMPLATE_FREQUENCIES,
+  CREDIT_CONSUME_ON_VALUES,
+  PARTICIPANT_MODES,
+} from "@/lib/constants/courseTemplate.constants";
+import { LESSON_CLASS_TYPES } from "@/lib/constants/lesson.constants";
+import type {
+  CourseCreditPolicy,
+  CourseLessonDefaults,
+  CourseOperationalPolicies,
+  CourseParticipantPolicy,
+  CoursePreparationPolicy,
+  CourseSchedulingDefaults,
+  ParticipantMode,
+} from "@/lib/types/course-policies";
 
 export type CourseProfileStatus =
   | "draft"
@@ -15,6 +30,27 @@ export type CourseType = "regular_group" | "intensive_group" | "private_flexible
 export type StorefrontPriceMode = "monthly" | "package" | "free" | "custom_label";
 export type ConsumptionOutcome = "consume" | "do_not_consume" | "reschedule";
 export type DayOfWeek = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export type CourseProfilePolicies = CourseOperationalPolicies;
+export type CourseMemberStatus = "active" | "paused" | "left";
+export type CourseMemberBillingMode = "individual_cycle";
+
+export interface ICourseMemberBilling {
+  mode: CourseMemberBillingMode;
+  billingAnchorDay?: number;
+  billingStartedAt?: Date | null;
+  nextBillingDate?: Date | null;
+  firstVoucherId?: Types.ObjectId | null;
+  lastVoucherId?: Types.ObjectId | null;
+  notes?: string;
+}
+
+export interface ICourseMember {
+  studentId: Types.ObjectId;
+  status: CourseMemberStatus;
+  joinedAt: Date;
+  leftAt?: Date | null;
+  billing: ICourseMemberBilling;
+}
 
 export interface IWeeklySlot {
   dayOfWeek: DayOfWeek;
@@ -155,12 +191,20 @@ export interface ICourseProfile {
   name?: string;
   classType?: ClassType;
   studentIds?: Types.ObjectId[];
+  members: ICourseMember[];
   startDate?: Date;
   targetEndDate?: Date;
   scheduleNotes?: string;
   internalNotes?: string;
   progress?: ICourseProgress;
   templateSnapshot?: ICourseTemplateSnapshot;
+  // TODO: Allow editing course policies without modifying the template.
+  // TODO: Create Lesson from CourseProfile using policies.
+  // TODO: Store policySnapshot on Lesson.
+  // TODO: Consume credits according to policySnapshot on completion.
+  policies?: CourseProfilePolicies;
+  // TODO: Generate the first voucher for a course member and fill billing dates/ids.
+  // TODO: Store a policy snapshot on each Lesson and consume credits from it.
 
   createdAt: Date;
   updatedAt: Date;
@@ -589,6 +633,183 @@ const CourseTemplateSnapshotSchema = new Schema<ICourseTemplateSnapshot>(
   { _id: false },
 );
 
+const CoursePolicyLessonDefaultsSchema = new Schema<CourseLessonDefaults>(
+  {
+    durationMinutes: { type: Number, required: true, min: 1 },
+    timezone: { type: String, required: true, trim: true },
+    defaultClassType: {
+      type: String,
+      enum: LESSON_CLASS_TYPES,
+      required: true,
+    },
+  },
+  { _id: false },
+);
+
+const CoursePolicySchedulingDefaultsSchema =
+  new Schema<CourseSchedulingDefaults>(
+    {
+      frequency: {
+        type: String,
+        enum: COURSE_TEMPLATE_FREQUENCIES,
+        required: true,
+      },
+      sessionsPerWeek: { type: Number, required: true, min: 1 },
+      preferredWeekdays: {
+        type: [{ type: Number, min: 0, max: 6 }],
+        default: [],
+      },
+      allowRecurringLessons: { type: Boolean, required: true },
+    },
+    { _id: false },
+  );
+
+const CoursePolicyCreditSchema = new Schema<CourseCreditPolicy>(
+  {
+    creditsPerLesson: { type: Number, required: true, min: 0 },
+    consumeOn: {
+      type: String,
+      enum: CREDIT_CONSUME_ON_VALUES,
+      required: true,
+    },
+    trialConsumesCredit: { type: Boolean, required: true },
+    cancellationConsumesCredit: { type: Boolean, required: true },
+    noShowConsumesCredit: { type: Boolean, required: true },
+  },
+  { _id: false },
+);
+
+const CoursePolicyParticipantSchema =
+  new Schema<CourseParticipantPolicy>(
+    {
+      participantMode: {
+        type: String,
+        enum: PARTICIPANT_MODES,
+        required: true,
+      },
+      minStudents: { type: Number, required: true, min: 1 },
+      maxStudents: { type: Number, required: true, min: 1 },
+    },
+    { _id: false },
+  );
+
+const CoursePolicyPreparationSchema =
+  new Schema<CoursePreparationPolicy>(
+    {
+      copyTemplateBlocksToLesson: { type: Boolean, required: true },
+      copyTemplateResourcesToLesson: { type: Boolean, required: true },
+      defaultPreparationStatus: {
+        type: String,
+        enum: ["needs_preparation", "prepared"],
+        required: true,
+      },
+    },
+    { _id: false },
+  );
+
+const CourseProfilePoliciesSchema = new Schema<CourseProfilePolicies>(
+  {
+    lessonDefaults: {
+      type: CoursePolicyLessonDefaultsSchema,
+      required: true,
+    },
+    schedulingDefaults: {
+      type: CoursePolicySchedulingDefaultsSchema,
+      required: true,
+    },
+    creditPolicy: {
+      type: CoursePolicyCreditSchema,
+      required: true,
+    },
+    participantPolicy: {
+      type: CoursePolicyParticipantSchema,
+      required: true,
+    },
+    preparationPolicy: {
+      type: CoursePolicyPreparationSchema,
+      required: true,
+    },
+  },
+  { _id: false },
+);
+
+const CourseMemberBillingSchema = new Schema<ICourseMemberBilling>(
+  {
+    mode: {
+      type: String,
+      enum: ["individual_cycle"],
+      required: true,
+      default: "individual_cycle",
+    },
+    billingAnchorDay: {
+      type: Number,
+      min: 1,
+      max: 31,
+    },
+    billingStartedAt: {
+      type: Date,
+      default: null,
+    },
+    nextBillingDate: {
+      type: Date,
+      default: null,
+    },
+    firstVoucherId: {
+      type: Schema.Types.ObjectId,
+      default: null,
+    },
+    lastVoucherId: {
+      type: Schema.Types.ObjectId,
+      default: null,
+    },
+    notes: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
+      default: "",
+    },
+  },
+  { _id: false },
+);
+
+const CourseMemberSchema = new Schema<ICourseMember>(
+  {
+    studentId: {
+      type: Schema.Types.ObjectId,
+      ref: "StudentProfile",
+      required: true,
+    },
+    status: {
+      type: String,
+      enum: ["active", "paused", "left"],
+      required: true,
+      default: "active",
+    },
+    joinedAt: {
+      type: Date,
+      required: true,
+      default: Date.now,
+    },
+    leftAt: {
+      type: Date,
+      default: null,
+    },
+    billing: {
+      type: CourseMemberBillingSchema,
+      required: true,
+      default: () => ({
+        mode: "individual_cycle",
+        billingStartedAt: null,
+        nextBillingDate: null,
+        firstVoucherId: null,
+        lastVoucherId: null,
+        notes: "",
+      }),
+    },
+  },
+  { _id: false },
+);
+
 
 
 const CourseProfileSchema = new Schema<ICourseProfile>(
@@ -738,6 +959,11 @@ const CourseProfileSchema = new Schema<ICourseProfile>(
       default: [],
     },
 
+    members: {
+      type: [CourseMemberSchema],
+      default: [],
+    },
+
     startDate: {
       type: Date,
     },
@@ -769,6 +995,10 @@ const CourseProfileSchema = new Schema<ICourseProfile>(
 
     templateSnapshot: {
       type: CourseTemplateSnapshotSchema,
+    },
+
+    policies: {
+      type: CourseProfilePoliciesSchema,
     },
   },
   {
@@ -842,9 +1072,11 @@ CourseProfileSchema.index({ ownerTeacherId: 1, status: 1 });
 CourseProfileSchema.index({ ownerTeacherId: 1, status: 1, createdAt: -1 });
 CourseProfileSchema.index({ ownerTeacherId: 1, templateId: 1 });
 CourseProfileSchema.index({ ownerTeacherId: 1, studentIds: 1 });
+CourseProfileSchema.index({ ownerTeacherId: 1, "members.studentId": 1 });
 CourseProfileSchema.index({ teacherId: 1, status: 1, createdAt: -1 });
 CourseProfileSchema.index({ teacherId: 1, templateId: 1 });
 CourseProfileSchema.index({ teacherId: 1, studentIds: 1 });
+CourseProfileSchema.index({ teacherId: 1, "members.studentId": 1 });
 CourseProfileSchema.index({ "publicationMeta.enrollmentOpen": 1, visibility: 1, status: 1 });
 
 export const CourseProfile =

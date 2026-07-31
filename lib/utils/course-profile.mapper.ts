@@ -18,11 +18,19 @@ import type {
   ICourseProfile,
 } from "@/models/CourseProfile";
 import type { ClassType } from "@/models/StudentProfile";
+import type { CourseOperationalPolicies } from "@/lib/types/course-policies";
+import { normalizeCourseMembers } from "@/lib/utils/course-members";
+import { normalizeCourseOperationalPolicies } from "@/lib/utils/course-policies";
 
-type CourseProfileSource = Omit<ICourseProfile, "studentIds"> & {
+type CourseProfileSource = Omit<ICourseProfile, "studentIds" | "members"> & {
   _id?: unknown;
   studentIds?: unknown[];
+  members?: unknown[];
 };
+
+interface CourseProfileDetailMapperOptions {
+  templateOperationalDefaults?: Partial<CourseOperationalPolicies> | null;
+}
 
 function toIdString(value: unknown): string {
   if (!value) return "";
@@ -49,22 +57,6 @@ function getFallbackClassType(
   if (courseType === "intensive_group") return "intensive";
   if (courseType === "semi-intensive_group") return "semi_intensive";
   return "private";
-}
-
-function getStudentNames(studentIds: unknown[] | undefined): string[] {
-  return (studentIds ?? []).flatMap((student) => {
-    if (
-      typeof student === "object" &&
-      student !== null &&
-      "fullName" in student &&
-      typeof student.fullName === "string"
-    ) {
-      const name = student.fullName.trim();
-      return name ? [name] : [];
-    }
-
-    return [];
-  });
 }
 
 function toWeeklySlotDTO(slot: {
@@ -233,9 +225,26 @@ export function toCourseProfileListItemDTO(
   source: CourseProfileSource
 ): CourseProfileListItemDTO {
   const snapshot = source.templateSnapshot;
-  const studentNames = getStudentNames(source.studentIds);
+  const members = normalizeCourseMembers({
+    members: source.members,
+    legacyStudentIds: source.studentIds,
+    fallbackJoinedAt: source.startDate ?? source.createdAt,
+  });
+  const activeMembersCount = members.filter(
+    (member) => member.status === "active",
+  ).length;
   const studentsCount =
-    source.studentIds?.length ?? source.stats.activeEnrollmentCount;
+    members.length > 0
+      ? activeMembersCount
+      : source.stats.activeEnrollmentCount;
+  const studentNames = Array.from(
+    new Set(
+      members.flatMap((member) =>
+        member.studentName ? [member.studentName] : [],
+      ),
+    ),
+  );
+  const policies = normalizeCourseOperationalPolicies(source.policies);
 
   return {
     id: toIdString(source._id),
@@ -247,7 +256,15 @@ export function toCourseProfileListItemDTO(
     name: source.name?.trim() || source.internalName,
     classType: source.classType ?? getFallbackClassType(source.courseType),
     studentsCount,
+    membersCount: members.length,
+    activeMembersCount,
     studentNames,
+    policySummary: {
+      durationMinutes: policies.lessonDefaults.durationMinutes,
+      defaultClassType: policies.lessonDefaults.defaultClassType,
+      frequency: policies.schedulingDefaults.frequency,
+      creditsPerLesson: policies.creditPolicy.creditsPerLesson,
+    },
     templateName: snapshot?.internalName ?? "",
     level: snapshot?.level ?? "",
     category: snapshot?.category ?? "",
@@ -278,8 +295,27 @@ export function toCourseProfileListItemDTO(
 }
 
 export function toCourseProfileDetailDTO(
-  source: CourseProfileSource
+  source: CourseProfileSource,
+  options: CourseProfileDetailMapperOptions = {},
 ): CourseProfileDetailDTO {
+  const policiesSource = source.policies
+    ? "course"
+    : options.templateOperationalDefaults
+      ? "template_fallback"
+      : "default_fallback";
+  const policies = normalizeCourseOperationalPolicies(
+    source.policies ?? options.templateOperationalDefaults,
+  );
+  const members = normalizeCourseMembers({
+    members: source.members,
+    legacyStudentIds: source.studentIds,
+    fallbackJoinedAt: source.startDate ?? source.createdAt,
+  });
+  const legacyStudentIds = normalizeCourseMembers({
+    legacyStudentIds: source.studentIds,
+    fallbackJoinedAt: source.startDate ?? source.createdAt,
+  }).map((member) => member.studentId);
+
   return {
     ...toCourseProfileListItemDTO(source),
     description: source.description,
@@ -318,6 +354,10 @@ export function toCourseProfileDetailDTO(
     storefront: toCourseStorefrontDTO(source.storefront),
     publicationMeta: toPublicationMetaDTO(source.publicationMeta),
     stats: toCourseStatsDTO(source.stats),
+    policies,
+    policiesSource,
+    members,
+    legacyStudentIds,
   };
 }
 

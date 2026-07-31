@@ -1,7 +1,6 @@
 "use client";
 
 import { useLessonDetail } from "@/lib/hooks/useLessonDetail";
-import { Clock3, ExternalLink, UserCheck, Users } from "lucide-react";
 import LessonDetailHeader from "./LessonDetailHeader";
 import { getTotalResources } from "@/lib/utils/lessonDetail-helpers";
 import LessonDetailLayout from "./LessonDetailLayout";

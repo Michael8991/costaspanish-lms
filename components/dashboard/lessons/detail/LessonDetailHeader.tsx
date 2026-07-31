@@ -14,6 +14,7 @@ import {
   Clock3,
   Edit3,
   FileText,
+  Star,
   Trash2,
 } from "lucide-react";
 import CustomModal from "@/components/ui/CustomModal";
@@ -21,6 +22,7 @@ import RescheduleLessonModalContent from "./RescheduleLessonModalContent";
 import DeleteLessonModalContent from "./DeleteLessonModalContent";
 import { LessonStatus } from "@/lib/types/lesson";
 import Link from "next/link";
+import SaveLessonAsTemplateModal from "@/components/dashboard/courses/templates/SaveLessonAsTemplateModal";
 
 interface LessonDetailHeaderProps {
   lesson: LessonDetailDTO;
@@ -53,6 +55,7 @@ export default function LessonDetailHeader({
 }: LessonDetailHeaderProps) {
   const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isSaveAsTemplateOpen, setIsSaveAsTemplateOpen] = useState(false);
   const [isUpdatingPreparation, setIsUpdatingPreparation] = useState(false);
 
   const handleDeleteLesson = async () => {
@@ -194,6 +197,15 @@ export default function LessonDetailHeader({
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
+              onClick={() => setIsSaveAsTemplateOpen(true)}
+              className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-[#9e2727]/30 bg-[#9e2727]/5 px-4 py-2 text-sm font-medium text-[#9e2727] transition hover:bg-[#9e2727]/10"
+            >
+              <Star size={15} />
+              Guardar como clase modelo
+            </button>
+
+            <button
+              type="button"
               onClick={handleTogglePreparationStatus}
               disabled={isUpdatingPreparation}
               className={`inline-flex cursor-pointer items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
@@ -272,6 +284,15 @@ export default function LessonDetailHeader({
           onConfirm={handleDeleteLesson}
         />
       </CustomModal>
+
+      <SaveLessonAsTemplateModal
+        isOpen={isSaveAsTemplateOpen}
+        onClose={() => setIsSaveAsTemplateOpen(false)}
+        lessonId={lesson.id}
+        initialLesson={lesson}
+        mode="from_lesson"
+        locale={locale}
+      />
     </>
   );
 }

@@ -4,8 +4,12 @@ import {
   CURRENCY_CODES,
   PARTICIPANT_MODES,
   STORE_FRONT_PRICE_MODE,
+  COURSE_TEMPLATE_FREQUENCIES,
+  CREDIT_CONSUME_ON_VALUES,
+  DEFAULT_OPERATIONAL_DEFAULTS,
 } from "../constants/courseTemplate.constants";
 import { CEFR_LEVELS } from "../constants/resource.constants";
+import { LESSON_CLASS_TYPES } from "../constants/lesson.constants";
 import {
   nonEmptyTrimmedString,
   nonNegativeNumber,
@@ -207,6 +211,115 @@ export const curriculumSchema = z.object({
   units: normalizeStringArray(120),
 });
 
+export const courseLessonDefaultsSchema = z.object({
+  durationMinutes: z.number().int().min(1).default(60),
+  timezone: z.string().trim().min(1).default("Europe/Madrid"),
+  defaultClassType: z.enum(LESSON_CLASS_TYPES).default("private"),
+});
+
+export const courseSchedulingDefaultsSchema = z.object({
+  frequency: z.enum(COURSE_TEMPLATE_FREQUENCIES).default("weekly"),
+  sessionsPerWeek: z.number().int().min(1).default(1),
+  preferredWeekdays: z
+    .array(z.number().int().min(0).max(6))
+    .default([]),
+  allowRecurringLessons: z.boolean().default(true),
+});
+
+export const courseCreditPolicySchema = z.object({
+  creditsPerLesson: z.number().min(0).default(1),
+  consumeOn: z.enum(CREDIT_CONSUME_ON_VALUES).default("completion"),
+  trialConsumesCredit: z.boolean().default(false),
+  cancellationConsumesCredit: z.boolean().default(false),
+  noShowConsumesCredit: z.boolean().default(true),
+});
+
+export const courseParticipantPolicySchema = z
+  .object({
+    participantMode: z.enum(PARTICIPANT_MODES).default("solo"),
+    minStudents: z.number().int().min(1).default(1),
+    maxStudents: z.number().int().min(1).default(1),
+  })
+  .superRefine((data, ctx) => {
+    if (data.maxStudents < data.minStudents) {
+      ctx.addIssue({
+        code: "custom",
+        message: "El máximo de alumnos debe ser igual o mayor que el mínimo.",
+        path: ["maxStudents"],
+      });
+    }
+
+    const exactCounts = {
+      solo: 1,
+      pair: 2,
+      trio: 3,
+    } as const;
+    const exactCount =
+      data.participantMode === "group"
+        ? undefined
+        : exactCounts[data.participantMode];
+
+    if (
+      exactCount !== undefined &&
+      (data.minStudents !== exactCount || data.maxStudents !== exactCount)
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: `Este modo requiere exactamente ${exactCount} ${
+          exactCount === 1 ? "alumno" : "alumnos"
+        }.`,
+        path: ["maxStudents"],
+      });
+    }
+
+    if (data.participantMode === "group" && data.maxStudents < 2) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Un grupo debe permitir al menos 2 alumnos.",
+        path: ["maxStudents"],
+      });
+    }
+  });
+
+export const coursePreparationPolicySchema = z.object({
+  copyTemplateBlocksToLesson: z.boolean().default(true),
+  copyTemplateResourcesToLesson: z.boolean().default(true),
+  defaultPreparationStatus: z
+    .enum(["needs_preparation", "prepared"])
+    .default("needs_preparation"),
+});
+
+const courseOperationalDefaultsObjectSchema = z.object({
+    lessonDefaults: courseLessonDefaultsSchema.default({
+      ...DEFAULT_OPERATIONAL_DEFAULTS.lessonDefaults,
+    }),
+    schedulingDefaults: courseSchedulingDefaultsSchema.default({
+      ...DEFAULT_OPERATIONAL_DEFAULTS.schedulingDefaults,
+      preferredWeekdays: [],
+    }),
+    creditPolicy: courseCreditPolicySchema.default({
+      ...DEFAULT_OPERATIONAL_DEFAULTS.creditPolicy,
+    }),
+    participantPolicy: courseParticipantPolicySchema.default({
+      ...DEFAULT_OPERATIONAL_DEFAULTS.participantPolicy,
+    }),
+    preparationPolicy: coursePreparationPolicySchema.default({
+      ...DEFAULT_OPERATIONAL_DEFAULTS.preparationPolicy,
+    }),
+  });
+
+export const courseOperationalDefaultsSchema =
+  courseOperationalDefaultsObjectSchema.default({
+    lessonDefaults: { ...DEFAULT_OPERATIONAL_DEFAULTS.lessonDefaults },
+    schedulingDefaults: {
+      ...DEFAULT_OPERATIONAL_DEFAULTS.schedulingDefaults,
+      preferredWeekdays: [],
+    },
+    creditPolicy: { ...DEFAULT_OPERATIONAL_DEFAULTS.creditPolicy },
+    participantPolicy: { ...DEFAULT_OPERATIONAL_DEFAULTS.participantPolicy },
+    preparationPolicy: { ...DEFAULT_OPERATIONAL_DEFAULTS.preparationPolicy },
+  });
+
 export const courseTemplateBaseSchema = z.object({
   code: nonEmptyTrimmedString("code", 60).transform((value) =>
     value.toUpperCase(),
@@ -220,6 +333,7 @@ export const courseTemplateBaseSchema = z.object({
     modules: [],
     units: [],
   }),
+  operationalDefaults: courseOperationalDefaultsSchema,
 });
 
 export const createCourseTemplateSchema = courseTemplateBaseSchema.superRefine(
@@ -244,8 +358,17 @@ export const createCourseTemplateSchema = courseTemplateBaseSchema.superRefine(
   },
 );
 
-export const updateCourseTemplateSchema = courseTemplateBaseSchema
-  .partial()
+export const updateCourseTemplateSchema = z
+  .object({
+    code: courseTemplateBaseSchema.shape.code.optional(),
+    internalName: courseTemplateBaseSchema.shape.internalName.optional(),
+    status: z.enum(COURSETEMPLATE_STATUS).optional(),
+    version: z.number().int().min(1).optional(),
+    pedagogicalMeta: pedagogicalMetaSchema.optional(),
+    storefront: storefrontSchema.optional(),
+    curriculum: curriculumSchema.optional(),
+    operationalDefaults: courseOperationalDefaultsObjectSchema.optional(),
+  })
   .superRefine((data, ctx) => {
     if (data.storefront?.priceMode === "free" && data.storefront?.priceOptions) {
       for (const [index, option] of data.storefront.priceOptions.entries()) {
@@ -266,6 +389,32 @@ export const courseTemplateDbSchema = courseTemplateBaseSchema.extend({
   updatedAt: z.date(),
 });
 
+export const importLessonToTemplateSchema = z
+  .object({
+    lessonId: z.string().trim().min(1, "lessonId is required"),
+    targetModuleOrder: z.number().int().min(0),
+    insertAt: z.number().int().min(0).optional(),
+    titleOverride: z.string().trim().max(140).optional(),
+    descriptionOverride: z.string().trim().max(1000).optional(),
+    teacherNotes: z.string().trim().max(1000).optional(),
+    importOptions: z
+      .object({
+        useActualContent: z.boolean().default(true),
+        includeResources: z.boolean().default(true),
+        selectedBlockIds: z.array(z.string().trim().min(1)).optional().default([]),
+      })
+      .strict()
+      .default({
+        useActualContent: true,
+        includeResources: true,
+        selectedBlockIds: [],
+      }),
+  })
+  .strict();
+
 export type CreateCourseTemplateInput = z.infer<typeof createCourseTemplateSchema>;
 export type UpdateCourseTemplateInput = z.infer<typeof updateCourseTemplateSchema>;
 export type CourseTemplateDbShape = z.infer<typeof courseTemplateDbSchema>;
+export type ImportLessonToTemplateInput = z.infer<
+  typeof importLessonToTemplateSchema
+>;

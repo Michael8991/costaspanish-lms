@@ -12,7 +12,13 @@ import {
   type CourseType,
   type ICourseProfile,
 } from "@/models/CourseProfile";
+import { CourseTemplate } from "@/models/CourseTemplate";
 import { StudentProfile, type ClassType } from "@/models/StudentProfile";
+import {
+  deriveStudentIdsFromMembers,
+  normalizeCourseMembers,
+} from "@/lib/utils/course-members";
+import { normalizeCourseOperationalPolicies } from "@/lib/utils/course-policies";
 
 export const runtime = "nodejs";
 
@@ -71,14 +77,18 @@ async function findCourse(
   return CourseProfile.findOne(getCourseQuery(id, user));
 }
 
-function validateCapacity(classType: ClassType, studentIds: string[]) {
-  if (studentIds.length === 0) {
+function validateCapacity(
+  classType: ClassType,
+  membersCount: number,
+  activeMembersCount: number,
+) {
+  if (membersCount === 0) {
     return "Selecciona al menos un alumno";
   }
-  if (classType === "private" && studentIds.length > 1) {
+  if (classType === "private" && activeMembersCount > 1) {
     return "Un curso privado admite como máximo un alumno";
   }
-  if (classType === "pair" && studentIds.length > 2) {
+  if (classType === "pair" && activeMembersCount > 2) {
     return "Un curso en pareja admite como máximo dos alumnos";
   }
   return null;
@@ -100,6 +110,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
     await dbConnect();
     const course = await CourseProfile.findOne(getCourseQuery(id, user))
       .populate({
+        path: "members.studentId",
+        select: "fullName contactEmail level isActive",
+      })
+      .populate({
         path: "studentIds",
         select: "fullName contactEmail level isActive",
       })
@@ -109,8 +123,16 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Course not found" }, { status: 404 });
     }
 
+    const template = course.policies
+      ? null
+      : await CourseTemplate.findById(course.templateId)
+          .select({ operationalDefaults: 1 })
+          .lean();
+
     return NextResponse.json({
-      item: toCourseProfileDetailDTO(course),
+      item: toCourseProfileDetailDTO(course, {
+        templateOperationalDefaults: template?.operationalDefaults,
+      }),
     });
   } catch (error) {
     console.error("GET /api/course/[id] error:", error);
@@ -155,34 +177,80 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     const classType = parsed.data.classType ?? course.classType ?? "private";
-    const studentIds =
-      parsed.data.studentIds ?? (course.studentIds ?? []).map(String);
-    const capacityError = validateCapacity(classType, studentIds);
+    const hasMembersUpdate = parsed.data.members !== undefined;
+    const hasStudentIdsUpdate = parsed.data.studentIds !== undefined;
+    const normalizedMembers = normalizeCourseMembers({
+      members: hasMembersUpdate
+        ? parsed.data.members
+        : hasStudentIdsUpdate
+          ? undefined
+          : course.members,
+      legacyStudentIds: hasMembersUpdate
+        ? []
+        : hasStudentIdsUpdate
+          ? parsed.data.studentIds
+          : course.studentIds,
+      fallbackJoinedAt:
+        parsed.data.startDate ?? course.startDate ?? course.createdAt,
+    });
+    const derivedStudentIds =
+      deriveStudentIdsFromMembers(normalizedMembers);
+    const capacityError = validateCapacity(
+      classType,
+      normalizedMembers.length,
+      normalizedMembers.filter((member) => member.status === "active")
+        .length,
+    );
 
     if (capacityError) {
       return NextResponse.json({ error: capacityError }, { status: 400 });
     }
 
-    if (parsed.data.studentIds) {
+    if (hasMembersUpdate || hasStudentIdsUpdate) {
       const studentsCount = await StudentProfile.countDocuments({
         _id: {
-          $in: parsed.data.studentIds.map(
+          $in: derivedStudentIds.map(
             (studentId) => new Types.ObjectId(studentId),
           ),
         },
       });
 
-      if (studentsCount !== parsed.data.studentIds.length) {
+      if (studentsCount !== derivedStudentIds.length) {
         return NextResponse.json(
           { error: "One or more students do not exist" },
           { status: 400 },
         );
       }
 
-      course.studentIds = parsed.data.studentIds.map(
+      course.studentIds = derivedStudentIds.map(
         (studentId) => new Types.ObjectId(studentId),
       );
-      course.stats.activeEnrollmentCount = parsed.data.studentIds.length;
+      course.members = normalizedMembers.map((member) => ({
+        studentId: new Types.ObjectId(member.studentId),
+        status: member.status,
+        joinedAt: new Date(member.joinedAt),
+        leftAt: member.leftAt ? new Date(member.leftAt) : null,
+        billing: {
+          mode: member.billing.mode,
+          billingAnchorDay: member.billing.billingAnchorDay ?? undefined,
+          billingStartedAt: member.billing.billingStartedAt
+            ? new Date(member.billing.billingStartedAt)
+            : null,
+          nextBillingDate: member.billing.nextBillingDate
+            ? new Date(member.billing.nextBillingDate)
+            : null,
+          firstVoucherId: member.billing.firstVoucherId
+            ? new Types.ObjectId(member.billing.firstVoucherId)
+            : null,
+          lastVoucherId: member.billing.lastVoucherId
+            ? new Types.ObjectId(member.billing.lastVoucherId)
+            : null,
+          notes: member.billing.notes,
+        },
+      }));
+      course.stats.activeEnrollmentCount = normalizedMembers.filter(
+        (member) => member.status === "active",
+      ).length;
     }
 
     if (parsed.data.name !== undefined) {
@@ -235,15 +303,32 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
           0,
       };
     }
+    if (parsed.data.policies) {
+      course.policies = normalizeCourseOperationalPolicies(
+        parsed.data.policies,
+      );
+      course.markModified("policies");
+    }
 
     await course.save();
     await course.populate({
       path: "studentIds",
       select: "fullName contactEmail level isActive",
     });
+    await course.populate({
+      path: "members.studentId",
+      select: "fullName contactEmail level isActive",
+    });
+    const template = course.policies
+      ? null
+      : await CourseTemplate.findById(course.templateId)
+          .select({ operationalDefaults: 1 })
+          .lean();
 
     return NextResponse.json({
-      item: toCourseProfileDetailDTO(course.toObject()),
+      item: toCourseProfileDetailDTO(course.toObject(), {
+        templateOperationalDefaults: template?.operationalDefaults,
+      }),
     });
   } catch (error) {
     console.error("PATCH /api/course/[id] error:", error);
