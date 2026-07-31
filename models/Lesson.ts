@@ -261,6 +261,7 @@ const CourseLinkSchema = new Schema(
         "review",
         "makeup",
         "extra",
+        "imported_historical",
         "legacy_free",
       ],
       required: true,
@@ -276,6 +277,10 @@ const CourseLinkSchema = new Schema(
       type: String,
       trim: true,
       default: "",
+    },
+    sourceTemplateLesson: {
+      type: SourceTemplateLessonSchema,
+      required: false,
     },
   },
   { _id: false },
@@ -343,6 +348,127 @@ const LessonPolicySnapshotSchema = new Schema(
   { _id: false },
 );
 
+const LessonCreditSettlementItemSchema = new Schema(
+  {
+    studentId: {
+      type: Schema.Types.ObjectId,
+      ref: "StudentProfile",
+      required: true,
+    },
+    voucherId: {
+      type: Schema.Types.ObjectId,
+      required: false,
+      default: null,
+    },
+    attendanceStatus: {
+      type: String,
+      enum: LESSON_ATTENDANCE_STATUSES,
+      required: false,
+    },
+    isTrial: {
+      type: Boolean,
+      required: true,
+      default: false,
+    },
+    creditsPlanned: {
+      type: Number,
+      min: 0,
+      required: true,
+    },
+    creditsConsumed: {
+      type: Number,
+      min: 0,
+      required: true,
+    },
+    reason: {
+      type: String,
+      enum: [
+        "attended",
+        "trial_free",
+        "no_show_charged",
+        "no_show_free",
+        "absent_free",
+        "scheduled_policy_not_processed_on_completion",
+        "legacy",
+        "no_voucher_required",
+      ],
+      required: true,
+    },
+    previousCreditsRemaining: {
+      type: Number,
+      min: 0,
+      required: false,
+      default: null,
+    },
+    newCreditsRemaining: {
+      type: Number,
+      min: 0,
+      required: false,
+      default: null,
+    },
+    notes: {
+      type: String,
+      trim: true,
+    },
+  },
+  { _id: false },
+);
+
+const LessonCreditSettlementSchema = new Schema(
+  {
+    status: {
+      type: String,
+      enum: ["pending", "settled", "skipped", "failed"],
+      required: true,
+    },
+    source: {
+      type: String,
+      enum: [
+        "course_policy",
+        "course_policy_fallback",
+        "legacy_attendees",
+      ],
+      required: true,
+    },
+    policySource: {
+      type: String,
+      enum: ["lesson_snapshot", "course_profile", "legacy"],
+      required: true,
+    },
+    consumeOn: {
+      type: String,
+      enum: ["completion", "scheduled", "legacy"],
+      required: true,
+    },
+    settledAt: {
+      type: Date,
+      required: false,
+      default: null,
+    },
+    settledBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: false,
+      default: null,
+    },
+    totalCreditsConsumed: {
+      type: Number,
+      min: 0,
+      required: true,
+      default: 0,
+    },
+    items: {
+      type: [LessonCreditSettlementItemSchema],
+      default: [],
+    },
+    warnings: {
+      type: [String],
+      default: [],
+    },
+  },
+  { _id: false },
+);
+
 const LessonSchema = new Schema(
   {
     teacherId: {
@@ -384,6 +510,11 @@ const LessonSchema = new Schema(
 
     policySnapshot: {
       type: LessonPolicySnapshotSchema,
+      required: false,
+    },
+
+    creditSettlement: {
+      type: LessonCreditSettlementSchema,
       required: false,
     },
 

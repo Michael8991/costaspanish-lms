@@ -41,11 +41,17 @@ export default async function CourseProfilePage({
   const rawCourse = await CourseProfile.findOne(courseFilter)
     .populate({
       path: "members.studentId",
-      select: "fullName contactEmail level isActive",
+      select: "fullName contactEmail level isActive activePlans",
+      ...(session.user.role === "admin"
+        ? {}
+        : { match: { teacherId: new Types.ObjectId(session.user.id) } }),
     })
     .populate({
       path: "studentIds",
       select: "fullName contactEmail level isActive",
+      ...(session.user.role === "admin"
+        ? {}
+        : { match: { teacherId: new Types.ObjectId(session.user.id) } }),
     })
     .lean();
 
@@ -53,7 +59,14 @@ export default async function CourseProfilePage({
 
   const [rawTemplate, rawCreatedLessons] = await Promise.all([
     CourseTemplate.findById(rawCourse.templateId).lean(),
-    Lesson.find({ courseId: rawCourse._id })
+    Lesson.find(
+      session.user.role === "admin"
+        ? { courseId: rawCourse._id }
+        : {
+            courseId: rawCourse._id,
+            teacherId: new Types.ObjectId(session.user.id),
+          },
+    )
       .sort({ scheduledStart: -1 })
       .limit(100)
       .lean(),

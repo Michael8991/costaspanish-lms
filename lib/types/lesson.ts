@@ -32,13 +32,22 @@ export type LessonCourseRelationType =
   | "review"
   | "makeup"
   | "extra"
+  | "imported_historical"
   | "legacy_free";
+
+export interface LessonSourceTemplateLesson {
+  moduleOrder: number;
+  lessonOrder: number;
+  moduleTitle?: string;
+  lessonTitle?: string;
+}
 
 export interface LessonCourseLink {
   relationType: LessonCourseRelationType;
   linkedAt?: Date;
   linkedBy?: Types.ObjectId;
   notes?: string;
+  sourceTemplateLesson?: LessonSourceTemplateLesson;
 }
 
 export interface LessonPolicySnapshot {
@@ -59,6 +68,57 @@ export interface LessonPolicySnapshot {
     copyTemplateResourcesToLesson: boolean;
     defaultPreparationStatus: LessonPreparationStatus;
   };
+}
+
+export type LessonCreditSettlementStatus =
+  | "pending"
+  | "settled"
+  | "skipped"
+  | "failed";
+
+export type LessonCreditSettlementSource =
+  | "course_policy"
+  | "course_policy_fallback"
+  | "legacy_attendees";
+
+export type LessonCreditPolicySource =
+  | "lesson_snapshot"
+  | "course_profile"
+  | "legacy";
+
+export type LessonCreditSettlementReason =
+  | "attended"
+  | "trial_free"
+  | "no_show_charged"
+  | "no_show_free"
+  | "absent_free"
+  | "scheduled_policy_not_processed_on_completion"
+  | "legacy"
+  | "no_voucher_required";
+
+export interface LessonCreditSettlementItem {
+  studentId: Types.ObjectId;
+  voucherId?: Types.ObjectId | null;
+  attendanceStatus?: LessonAttendanceStatus;
+  isTrial: boolean;
+  creditsPlanned: number;
+  creditsConsumed: number;
+  reason: LessonCreditSettlementReason;
+  previousCreditsRemaining?: number | null;
+  newCreditsRemaining?: number | null;
+  notes?: string;
+}
+
+export interface LessonCreditSettlement {
+  status: LessonCreditSettlementStatus;
+  source: LessonCreditSettlementSource;
+  policySource: LessonCreditPolicySource;
+  consumeOn: "completion" | "scheduled" | "legacy";
+  settledAt?: Date | null;
+  settledBy?: Types.ObjectId | null;
+  totalCreditsConsumed: number;
+  items: LessonCreditSettlementItem[];
+  warnings?: string[];
 }
 
 export interface LessonAttendee {
@@ -127,12 +187,8 @@ export interface Lesson{
     courseTemplateVersion?: number;
     courseLink?: LessonCourseLink;
     policySnapshot?: LessonPolicySnapshot;
-    sourceTemplateLesson?: {
-      moduleOrder: number;
-      lessonOrder: number;
-      moduleTitle?: string;
-      lessonTitle?: string;
-    };
+    creditSettlement?: LessonCreditSettlement;
+    sourceTemplateLesson?: LessonSourceTemplateLesson;
 
     title: string;
     status: LessonStatus;

@@ -1,124 +1,204 @@
-import { requireAuth, requireRole } from "@/lib/auth/apiAuth";
-import { PlanBillingType, StudentProfile, ClassType } from "@/models/StudentProfile";
+import { revalidatePath } from "next/cache";
 import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
+
+import { requireAuth, requireRole } from "@/lib/auth/apiAuth";
+import { getStudentOwnershipFilter } from "@/lib/auth/studentOwnership";
 import dbConnect from "@/lib/mongo";
-import { revalidatePath } from "next/cache";
+import { createStudentVoucherSchema } from "@/lib/validators/voucher";
+import { StudentProfile, type PlanDoc } from "@/models/StudentProfile";
 
-type Ctx = { params: Promise<{ id: string }> }; 
-
-function parseDate(value: unknown) {
-  const d = new Date(String(value));
-  return Number.isNaN(d.getTime()) ? null : d;
-}
+type Ctx = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, { params }: Ctx) {
-    const user = await requireAuth(req);
-    if (!requireRole(user, ["teacher", "admin"])) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const user = await requireAuth(req);
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!requireRole(user, ["teacher", "admin"])) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
-    const { id } = await params;
-    if (!mongoose.isValidObjectId(id)) {
-        return NextResponse.json({ error: "Invalid student id" }, { status: 400 });
-    }
+  const { id } = await params;
+  if (!mongoose.isValidObjectId(id) || !mongoose.isValidObjectId(user.id)) {
+    return NextResponse.json({ error: "Invalid student id" }, { status: 400 });
+  }
 
-    const body = await req.json().catch(() => null);
-    if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const body: unknown = await req.json().catch(() => null);
+  const parsed = createStudentVoucherSchema.safeParse(body);
 
-    const name = typeof body.name === "string" ? body.name.trim() : "";
-    const billingType = body.billingType as PlanBillingType;
-    const classType = body.classType as ClassType;
-    const validUntil = parseDate(body.validUntil);
-    const validFrom = body.validFrom ? parseDate(body.validFrom) : new Date();
-    const price = Number(body.price);
-    
-    
-    if (!name) return NextResponse.json({ error: "Plan name is required" }, { status: 400 });
-    if (!["single", "package", "subscription"].includes(String(billingType))) {
-        return NextResponse.json({ error: "Invalid billingType" }, { status: 400 });
-    }
-    if (!["private", "pair", "group_regular", "semi_intensive", "intensive"].includes(String(classType))) {
-        return NextResponse.json({ error: "Invalid classType" }, { status: 400 });
-    }
-    if (!validUntil) return NextResponse.json({ error: "validUntil is required" }, { status: 400 });
-    
-    const creditsTotal =
-    body.creditsTotal === undefined ? undefined : Number(body.creditsTotal);
-    let creditsRemaining =
-    body.creditsRemaining === undefined ? undefined : Number(body.creditsRemaining);
-    
-    if (billingType === "package") {
-        if (!Number.isFinite(creditsTotal) || (creditsTotal ?? 0) <= 0) {
-            return NextResponse.json({ error: "creditsTotal must be > 0 for package" }, { status: 400 });
-        }
-        if (!Number.isFinite(creditsRemaining as number)) creditsRemaining = creditsTotal!;
-        if ((creditsRemaining as number) > (creditsTotal as number) || (creditsRemaining as number) < 0) {
-            return NextResponse.json({ error: "Invalid creditsRemaining" }, { status: 400 });
-        }
-    }
-    if (body.price === undefined || isNaN(price) || price < 0) {
-        return NextResponse.json({error: "Price is required and must be a valid number (>= 0)"}, {status: 400});
-    }
-    
-    await dbConnect();
+  if (!parsed.success) {
+    return NextResponse.json(
+      {
+        error: "Invalid voucher payload",
+        details: parsed.error.issues.map((issue) => ({
+          path: issue.path.join("."),
+          message: issue.message,
+        })),
+      },
+      { status: 400 },
+    );
+  }
 
-    const plan = {
-        name,
-        billingType,
-        classType,
-        validFrom: validFrom ?? new Date(),
-        validUntil,
-        creditsTotal,
-        creditsRemaining,
-        status: "active" as const,
-        price,
-    }
+  const payload = parsed.data;
+  const creditsTotal = payload.creditsTotal;
+  const creditsRemaining = payload.creditsRemaining ?? creditsTotal;
 
-    const updated = await StudentProfile.findOneAndUpdate(
-        {
-            _id: id,
-            activePlans: { $not: { $elemMatch: { classType, status: "active" } } },
+  if (
+    payload.billingType === "package" &&
+    (creditsTotal === undefined || creditsTotal <= 0)
+  ) {
+    return NextResponse.json(
+      { error: "creditsTotal must be > 0 for package" },
+      { status: 400 },
+    );
+  }
+  if (
+    creditsTotal !== undefined &&
+    creditsRemaining !== undefined &&
+    creditsRemaining > creditsTotal
+  ) {
+    return NextResponse.json(
+      { error: "creditsRemaining cannot exceed creditsTotal" },
+      { status: 400 },
+    );
+  }
+
+  const priceTotal = payload.priceTotal ?? payload.price ?? 0;
+  const amountPaid =
+    payload.paymentStatus === "paid" && payload.amountPaid === 0
+      ? priceTotal
+      : payload.amountPaid;
+  const unitCreditPriceSnapshot =
+    creditsTotal !== undefined && creditsTotal > 0
+      ? priceTotal / creditsTotal
+      : null;
+  const plan: Omit<PlanDoc, "_id"> = {
+    name: payload.name,
+    billingType: payload.billingType,
+    classType: payload.classType,
+    validFrom: payload.validFrom ?? new Date(),
+    validUntil: payload.validUntil,
+    creditsTotal,
+    creditsRemaining,
+    status: payload.status,
+    price: priceTotal,
+    courseId: payload.courseId
+      ? new mongoose.Types.ObjectId(payload.courseId)
+      : undefined,
+    courseNameSnapshot: payload.courseNameSnapshot,
+    generatedFromCourse: payload.generatedFromCourse,
+    generatedFromCourseMember: payload.generatedFromCourseMember,
+    billingMode: payload.billingMode ?? undefined,
+    billingPeriodStart: payload.billingPeriodStart ?? undefined,
+    billingPeriodEnd: payload.billingPeriodEnd ?? undefined,
+    billingAnchorDay: payload.billingAnchorDay ?? undefined,
+    paymentStatus: payload.paymentStatus,
+    amountPaid,
+    paidAt:
+      payload.paymentStatus === "paid"
+        ? payload.paidAt ?? new Date()
+        : payload.paidAt,
+    paymentMethod: payload.paymentMethod,
+    paymentNotes: payload.paymentNotes,
+    internalNotes: payload.internalNotes,
+    priceTotal,
+    currency: payload.currency,
+    unitCreditPriceSnapshot,
+    createdFrom: payload.createdFrom,
+  };
+
+  await dbConnect();
+  const ownershipFilter = getStudentOwnershipFilter(user, {
+    _id: new mongoose.Types.ObjectId(id),
+  });
+  if (!ownershipFilter) {
+    return NextResponse.json({ error: "Invalid user id" }, { status: 500 });
+  }
+  const accessibleStudent = await StudentProfile.exists(ownershipFilter);
+  if (!accessibleStudent) {
+    return NextResponse.json({ error: "Student not found" }, { status: 404 });
+  }
+  const studentFilter = getStudentOwnershipFilter(user, {
+    _id: new mongoose.Types.ObjectId(id),
+    activePlans: {
+      $not: {
+        $elemMatch: {
+          classType: payload.classType,
+          status: "active",
         },
-        { $push: { activePlans: plan } },
-        { new: true, runValidators: true }
-    ).lean();
+      },
+    },
+  });
+  if (!studentFilter) {
+    return NextResponse.json({ error: "Invalid user id" }, { status: 500 });
+  }
+  const updated = await StudentProfile.findOneAndUpdate(
+    studentFilter,
+    { $push: { activePlans: plan } },
+    { new: true, runValidators: true },
+  ).lean();
 
-    if (!updated) {
-        return NextResponse.json({ 
-            error: `El alumno ya tiene un plan activo del modelo '${classType}'. Por favor, finaliza o archiva el actual antes de añadir uno nuevo igual.` 
-        }, { status: 409 });
-    }
-    revalidatePath("/", "layout");
-    return  NextResponse.json(updated, {status: 201})
+  if (!updated) {
+    return NextResponse.json(
+      {
+        error: `El alumno ya tiene un plan activo del modelo '${payload.classType}'. Finaliza o archiva el actual antes de añadir otro.`,
+      },
+      { status: 409 },
+    );
+  }
 
-
+  // TODO: Create PaymentLedgerEntry when a voucher is marked as paid.
+  revalidatePath("/", "layout");
+  return NextResponse.json(updated, { status: 201 });
 }
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-    const user = await requireAuth(req);
-        if (!requireRole(user, ["admin", "teacher"])) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
-        const { id } = await params;
-        if (!mongoose.isValidObjectId(id)) {
-            return NextResponse.json({ error: "Invalid id" }, { status: 400 });
-        }
-    try {
-        await dbConnect();
-        const student = await StudentProfile.findById(id).select('activePlans').lean();
-        if(!student) return NextResponse.json({error: "Student does not found"}, {status: 400})
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const user = await requireAuth(req);
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!requireRole(user, ["admin", "teacher"])) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
-        const history = (student.activePlans || []).sort((a, b) => 
-        new Date(b.validFrom).getTime() - new Date(a.validFrom).getTime()
-    );
-        if (!history) {
-            return NextResponse.json({error: "No Vouchers"}, {status: 404})
-        }
-        revalidatePath("/", "layout");
-        return NextResponse.json(history, {status: 200})
-    } catch (error) {
-        console.log("Error fetching student voucher:", error);
-        return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
+  const { id } = await params;
+  if (!mongoose.isValidObjectId(id) || !mongoose.isValidObjectId(user.id)) {
+    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+  }
+
+  try {
+    await dbConnect();
+    const studentFilter = getStudentOwnershipFilter(user, {
+      _id: new mongoose.Types.ObjectId(id),
+    });
+    if (!studentFilter) {
+      return NextResponse.json({ error: "Invalid user id" }, { status: 500 });
     }
+    const student = await StudentProfile.findOne(studentFilter)
+      .select("activePlans")
+      .lean();
+    if (!student) {
+      return NextResponse.json(
+        { error: "Student not found" },
+        { status: 404 },
+      );
+    }
+
+    const history = [...(student.activePlans ?? [])].sort(
+      (first, second) =>
+        new Date(second.validFrom).getTime() -
+        new Date(first.validFrom).getTime(),
+    );
+    return NextResponse.json(history, { status: 200 });
+  } catch (error) {
+    console.error("Error fetching student voucher:", error);
+    return NextResponse.json(
+      { error: "Error interno del servidor" },
+      { status: 500 },
+    );
+  }
 }

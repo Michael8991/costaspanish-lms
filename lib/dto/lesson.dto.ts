@@ -96,10 +96,17 @@ export interface LessonCourseLinkDTO {
     | "review"
     | "makeup"
     | "extra"
+    | "imported_historical"
     | "legacy_free";
   linkedAt: string | null;
   linkedBy: string | null;
   notes: string;
+  sourceTemplateLesson?: {
+    moduleOrder: number;
+    lessonOrder: number;
+    moduleTitle?: string;
+    lessonTitle?: string;
+  } | null;
 }
 
 export interface LessonPolicySnapshotDTO {
@@ -122,6 +129,42 @@ export interface LessonPolicySnapshotDTO {
   };
 }
 
+export interface LessonCreditSettlementItemDTO {
+  studentId: string;
+  voucherId: string | null;
+  attendanceStatus?: LessonAttendanceStatus;
+  isTrial: boolean;
+  creditsPlanned: number;
+  creditsConsumed: number;
+  reason:
+    | "attended"
+    | "trial_free"
+    | "no_show_charged"
+    | "no_show_free"
+    | "absent_free"
+    | "scheduled_policy_not_processed_on_completion"
+    | "legacy"
+    | "no_voucher_required";
+  previousCreditsRemaining: number | null;
+  newCreditsRemaining: number | null;
+  notes?: string;
+}
+
+export interface LessonCreditSettlementDTO {
+  status: "pending" | "settled" | "skipped" | "failed";
+  source:
+    | "course_policy"
+    | "course_policy_fallback"
+    | "legacy_attendees";
+  policySource: "lesson_snapshot" | "course_profile" | "legacy";
+  consumeOn: "completion" | "scheduled" | "legacy";
+  settledAt: string | null;
+  settledBy: string | null;
+  totalCreditsConsumed: number;
+  items: LessonCreditSettlementItemDTO[];
+  warnings: string[];
+}
+
 export interface LessonListDTO {
   id: string;
   courseId?: string;
@@ -129,7 +172,7 @@ export interface LessonListDTO {
   courseTemplateId?: string;
   courseTemplateVersion?: number;
   courseLink: LessonCourseLinkDTO | null;
-  policySnapshot?: LessonPolicySnapshotDTO;
+  policySnapshot?: LessonPolicySnapshotDTO | null;
   sourceTemplateLesson?: {
     moduleOrder: number;
     lessonOrder: number;
@@ -146,14 +189,15 @@ export interface LessonListDTO {
   isTrial: boolean;
   attendeesCount: number;
   blocksCount: number;
+  resourcesCount: number;
+  totalEstimatedMinutes: number;
+  totalActualMinutes: number;
+  scheduledDurationMinutes: number;
 }
 
 export interface LessonDetailDTO extends LessonListDTO {
   teacherId: string;
-
-  totalEstimatedMinutes: number;
-  totalActualMinutes: number;
-  scheduledDurationMinutes: number;
+  creditSettlement: LessonCreditSettlementDTO | null;
 
   attendees: LessonAttendeeDTO[];
   blocks: LessonBlockDTO[];

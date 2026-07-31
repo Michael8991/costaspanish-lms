@@ -1,9 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LessonDetailDTO } from "@/lib/dto/lesson.dto";
+import {
+  LessonCreditSettlementDTO,
+  LessonDetailDTO,
+} from "@/lib/dto/lesson.dto";
 import { formatLabel } from "@/lib/utils/lessonDetail-helpers";
 import { normalizeLessonBlockCategories } from "@/lib/utils/lesson-block-categories";
+import {
+  calculateCreditsForAttendee,
+  type EffectiveLessonCreditPolicy,
+} from "@/lib/utils/lesson-credit-policy";
 import CustomModal from "@/components/ui/CustomModal";
 import {
   CheckCircle2,
@@ -34,10 +41,9 @@ type LessonDetailApiResponse = {
 };
 
 type CompleteLessonApiResponse = {
-  item?: {
-    attendees?: LessonAttendeeItem[];
-  };
+  item?: LessonDetailDTO;
   error?: string;
+  warnings?: string[];
 };
 
 const BLOCK_SUCCESS_RATINGS = [1, 2, 3, 4, 5] as const;
@@ -132,6 +138,20 @@ function mapBlocksToPatchPayload(blocks: ReviewLessonBlock[]) {
   }));
 }
 
+function mapAttendeesToPatchPayload(attendees: LessonAttendeeItem[]) {
+  return attendees.map((attendee) => {
+    const voucherId = attendee.voucherId?.trim();
+
+    return {
+      studentId: attendee.studentId,
+      voucherId: voucherId || undefined,
+      attendanceStatus: attendee.attendanceStatus,
+      creditsToConsume: attendee.creditsToConsume ?? 1,
+      isTrial: attendee.isTrial ?? false,
+    };
+  });
+}
+
 function getRatingLabel(rating: number) {
   if (rating === 1) return "No funcionó";
   if (rating === 2) return "Flojo";
@@ -139,6 +159,50 @@ function getRatingLabel(rating: number) {
   if (rating === 4) return "Bien";
   if (rating === 5) return "Muy bien";
   return "";
+}
+
+function formatCredits(value: number) {
+  return new Intl.NumberFormat("es-ES", {
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function getSettlementSourceLabel(
+  source: LessonCreditSettlementDTO["source"],
+) {
+  if (source === "course_policy") return "Reglas del curso";
+  if (source === "course_policy_fallback") return "Fallback del curso";
+  return "Configuración legacy de asistentes";
+}
+
+function getSettlementStatusLabel(
+  status: LessonCreditSettlementDTO["status"],
+) {
+  if (status === "settled") return "Liquidado";
+  if (status === "skipped") return "Sin cargo al completar";
+  if (status === "failed") return "Fallido";
+  return "En proceso";
+}
+
+function getSettlementReasonLabel(
+  reason: LessonCreditSettlementDTO["items"][number]["reason"],
+) {
+  const labels: Record<
+    LessonCreditSettlementDTO["items"][number]["reason"],
+    string
+  > = {
+    attended: "Asistencia",
+    trial_free: "Trial sin cargo",
+    no_show_charged: "No-show con cargo",
+    no_show_free: "No-show sin cargo",
+    absent_free: "Ausencia sin cargo",
+    scheduled_policy_not_processed_on_completion:
+      "Consumo previsto al programar",
+    legacy: "Configuración del asistente",
+    no_voucher_required: "No requiere bono",
+  };
+
+  return labels[reason];
 }
 
 export default function LessonAttendancePanel({
@@ -155,6 +219,8 @@ export default function LessonAttendancePanel({
   const [localLessonStatus, setLocalLessonStatus] = useState<LocalLessonStatus>(
     lesson.status,
   );
+  const [creditSettlement, setCreditSettlement] =
+    useState<LessonCreditSettlementDTO | null>(lesson.creditSettlement);
   const [nextLessonFocus, setNextLessonFocus] = useState(
     lessonNextLessonFocus,
   );
@@ -165,9 +231,15 @@ export default function LessonAttendancePanel({
   useEffect(() => {
     setAttendees(lesson.attendees);
     setLocalLessonStatus(lesson.status);
+    setCreditSettlement(lesson.creditSettlement);
     setNextLessonFocus(lessonNextLessonFocus);
     setNextLessonFocusDraft(lessonNextLessonFocus);
-  }, [lesson.attendees, lesson.status, lessonNextLessonFocus]);
+  }, [
+    lesson.attendees,
+    lesson.creditSettlement,
+    lesson.status,
+    lessonNextLessonFocus,
+  ]);
   const [error, setError] = useState<string | null>(null);
   const [isCompletingLesson, setIsCompletingLesson] = useState(false);
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
@@ -196,6 +268,32 @@ export default function LessonAttendancePanel({
 
   const hasNextLessonFocusChanges =
     nextLessonFocusDraft !== nextLessonFocus;
+  const previewPolicy: EffectiveLessonCreditPolicy | null =
+    lesson.policySnapshot
+      ? {
+          mode: "course",
+          ...lesson.policySnapshot.creditPolicy,
+        }
+      : lesson.courseId
+        ? null
+        : {
+            mode: "legacy",
+            creditsPerLesson: 0,
+            consumeOn: "completion",
+            trialConsumesCredit: false,
+            cancellationConsumesCredit: false,
+            noShowConsumesCredit: true,
+          };
+  const creditPreview = attendees.map((attendee) => ({
+    attendee,
+    calculation: previewPolicy
+      ? calculateCreditsForAttendee({
+          attendee,
+          policy: previewPolicy,
+          legacyCreditsToConsume: attendee.creditsToConsume,
+        })
+      : null,
+  }));
 
   const updateNextLessonFocus = async () => {
     const previousNextLessonFocus = nextLessonFocus;
@@ -319,6 +417,10 @@ export default function LessonAttendancePanel({
         setAttendees(data.item.attendees);
       }
 
+      if (data?.item?.creditSettlement) {
+        setCreditSettlement(data.item.creditSettlement);
+      }
+
       setIsCompleteModalOpen(false);
     } catch (error) {
       setCompletionReviewError(
@@ -353,13 +455,7 @@ export default function LessonAttendancePanel({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          attendees: nextAttendees.map((attendee) => ({
-            studentId: attendee.studentId,
-            voucherId: attendee.voucherId,
-            attendanceStatus: attendee.attendanceStatus,
-            creditsToConsume: attendee.creditsToConsume ?? 1,
-            isTrial: attendee.isTrial ?? false,
-          })),
+          attendees: mapAttendeesToPatchPayload(nextAttendees),
         }),
       });
 
@@ -490,6 +586,88 @@ export default function LessonAttendancePanel({
         )}
       </section>
 
+      {creditSettlement && (
+        <section className="rounded-3xl border border-emerald-200 bg-emerald-50/50 p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold text-gray-950">
+                Créditos liquidados
+              </h2>
+              <p className="mt-1 text-xs text-gray-600">
+                {getSettlementSourceLabel(creditSettlement.source)}
+              </p>
+            </div>
+            <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-200">
+              {getSettlementStatusLabel(creditSettlement.status)}
+            </span>
+          </div>
+
+          <dl className="mt-4 grid grid-cols-2 gap-3 rounded-2xl bg-white/80 p-3 ring-1 ring-emerald-100">
+            <div>
+              <dt className="text-[11px] uppercase tracking-wide text-gray-400">
+                Total consumido
+              </dt>
+              <dd className="mt-1 text-sm font-semibold text-gray-900">
+                {formatCredits(creditSettlement.totalCreditsConsumed)} créditos
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[11px] uppercase tracking-wide text-gray-400">
+                Fecha
+              </dt>
+              <dd className="mt-1 text-sm font-medium text-gray-700">
+                {creditSettlement.settledAt
+                  ? new Intl.DateTimeFormat("es-ES", {
+                      dateStyle: "short",
+                      timeStyle: "short",
+                    }).format(new Date(creditSettlement.settledAt))
+                  : "—"}
+              </dd>
+            </div>
+          </dl>
+
+          <div className="mt-3 space-y-2">
+            {creditSettlement.items.map((item, index) => {
+              const attendee = attendees.find(
+                (candidate) => candidate.studentId === item.studentId,
+              );
+
+              return (
+                <div
+                  key={`${item.studentId}-${index}`}
+                  className="rounded-xl border border-emerald-100 bg-white px-3 py-2.5"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-semibold text-gray-900">
+                        {attendee?.studentName || `Alumno ${index + 1}`}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-gray-500">
+                        {getSettlementReasonLabel(item.reason)}
+                        {item.voucherId
+                          ? ` · Bono …${item.voucherId.slice(-6)}`
+                          : ""}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-xs font-semibold text-gray-900">
+                      {formatCredits(item.creditsConsumed)} cr.
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {creditSettlement.warnings.length > 0 && (
+            <p className="mt-3 text-[11px] text-amber-700">
+              La liquidación incluye {creditSettlement.warnings.length} aviso
+              {creditSettlement.warnings.length === 1 ? "" : "s"} operativo
+              {creditSettlement.warnings.length === 1 ? "" : "s"}.
+            </p>
+          )}
+        </section>
+      )}
+
       <section className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm">
         <h2 className="text-base font-semibold text-gray-950">Notas rápidas</h2>
 
@@ -563,6 +741,100 @@ export default function LessonAttendancePanel({
             Valora rápidamente qué tal funcionó cada bloque antes de cerrar la
             clase.
           </p>
+
+          <section className="rounded-2xl border border-gray-600 bg-gray-800/70 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-white">
+                  Consumo de créditos
+                </h3>
+                <p className="mt-1 text-xs text-gray-300">
+                  {lesson.courseId
+                    ? lesson.policySnapshot
+                      ? "Se aplicarán las reglas guardadas en esta clase."
+                      : "Se aplicarán las reglas actuales del curso y se guardará una copia."
+                    : "Se aplicará el consumo configurado en los asistentes de esta clase."}
+                </p>
+              </div>
+
+              {previewPolicy?.mode === "course" && (
+                <span className="rounded-full bg-[#9e2727]/20 px-2.5 py-1 text-[11px] font-semibold text-red-100 ring-1 ring-[#c96b6b]/30">
+                  {formatCredits(previewPolicy.creditsPerLesson)} cr. por clase
+                </span>
+              )}
+            </div>
+
+            {previewPolicy?.mode === "course" && (
+              <dl className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+                <div className="rounded-xl bg-gray-700/70 p-2">
+                  <dt className="text-gray-400">Consume</dt>
+                  <dd className="mt-0.5 font-medium text-white">
+                    {previewPolicy.consumeOn === "completion"
+                      ? "Al completar"
+                      : "Al programar"}
+                  </dd>
+                </div>
+                <div className="rounded-xl bg-gray-700/70 p-2">
+                  <dt className="text-gray-400">Trial</dt>
+                  <dd className="mt-0.5 font-medium text-white">
+                    {previewPolicy.trialConsumesCredit ? "Con cargo" : "Gratis"}
+                  </dd>
+                </div>
+                <div className="rounded-xl bg-gray-700/70 p-2">
+                  <dt className="text-gray-400">No-show</dt>
+                  <dd className="mt-0.5 font-medium text-white">
+                    {previewPolicy.noShowConsumesCredit
+                      ? "Con cargo"
+                      : "Sin cargo"}
+                  </dd>
+                </div>
+                <div className="rounded-xl bg-gray-700/70 p-2">
+                  <dt className="text-gray-400">Créditos</dt>
+                  <dd className="mt-0.5 font-medium text-white">
+                    {formatCredits(previewPolicy.creditsPerLesson)}
+                  </dd>
+                </div>
+              </dl>
+            )}
+
+            <div className="mt-3 overflow-hidden rounded-xl border border-gray-600">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-3 bg-gray-700/80 px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-gray-300">
+                <span>Alumno y asistencia</span>
+                <span>Previsto</span>
+                <span>A consumir</span>
+              </div>
+              <div className="divide-y divide-gray-700">
+                {creditPreview.map(({ attendee, calculation }, index) => (
+                  <div
+                    key={`${attendee.studentId}-${index}`}
+                    className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 px-3 py-2.5 text-xs"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-white">
+                        {attendee.studentName || `Alumno ${index + 1}`}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-gray-400">
+                        {formatLabel(attendee.attendanceStatus)}
+                        {attendee.voucherId
+                          ? ` · Bono …${attendee.voucherId.slice(-6)}`
+                          : " · Bono por resolver"}
+                      </p>
+                    </div>
+                    <span className="text-gray-300">
+                      {calculation
+                        ? `${formatCredits(calculation.creditsPlanned)} cr.`
+                        : "Curso"}
+                    </span>
+                    <span className="font-semibold text-white">
+                      {calculation
+                        ? `${formatCredits(calculation.creditsConsumed)} cr.`
+                        : "Servidor"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
 
           {isLoadingCompletionReview && (
             <div className="rounded-2xl border border-gray-600 bg-gray-700/60 p-4 text-sm text-gray-200">

@@ -1,11 +1,13 @@
 import EditStudentForm from "@/components/dashboard/teacher/forms/EditStudentForm";
 import Breadcrumbs from "@/components/ui/Breadcrumbs";
+import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/mongo";
 import { StudentProfile } from "@/models/StudentProfile";
 import { ArrowLeft } from "lucide-react";
 import { Types } from "mongoose";
+import { getServerSession } from "next-auth";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 export default async function EditStudent({
   params,
@@ -13,13 +15,24 @@ export default async function EditStudent({
   params: Promise<{ locale: string; id: string }>;
 }) {
   const { locale, id } = await params;
+  const session = await getServerSession(authOptions);
 
-  if (!Types.ObjectId.isValid(id)) {
+  if (!session?.user) redirect("/login");
+  if (session.user.role === "student") redirect(`/${locale}/dashboard`);
+
+  if (!Types.ObjectId.isValid(id) || !Types.ObjectId.isValid(session.user.id)) {
     notFound();
   }
 
   await dbConnect();
-  const rawStudent = await StudentProfile.findById(id).lean();
+  const rawStudent = await StudentProfile.findOne(
+    session.user.role === "admin"
+      ? { _id: new Types.ObjectId(id) }
+      : {
+          _id: new Types.ObjectId(id),
+          teacherId: new Types.ObjectId(session.user.id),
+        },
+  ).lean();
 
   if (!rawStudent) {
     notFound();

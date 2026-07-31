@@ -9,11 +9,15 @@ import {
   UserRoundPlus,
 } from "lucide-react";
 import { getServerSession } from "next-auth";
+import { Types } from "mongoose";
 import { redirect } from "next/navigation";
 
 export default async function QuickStats() {
   const session = await getServerSession(authOptions);
   if (!session?.user || session.user.role === "student") {
+    redirect(`/en/dashboard`);
+  }
+  if (!Types.ObjectId.isValid(session.user.id)) {
     redirect(`/en/dashboard`);
   }
   let activeCourses = 0;
@@ -27,6 +31,13 @@ export default async function QuickStats() {
 
   try {
     await dbConnect();
+    const currentUserObjectId = new Types.ObjectId(session.user.id);
+    const courseOwnerFilter =
+      session.user.role === "admin"
+        ? {}
+        : { ownerTeacherId: currentUserObjectId };
+    const studentOwnerFilter =
+      session.user.role === "admin" ? {} : { teacherId: currentUserObjectId };
     [
       activeCourses,
       publishedCourses,
@@ -37,16 +48,17 @@ export default async function QuickStats() {
       semiIntensiveGroups,
       privateGroups,
     ] = await Promise.all([
-      CourseProfile.countDocuments({ status: "active" }),
-      CourseProfile.countDocuments({ "storefront.isPublished": true }),
-      StudentProfile.countDocuments({ active: true }), //Todo: implementar funcion correcta
+      CourseProfile.countDocuments({ ...courseOwnerFilter, status: "active" }),
+      CourseProfile.countDocuments({ ...courseOwnerFilter, "storefront.isPublished": true }),
+      StudentProfile.countDocuments({ ...studentOwnerFilter, isActive: true }),
       CourseProfile.countDocuments({
+        ...courseOwnerFilter,
         "publicationMeta.enrollmentOpen": true,
       }),
-      CourseProfile.countDocuments({ courseType: "regular_group" }),
-      CourseProfile.countDocuments({ courseType: "intensive_group" }),
-      CourseProfile.countDocuments({ courseType: "semi-intensive_group" }),
-      CourseProfile.countDocuments({ courseType: "private_flexible" }),
+      CourseProfile.countDocuments({ ...courseOwnerFilter, courseType: "regular_group" }),
+      CourseProfile.countDocuments({ ...courseOwnerFilter, courseType: "intensive_group" }),
+      CourseProfile.countDocuments({ ...courseOwnerFilter, courseType: "semi-intensive_group" }),
+      CourseProfile.countDocuments({ ...courseOwnerFilter, courseType: "private_flexible" }),
     ]);
   } catch (error) {
     console.error("Error fetching summary stats:", error);

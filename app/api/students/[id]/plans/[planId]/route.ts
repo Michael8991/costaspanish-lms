@@ -1,276 +1,287 @@
-import { requireAuth, requireRole } from "@/lib/auth/apiAuth";
-import dbConnect from "@/lib/mongo";
-import {
-  ClassType,
-  PlanBillingType,
-  PlanStatus,
-  StudentProfile,
-  StudentProfileDoc,
-} from "@/models/StudentProfile";
 import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 
-type Ctx = { params: { id: string; planId: string } | Promise<{ id: string; planId: string }> };
+import { requireAuth, requireRole } from "@/lib/auth/apiAuth";
+import { getStudentOwnershipFilter } from "@/lib/auth/studentOwnership";
+import dbConnect from "@/lib/mongo";
+import { updateStudentVoucherSchema } from "@/lib/validators/voucher";
+import {
+  StudentProfile,
+  type PlanStatus,
+  type StudentProfileDoc,
+} from "@/models/StudentProfile";
 
-type PlanSetPath =
-  | "activePlans.$.name"
-  | "activePlans.$.billingType"
-  | "activePlans.$.classType"
-  | "activePlans.$.validFrom"
-  | "activePlans.$.validUntil"
-  | "activePlans.$.creditsTotal"
-  | "activePlans.$.creditsRemaining"
-  | "activePlans.$.status";
-
-type PlanSetValue = string | number | Date;
-type PlanSet = Partial<Record<PlanSetPath, PlanSetValue>>;
-
-function parseDate(value: unknown) {
-  if (value === undefined || value === null) return null;
-  const d = new Date(String(value));
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-
-function isClassType(v: unknown): v is ClassType {
-  return v === "private" || v === "pair" || v === "group_regular" || v === "semi_intensive" || v === "intensive";
-}
-
-function isPlanBillingType(v: unknown): v is PlanBillingType {
-  return v === "single" || v === "package" || v === "subscription";
-}
-
-function isPlanStatus(v: unknown): v is PlanStatus {
-  return v === "active" || v === "exhausted" || v === "expired" || v === "canceled";
-}
-
-type PlanActiveConflictGuard = {
-  $not: {
-    $elemMatch: {
-      _id: { $ne: mongoose.Types.ObjectId };
-      classType: ClassType;
-      status: "active";
-    };
-  };
-};
-
-type PatchQuery = mongoose.QueryFilter<StudentProfileDoc> & {
-  _id: mongoose.Types.ObjectId;
-  "activePlans._id": mongoose.Types.ObjectId;
-  activePlans?: PlanActiveConflictGuard;
+type Ctx = {
+  params:
+    | { id: string; planId: string }
+    | Promise<{ id: string; planId: string }>;
 };
 
 export async function PATCH(req: NextRequest, { params }: Ctx) {
-
-  let finalCreditsRemaining: number | undefined;
-  let finalValidUntil: Date | undefined;
-
   try {
     const user = await requireAuth(req);
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
     if (!requireRole(user, ["teacher", "admin"])) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const { id, planId } = await params;
-
-    if (!mongoose.isValidObjectId(id)) {
-      return NextResponse.json({ error: "Invalid student id" }, { status: 400 });
-    }
-    if (!mongoose.isValidObjectId(planId)) {
-      return NextResponse.json({ error: "Invalid plan id" }, { status: 400 });
+    if (!mongoose.isValidObjectId(id) || !mongoose.isValidObjectId(planId) || !mongoose.isValidObjectId(user.id)) {
+      return NextResponse.json({ error: "Invalid IDs" }, { status: 400 });
     }
 
-    const body = await req.json().catch(() => null);
-    if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-
-    const set: PlanSet = {};
-
-    if (typeof body.name === "string") set["activePlans.$.name"] = body.name.trim();
-
-    if (body.billingType !== undefined) {
-      if (!isPlanBillingType(body.billingType)) {
-        return NextResponse.json({ error: "Invalid billingType" }, { status: 400 });
-      }
-      set["activePlans.$.billingType"] = body.billingType;
-    }
-
-    if (body.classType !== undefined) {
-      if (!isClassType(body.classType)) {
-        return NextResponse.json({ error: "Invalid classType" }, { status: 400 });
-      }
-      set["activePlans.$.classType"] = body.classType;
-    }
-
-    if (body.status !== undefined) {
-      if (!isPlanStatus(body.status)) {
-        return NextResponse.json({ error: "Invalid status" }, { status: 400 });
-      }
-      set["activePlans.$.status"] = body.status;
-    }
-
-    if (body.validFrom !== undefined) {
-      const d = parseDate(body.validFrom);
-      if (!d) return NextResponse.json({ error: "Invalid validFrom" }, { status: 400 });
-      set["activePlans.$.validFrom"] = d;
-    }
-
-    if (body.validUntil !== undefined) {
-      const d = parseDate(body.validUntil);
-      if (!d) return NextResponse.json({ error: "Invalid validUntil" }, { status: 400 });
-      set["activePlans.$.validUntil"] = d;
-      finalValidUntil = d;
-    }
-
-    if (body.creditsTotal !== undefined) {
-      const n = Number(body.creditsTotal);
-      if (!Number.isFinite(n)) return NextResponse.json({ error: "creditsTotal must be a number" }, { status: 400 });
-      set["activePlans.$.creditsTotal"] = n;
-    }
-
-    if (body.creditsRemaining !== undefined) {
-      const n = Number(body.creditsRemaining);
-      if (!Number.isFinite(n)) return NextResponse.json({ error: "creditsRemaining must be a number" }, { status: 400 });
-      if (n < 0) {
-        return NextResponse.json(
-          { error: "creditsRemaining cannot be negative" },
-          { status: 400 }
-        ) 
-      }
-      set["activePlans.$.creditsRemaining"] = n;
-      finalCreditsRemaining = n;
-    }
-
-    if (
-      finalCreditsRemaining !== undefined &&
-      body.creditsTotal !== undefined &&
-      finalCreditsRemaining > Number(body.creditsTotal)
-    ) {
+    const body: unknown = await req.json().catch(() => null);
+    const parsed = updateStudentVoucherSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "creditsRemaining cannot be greater than creditsTotal" },
-        { status: 400 }
+        {
+          error: "Invalid voucher payload",
+          details: parsed.error.issues.map((issue) => ({
+            path: issue.path.join("."),
+            message: issue.message,
+          })),
+        },
+        { status: 400 },
       );
-    }
-
-    if (Object.keys(set).length === 0) {
-      return NextResponse.json({ error: "No valid fields provided to update" }, { status: 400 });
     }
 
     await dbConnect();
-
-    const planObjectId = new mongoose.Types.ObjectId(planId);
     const studentObjectId = new mongoose.Types.ObjectId(id);
-
-
-    let finalStatus: PlanStatus | undefined =
-      typeof set["activePlans.$.status"] === "string" ? (set["activePlans.$.status"] as PlanStatus) : undefined;
-
-    let finalClassType: ClassType | undefined =
-      typeof set["activePlans.$.classType"] === "string" ? (set["activePlans.$.classType"] as ClassType) : undefined;
-
-   
-    const needsCurrent =
-      (finalStatus === "active" && !finalClassType) || 
-      (!!finalClassType && !finalStatus) ||
-      finalCreditsRemaining === undefined ||
-      finalValidUntil === undefined;
-
-    if (needsCurrent) {
-      const current = await StudentProfile.findOne(
-        { _id: studentObjectId, "activePlans._id": planObjectId },
-        { activePlans: { $elemMatch: { _id: planObjectId } } }
-      ).lean();
-
-      if (!current || !current.activePlans?.length) {
-        return NextResponse.json({ error: "Student or specific plan not found" }, { status: 404 });
-      }
-
-      const currentPlan = current.activePlans[0];
-      if (!finalStatus) finalStatus = currentPlan.status;
-      if (!finalClassType) finalClassType = currentPlan.classType;
-      if (finalCreditsRemaining === undefined) {
-        finalCreditsRemaining = currentPlan.creditsRemaining;
-      }
-      if (finalValidUntil === undefined) {
-        finalValidUntil = new Date(currentPlan.validUntil);
-      }
-    }
-
-    if (finalStatus !== "canceled") {
-      if (finalValidUntil && new Date(finalValidUntil) < new Date()) {
-        finalStatus = "expired";
-      } else if(finalCreditsRemaining === 0) {
-        finalStatus = "exhausted";
-      } else {
-        finalStatus = "active"
-      }
-      set["activePlans.$.status"] = finalStatus;
-    }
-
-    const query: PatchQuery = {
+    const planObjectId = new mongoose.Types.ObjectId(planId);
+    const currentFilter = getStudentOwnershipFilter(user, {
       _id: studentObjectId,
       "activePlans._id": planObjectId,
-    };
+    });
+    if (!currentFilter) {
+      return NextResponse.json({ error: "Invalid user id" }, { status: 500 });
+    }
+    const current = await StudentProfile.findOne(
+      currentFilter,
+      { activePlans: { $elemMatch: { _id: planObjectId } } },
+    ).lean();
 
-    // Aplica el guard SOLO si el plan va a quedar activo y tenemos classType final
-    if (finalStatus === "active" && finalClassType) {
-    query.activePlans = {
-      $not: {
-        $elemMatch: {
-          _id: { $ne: planObjectId },
-          classType: finalClassType,
-          status: "active",
-        },
-      },
-    };
-  }
-
-    const updated = await StudentProfile.findOneAndUpdate(query, { $set: set }, { new: true, runValidators: true }).lean();
-
-    if (!updated) {
-      const exists = await StudentProfile.exists({ _id: studentObjectId, "activePlans._id": planObjectId });
+    if (!current?.activePlans?.length) {
       return NextResponse.json(
-        { error: exists ? "Conflict: already an active plan with same classType" : "Not found" },
-        { status: exists ? 409 : 404 }
+        { error: "Student or specific plan not found" },
+        { status: 404 },
       );
     }
 
+    const payload = parsed.data;
+    const currentPlan = current.activePlans[0];
+    const finalCreditsTotal = payload.creditsTotal ?? currentPlan.creditsTotal;
+    const finalCreditsRemaining =
+      payload.creditsRemaining ?? currentPlan.creditsRemaining;
+    const finalValidFrom = payload.validFrom ?? currentPlan.validFrom;
+    const finalValidUntil = payload.validUntil ?? currentPlan.validUntil;
+    const finalBillingPeriodStart =
+      payload.billingPeriodStart === undefined
+        ? currentPlan.billingPeriodStart
+        : payload.billingPeriodStart;
+    const finalBillingPeriodEnd =
+      payload.billingPeriodEnd === undefined
+        ? currentPlan.billingPeriodEnd
+        : payload.billingPeriodEnd;
+
+    if (
+      finalCreditsTotal !== undefined &&
+      finalCreditsRemaining !== undefined &&
+      finalCreditsRemaining > finalCreditsTotal
+    ) {
+      return NextResponse.json(
+        { error: "creditsRemaining cannot exceed creditsTotal" },
+        { status: 400 },
+      );
+    }
+    if (new Date(finalValidUntil) < new Date(finalValidFrom)) {
+      return NextResponse.json(
+        { error: "validUntil cannot be before validFrom" },
+        { status: 400 },
+      );
+    }
+    if (
+      finalBillingPeriodStart &&
+      finalBillingPeriodEnd &&
+      finalBillingPeriodEnd < finalBillingPeriodStart
+    ) {
+      return NextResponse.json(
+        { error: "billingPeriodEnd cannot be before billingPeriodStart" },
+        { status: 400 },
+      );
+    }
+
+    const set: Record<string, unknown> = {};
+    const directFields = [
+      "name",
+      "billingType",
+      "classType",
+      "validFrom",
+      "validUntil",
+      "creditsTotal",
+      "creditsRemaining",
+      "status",
+      "courseNameSnapshot",
+      "generatedFromCourse",
+      "generatedFromCourseMember",
+      "billingMode",
+      "billingPeriodStart",
+      "billingPeriodEnd",
+      "billingAnchorDay",
+      "paymentMethod",
+      "paymentNotes",
+      "internalNotes",
+      "currency",
+      "createdFrom",
+    ] as const;
+
+    for (const field of directFields) {
+      if (payload[field] !== undefined) {
+        set[`activePlans.$.${field}`] = payload[field];
+      }
+    }
+    if (payload.courseId !== undefined) {
+      set["activePlans.$.courseId"] = new mongoose.Types.ObjectId(
+        payload.courseId,
+      );
+    }
+
+    const priceWasUpdated =
+      payload.price !== undefined || payload.priceTotal !== undefined;
+    const finalPriceTotal =
+      payload.priceTotal ??
+      payload.price ??
+      currentPlan.priceTotal ??
+      currentPlan.price;
+    if (priceWasUpdated) {
+      set["activePlans.$.price"] = finalPriceTotal;
+      set["activePlans.$.priceTotal"] = finalPriceTotal;
+    }
+    if (priceWasUpdated || payload.creditsTotal !== undefined) {
+      set["activePlans.$.unitCreditPriceSnapshot"] =
+        finalCreditsTotal !== undefined && finalCreditsTotal > 0
+          ? finalPriceTotal / finalCreditsTotal
+          : null;
+    }
+
+    const finalPaymentStatus =
+      payload.paymentStatus ?? currentPlan.paymentStatus ?? "pending";
+    if (payload.paymentStatus !== undefined) {
+      set["activePlans.$.paymentStatus"] = finalPaymentStatus;
+    }
+    if (payload.amountPaid !== undefined) {
+      set["activePlans.$.amountPaid"] = payload.amountPaid;
+    } else if (
+      payload.paymentStatus === "paid" &&
+      (currentPlan.amountPaid ?? 0) === 0
+    ) {
+      set["activePlans.$.amountPaid"] = finalPriceTotal;
+    }
+    if (payload.paidAt !== undefined) {
+      set["activePlans.$.paidAt"] = payload.paidAt;
+    } else if (payload.paymentStatus === "paid" && !currentPlan.paidAt) {
+      set["activePlans.$.paidAt"] = new Date();
+    }
+
+    let finalStatus: PlanStatus = payload.status ?? currentPlan.status;
+    if (finalStatus !== "canceled") {
+      if (new Date(finalValidUntil) < new Date()) finalStatus = "expired";
+      else if (finalCreditsRemaining === 0) finalStatus = "exhausted";
+      else finalStatus = "active";
+      set["activePlans.$.status"] = finalStatus;
+    }
+
+    if (Object.keys(set).length === 0) {
+      return NextResponse.json(
+        { error: "No valid fields provided to update" },
+        { status: 400 },
+      );
+    }
+
+    const queryBase: mongoose.QueryFilter<StudentProfileDoc> = {
+      _id: studentObjectId,
+      "activePlans._id": planObjectId,
+    };
+    const finalClassType = payload.classType ?? currentPlan.classType;
+    if (finalStatus === "active") {
+      queryBase.activePlans = {
+        $not: {
+          $elemMatch: {
+            _id: { $ne: planObjectId },
+            classType: finalClassType,
+            status: "active",
+          },
+        },
+      };
+    }
+    const query = getStudentOwnershipFilter(user, queryBase);
+    if (!query) {
+      return NextResponse.json({ error: "Invalid user id" }, { status: 500 });
+    }
+
+    const updated = await StudentProfile.findOneAndUpdate(
+      query,
+      { $set: set },
+      { new: true, runValidators: true },
+    ).lean();
+
+    if (!updated) {
+      return NextResponse.json(
+        { error: "Conflict: already an active plan with same classType" },
+        { status: 409 },
+      );
+    }
+
+    // TODO: Create PaymentLedgerEntry when a voucher is marked as paid.
     return NextResponse.json(updated);
   } catch (error) {
     console.error("Error patching plan:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 },
+    );
   }
 }
 
 export async function DELETE(req: NextRequest, { params }: Ctx) {
   const user = await requireAuth(req);
-  if (!requireRole(user, ["teacher", "admin"])) {
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!requireRole(user, ["teacher", "admin"])) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { id, planId } = await params;
-
-  if (!mongoose.isValidObjectId(id) || !mongoose.isValidObjectId(planId)) {
+  if (!mongoose.isValidObjectId(id) || !mongoose.isValidObjectId(planId) || !mongoose.isValidObjectId(user.id)) {
     return NextResponse.json({ error: "Invalid IDs" }, { status: 400 });
   }
 
   await dbConnect();
-
-  const updateStudent = await StudentProfile.findOneAndUpdate({
-    _id: id,
-    "activePlans._id": planId
-  },
+  const studentFilter = getStudentOwnershipFilter(user, {
+    _id: new mongoose.Types.ObjectId(id),
+    "activePlans._id": new mongoose.Types.ObjectId(planId),
+  });
+  if (!studentFilter) {
+    return NextResponse.json({ error: "Invalid user id" }, { status: 500 });
+  }
+  const updateStudent = await StudentProfile.findOneAndUpdate(
+    studentFilter,
     {
       $set: {
         "activePlans.$.status": "canceled",
         "activePlans.$.creditsRemaining": 0,
-      }
-    }, { new: true }).lean();
-  
+      },
+    },
+    { new: true },
+  ).lean();
+
   if (!updateStudent) {
-    return NextResponse.json({ error: "Alumno o plan no encontrado." }, { status: 404 });
+    return NextResponse.json(
+      { error: "Alumno o plan no encontrado." },
+      { status: 404 },
+    );
   }
-  return NextResponse.json({success:true},{status: 200})
+  return NextResponse.json({ success: true }, { status: 200 });
 }

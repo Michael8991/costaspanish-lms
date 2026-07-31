@@ -18,7 +18,13 @@ import { FormEvent, useState } from "react";
 import CourseProfileTemplatePlan from "@/components/dashboard/courses/CourseProfileTemplatePlan";
 import CourseProfilePoliciesSummary from "@/components/dashboard/courses/CourseProfilePoliciesSummary";
 import CourseProfileMembersSection from "@/components/dashboard/courses/CourseProfileMembersSection";
-import type { CourseProfileDetailDTO } from "@/lib/dto/course-profile.dto";
+import CourseProfileLessonsSection from "@/components/dashboard/courses/CourseProfileLessonsSection";
+import CreateCourseVouchersModal from "@/components/dashboard/courses/CreateCourseVouchersModal";
+import EditCourseVoucherModal from "@/components/dashboard/courses/EditCourseVoucherModal";
+import type {
+  CourseMemberDTO,
+  CourseProfileDetailDTO,
+} from "@/lib/dto/course-profile.dto";
 import type { CourseTemplateDetailDTO } from "@/lib/dto/course-template.dto";
 import type { LessonListDTO } from "@/lib/dto/lesson.dto";
 import {
@@ -70,6 +76,11 @@ export default function CourseProfileDetailView({
   const [course, setCourse] = useState(initialCourse);
   const [isEditing, setIsEditing] = useState(initialEdit);
   const [isArchiving, setIsArchiving] = useState(false);
+  const [voucherModalStudentIds, setVoucherModalStudentIds] = useState<
+    string[] | null
+  >(null);
+  const [editingVoucherMember, setEditingVoucherMember] =
+    useState<CourseMemberDTO | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const archiveCourse = async () => {
@@ -192,7 +203,20 @@ export default function CourseProfileDetailView({
         />
       </section>
 
-      <CourseProfileMembersSection members={course.members} />
+      <CourseProfileMembersSection
+        members={course.members}
+        onCreateVouchers={
+          course.status === "archived"
+            ? undefined
+            : () => setVoucherModalStudentIds([])
+        }
+        onCreateVoucher={
+          course.status === "archived"
+            ? undefined
+            : (studentId) => setVoucherModalStudentIds([studentId])
+        }
+        onEditVoucher={setEditingVoucherMember}
+      />
 
       <CourseProfilePoliciesSummary
         course={course}
@@ -202,6 +226,8 @@ export default function CourseProfileDetailView({
           router.refresh();
         }}
       />
+
+      <CourseProfileLessonsSection courseId={course.id} locale={locale} />
 
       <section className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -278,6 +304,37 @@ export default function CourseProfileDetailView({
           }}
         />
       )}
+
+      <CreateCourseVouchersModal
+        isOpen={voucherModalStudentIds !== null}
+        onClose={() => setVoucherModalStudentIds(null)}
+        course={course}
+        initialStudentIds={voucherModalStudentIds ?? undefined}
+        onGenerated={(updatedCourse) => {
+          setCourse(updatedCourse);
+          setVoucherModalStudentIds(null);
+          router.refresh();
+        }}
+      />
+
+      <EditCourseVoucherModal
+        isOpen={editingVoucherMember !== null}
+        onClose={() => setEditingVoucherMember(null)}
+        course={course}
+        member={editingVoucherMember}
+        onSaved={(voucher) => {
+          setCourse((current) => ({
+            ...current,
+            members: current.members.map((member) =>
+              member.studentId === editingVoucherMember?.studentId
+                ? { ...member, lastVoucher: voucher }
+                : member,
+            ),
+          }));
+          setEditingVoucherMember(null);
+          router.refresh();
+        }}
+      />
     </div>
   );
 }

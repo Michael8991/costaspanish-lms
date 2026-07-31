@@ -24,6 +24,7 @@ import {
   btnVariants,
 } from "@/components/ui/buttons/CustomizedButtons";
 import Link from "next/link";
+import { getLessonStatusVisual } from "@/lib/utils/lesson-status-visuals";
 
 interface LessonTableProps {
   locale: string;
@@ -372,48 +373,19 @@ function formatLessonDateTime(start: string, end: string) {
   return `${date} · ${startTime} - ${endTime}`;
 }
 function getLessonStatusMeta(status: LessonListDTO["status"]) {
-  if (status === "scheduled") {
-    return {
-      label: "Programada",
-      icon: CircleDot,
-      badgeClassName: "bg-blue-50 text-blue-700 ring-blue-100",
-      sideBarClassName: "bg-blue-500",
-    };
-  }
+  const visual = getLessonStatusVisual(status);
+  const icon =
+    status === "scheduled"
+      ? CircleDot
+      : status === "in_progress"
+        ? PlayCircle
+        : status === "completed"
+          ? CircleCheck
+          : status === "canceled_by_teacher"
+            ? XCircle
+            : Ban;
 
-  if (status === "in_progress") {
-    return {
-      label: "En curso",
-      icon: PlayCircle,
-      badgeClassName: "bg-amber-50 text-amber-700 ring-amber-100",
-      sideBarClassName: "bg-amber-500",
-    };
-  }
-
-  if (status === "completed") {
-    return {
-      label: "Completada",
-      icon: CircleCheck,
-      badgeClassName: "bg-emerald-50 text-emerald-700 ring-emerald-100",
-      sideBarClassName: "bg-emerald-500",
-    };
-  }
-
-  if (status === "canceled_by_teacher") {
-    return {
-      label: "Cancelada",
-      icon: XCircle,
-      badgeClassName: "bg-red-50 text-red-700 ring-red-100",
-      sideBarClassName: "bg-red-500",
-    };
-  }
-
-  return {
-    label: "Anulada",
-    icon: Ban,
-    badgeClassName: "bg-gray-100 text-gray-700 ring-gray-200",
-    sideBarClassName: "bg-gray-400",
-  };
+  return { ...visual, icon };
 }
 
 function getClassTypeLabel(classType: LessonListDTO["classType"]) {

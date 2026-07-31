@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "backfill:students-teacher-known": "node --env-file=.env.local --experimental-strip-types scripts/backfill-students-teacher-id.ts",
     "start": "next start",
     "lint": "eslint"
   },

@@ -52,8 +52,8 @@ export default function CourseProfileTemplatePlan({
           Plan del curso
         </h2>
         <p className="mt-1 text-sm text-slate-500">
-          Elige una clase modelo para programar una clase real con sus bloques
-          y recursos sugeridos.
+          Este es el plan previsto de la plantilla. Elige una clase modelo para
+          programar una clase real con sus bloques y recursos sugeridos.
         </p>
       </div>
 

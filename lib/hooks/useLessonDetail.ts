@@ -8,6 +8,7 @@ type UseLessonDetailResult = {
   isLoading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
+  updateLesson: (lesson: LessonDetailDTO) => void;
 };
 
 type LessonDetailApiResponse = {
@@ -62,5 +63,6 @@ export function useLessonDetail(
     isLoading,
     error,
     refetch: fetchLesson,
+    updateLesson: setLesson,
   };
 }

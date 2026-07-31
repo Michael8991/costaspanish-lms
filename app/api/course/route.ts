@@ -81,11 +81,17 @@ export async function GET(request: NextRequest) {
       CourseProfile.find(query)
         .populate({
           path: "members.studentId",
-          select: "fullName contactEmail level isActive",
+          select: "fullName contactEmail level isActive activePlans",
+          ...(user.role === "admin"
+            ? {}
+            : { match: { teacherId: new Types.ObjectId(user.id) } }),
         })
         .populate({
           path: "studentIds",
           select: "fullName contactEmail level isActive",
+          ...(user.role === "admin"
+            ? {}
+            : { match: { teacherId: new Types.ObjectId(user.id) } }),
         })
         .sort({ createdAt: -1, _id: -1 })
         .skip(skip)

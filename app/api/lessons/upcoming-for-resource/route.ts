@@ -1,4 +1,5 @@
 import { getCurrentUserObjectId } from "@/lib/auth/getCurrentUserObjectId";
+import { getStudentOwnershipFilter } from "@/lib/auth/studentOwnership";
 import { requireAuth, requireRole } from "@/lib/auth/apiAuth";
 import type {
   UpcomingLessonForResourceDTO,
@@ -112,10 +113,16 @@ export async function GET(req: NextRequest) {
       ),
     ].map((id) => new Types.ObjectId(id));
 
+    const studentFilter = getStudentOwnershipFilter(user, {
+      _id: { $in: studentIds },
+    });
+    if (!studentFilter) {
+      return NextResponse.json({ error: "Invalid user id" }, { status: 500 });
+    }
     const students =
       studentIds.length === 0
         ? []
-        : await StudentProfile.find({ _id: { $in: studentIds } })
+        : await StudentProfile.find(studentFilter)
             .select("fullName contactEmail")
             .lean<StudentNameSource[]>();
     const studentNamesById = new Map(

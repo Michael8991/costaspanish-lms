@@ -7,6 +7,9 @@ import type {
   PlanDoc,
   PlanStatus,
   StudentProfileDoc,
+  VoucherCreatedFrom,
+  VoucherPaymentMethod,
+  VoucherPaymentStatus,
 } from "@/models/StudentProfile";
 
 type StudentPlanListSource = Partial<PlanDoc> & {
@@ -45,12 +48,33 @@ export interface StudentPlanListDTO {
   creditsTotal: number;
   validFrom: string | null;
   validUntil: string | null;
+  courseId: string | null;
+  courseNameSnapshot: string | null;
+  generatedFromCourse: boolean;
+  generatedFromCourseMember: boolean;
+  billingMode: "individual_cycle" | null;
+  billingPeriodStart: string | null;
+  billingPeriodEnd: string | null;
+  billingAnchorDay: number | null;
+  paymentStatus: VoucherPaymentStatus;
+  amountPaid: number;
+  paidAt: string | null;
+  paymentMethod: VoucherPaymentMethod;
+  paymentNotes: string;
+  internalNotes: string;
+  priceTotal: number | null;
+  currency: "EUR";
+  unitCreditPriceSnapshot: number | null;
+  createdFrom: VoucherCreatedFrom;
+  consumedCredits: number | null;
+  remainingValue: number | null;
+  consumedValue: number | null;
 }
 
 export interface StudentListDTO {
   id: string;
   _id: string;
-  teacherId?: string;
+  teacherId: string | null;
   userId?: string;
   fullName: string;
   contactEmail: string;
@@ -100,12 +124,45 @@ function toFiniteNumberOrZero(value: number | null | undefined): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
-function toStudentPlanListDTO(
+export function toStudentPlanListDTO(
   plan: StudentPlanListSource,
 ): StudentPlanListDTO {
   const id = plan._id ? String(plan._id) : "";
   const name = plan.name?.trim() || "Plan sin nombre";
   const billingType = plan.billingType ?? "single";
+  const creditsTotal =
+    typeof plan.creditsTotal === "number" && Number.isFinite(plan.creditsTotal)
+      ? plan.creditsTotal
+      : null;
+  const creditsRemaining =
+    typeof plan.creditsRemaining === "number" &&
+    Number.isFinite(plan.creditsRemaining)
+      ? plan.creditsRemaining
+      : null;
+  const priceTotal =
+    typeof plan.priceTotal === "number" && Number.isFinite(plan.priceTotal)
+      ? plan.priceTotal
+      : typeof plan.price === "number" && Number.isFinite(plan.price)
+        ? plan.price
+        : null;
+  const unitCreditPriceSnapshot =
+    typeof plan.unitCreditPriceSnapshot === "number" &&
+    Number.isFinite(plan.unitCreditPriceSnapshot)
+      ? plan.unitCreditPriceSnapshot
+      : priceTotal !== null && creditsTotal !== null && creditsTotal > 0
+        ? priceTotal / creditsTotal
+        : null;
+  const consumedCredits =
+    creditsTotal !== null && creditsRemaining !== null
+      ? Math.max(0, creditsTotal - creditsRemaining)
+      : null;
+  const validUntil = toISOStringOrNull(plan.validUntil);
+  const fallbackStatus: PlanStatus =
+    creditsRemaining !== null && creditsRemaining <= 0
+      ? "exhausted"
+      : validUntil && new Date(validUntil) < new Date()
+        ? "expired"
+        : "active";
 
   return {
     id,
@@ -116,12 +173,48 @@ function toStudentPlanListDTO(
     type: billingType,
     planType: billingType,
     classType: plan.classType ?? "private",
-    status: plan.status ?? "active",
-    creditsRemaining: toFiniteNumberOrZero(plan.creditsRemaining),
-    creditsTotal: toFiniteNumberOrZero(plan.creditsTotal),
+    status: plan.status ?? fallbackStatus,
+    creditsRemaining: creditsRemaining ?? 0,
+    creditsTotal: creditsTotal ?? 0,
     validFrom: toISOStringOrNull(plan.validFrom),
-    validUntil: toISOStringOrNull(plan.validUntil),
+    validUntil,
+    courseId: plan.courseId ? String(plan.courseId) : null,
+    courseNameSnapshot: plan.courseNameSnapshot?.trim() || null,
+    generatedFromCourse: plan.generatedFromCourse ?? false,
+    generatedFromCourseMember: plan.generatedFromCourseMember ?? false,
+    billingMode: plan.billingMode ?? null,
+    billingPeriodStart: toISOStringOrNull(plan.billingPeriodStart),
+    billingPeriodEnd: toISOStringOrNull(plan.billingPeriodEnd),
+    billingAnchorDay: plan.billingAnchorDay ?? null,
+    paymentStatus: plan.paymentStatus ?? "pending",
+    amountPaid: toFiniteNumberOrZero(plan.amountPaid),
+    paidAt: toISOStringOrNull(plan.paidAt),
+    paymentMethod: plan.paymentMethod ?? "",
+    paymentNotes: plan.paymentNotes ?? "",
+    internalNotes: plan.internalNotes ?? plan.notes ?? "",
+    priceTotal,
+    currency: plan.currency ?? "EUR",
+    unitCreditPriceSnapshot,
+    createdFrom: plan.createdFrom ?? "legacy",
+    consumedCredits,
+    remainingValue:
+      creditsRemaining !== null && unitCreditPriceSnapshot !== null
+        ? creditsRemaining * unitCreditPriceSnapshot
+        : null,
+    consumedValue:
+      consumedCredits !== null && unitCreditPriceSnapshot !== null
+        ? consumedCredits * unitCreditPriceSnapshot
+        : null,
   };
+}
+
+export interface StudentDetailDTO extends StudentListDTO {
+  contactEmailLower: string;
+  country: string | null;
+  nativeLanguage: string | null;
+  timezone: string;
+  goals: string[];
+  internalNotes: string;
 }
 
 export function toStudentListDTO(
@@ -136,7 +229,7 @@ export function toStudentListDTO(
   return {
     id,
     _id: id,
-    teacherId: student.teacherId ? String(student.teacherId) : undefined,
+    teacherId: student.teacherId ? String(student.teacherId) : null,
     userId: student.userId ? String(student.userId) : undefined,
     fullName: student.fullName?.trim() || "Estudiante sin nombre",
     contactEmail: student.contactEmail?.trim() || "",
@@ -147,5 +240,20 @@ export function toStudentListDTO(
     activePlans: activePlans.map(toStudentPlanListDTO),
     createdAt: toISOStringOrNull(student.createdAt),
     updatedAt: toISOStringOrNull(student.updatedAt),
+  };
+}
+
+
+export function toStudentDetailDTO(
+  student: StudentProfileDoc,
+): StudentDetailDTO {
+  return {
+    ...toStudentListDTO(student),
+    contactEmailLower: student.contactEmailLower?.trim() || "",
+    country: student.country?.trim() || null,
+    nativeLanguage: student.nativeLanguage?.trim() || null,
+    timezone: student.timezone?.trim() || "Europe/Madrid",
+    goals: Array.isArray(student.goals) ? [...student.goals] : [],
+    internalNotes: student.internalNotes ?? "",
   };
 }

@@ -21,6 +21,7 @@ type CourseProfileSelectProps = {
   onAvailabilityChange?: (hasActiveCourses: boolean) => void;
   locale: string;
   disabled?: boolean;
+  requireActiveMembers?: boolean;
 };
 
 type CourseListResponse = {
@@ -34,6 +35,7 @@ export default function CourseProfileSelect({
   onAvailabilityChange,
   locale,
   disabled = false,
+  requireActiveMembers = true,
 }: CourseProfileSelectProps) {
   const [courses, setCourses] = useState<CourseProfileListItemDTO[]>([]);
   const [search, setSearch] = useState("");
@@ -95,13 +97,15 @@ export default function CourseProfileSelect({
       return;
     }
 
-    const firstSelectableCourse = courses.find(
-      (course) => course.activeMembersCount > 0,
+    const firstSelectableCourse = courses.find((course) =>
+      requireActiveMembers
+        ? course.activeMembersCount > 0
+        : course.membersCount > 0,
     );
     if (!value && !disabled && firstSelectableCourse) {
       onChangeRef.current(firstSelectableCourse.id, firstSelectableCourse);
     }
-  }, [courses, disabled, isLoading, value]);
+  }, [courses, disabled, isLoading, requireActiveMembers, value]);
 
   const filteredCourses = useMemo(() => {
     const normalizedSearch = search.trim().toLocaleLowerCase("es");
@@ -153,7 +157,11 @@ export default function CourseProfileSelect({
             <option
               key={course.id}
               value={course.id}
-              disabled={course.activeMembersCount === 0}
+              disabled={
+                requireActiveMembers
+                  ? course.activeMembersCount === 0
+                  : course.membersCount === 0
+              }
             >
               {course.name} · {CLASS_TYPE_LABELS[course.classType] ?? course.classType} ·{" "}
               {course.activeMembersCount} integrantes
@@ -182,9 +190,13 @@ export default function CourseProfileSelect({
 
       {!isLoading &&
         courses.length > 0 &&
-        courses.every((course) => course.activeMembersCount === 0) && (
+        courses.every((course) =>
+          requireActiveMembers
+            ? course.activeMembersCount === 0
+            : course.membersCount === 0,
+        ) && (
           <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            Los cursos activos todavía no tienen integrantes activos.
+            Los cursos activos todavía no tienen integrantes disponibles.
           </p>
         )}
 

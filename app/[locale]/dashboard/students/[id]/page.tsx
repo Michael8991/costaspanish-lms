@@ -1,28 +1,18 @@
 import ActiveVouchersPanel from "@/components/dashboard/teacher/students/ActiveVouchersPanel";
 import ComplexStudentHeader from "@/components/dashboard/teacher/students/ComplexStudentHeader";
 import Breadcrumbs from "@/components/ui/Breadcrumbs";
+import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/mongo";
-import { DBStudent } from "@/lib/types/student";
 import { StudentProfile } from "@/models/StudentProfile";
 import {
-  AlertCircle,
-  AlertTriangle,
   ArrowLeft,
-  ArrowRight,
-  Calendar,
-  CheckCircle,
   ChevronDown,
-  Clock,
   Lock,
-  Mail,
-  Pencil,
-  Phone,
-  Plus,
-  Presentation,
 } from "lucide-react";
 import { Types } from "mongoose";
+import { getServerSession } from "next-auth";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 //!Mock lessons
 //TODO Eliminar y crear la conexion real
@@ -69,25 +59,30 @@ import { notFound } from "next/navigation";
 //   },
 // ];
 
-const statusStyles: Record<string, string> = {
-  scheduled: "bg-blue-50 text-blue-700 border-blue-200",
-  completed: "bg-green-50 text-green-700 border-green-200",
-  cancelled: "bg-red-50 text-red-700 border-red-200",
-};
-
 export default async function StudentPage({
   params,
 }: {
   params: Promise<{ locale: string; id: string }>;
 }) {
   const { locale, id } = await params;
+  const session = await getServerSession(authOptions);
 
-  if (!Types.ObjectId.isValid(id)) {
+  if (!session?.user) redirect("/login");
+  if (session.user.role === "student") redirect(`/${locale}/dashboard`);
+
+  if (!Types.ObjectId.isValid(id) || !Types.ObjectId.isValid(session.user.id)) {
     notFound();
   }
 
   await dbConnect();
-  const rawStudent = await StudentProfile.findById(id).lean();
+  const rawStudent = await StudentProfile.findOne(
+    session.user.role === "admin"
+      ? { _id: new Types.ObjectId(id) }
+      : {
+          _id: new Types.ObjectId(id),
+          teacherId: new Types.ObjectId(session.user.id),
+        },
+  ).lean();
 
   if (!rawStudent) {
     notFound();

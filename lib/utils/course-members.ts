@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 
 import type { CourseMemberDTO } from "@/lib/dto/course-profile.dto";
+import { toStudentPlanListDTO } from "@/lib/dto/student.dto";
 
 export type CourseMemberStatus = "active" | "paused" | "left";
 export type CourseMemberBillingMode = "individual_cycle";
@@ -172,6 +173,14 @@ export function normalizeCourseMembers({
 
     const joinedAt = toValidDate(member.joinedAt, joinedAtFallback);
     const billing = toRecord(member.billing);
+    const studentRecord = toRecord(member.studentId);
+    const activePlans = Array.isArray(studentRecord?.activePlans)
+      ? studentRecord.activePlans
+      : [];
+    const lastVoucherId = toIdString(billing?.lastVoucherId);
+    const lastVoucherSource = activePlans.find(
+      (plan) => toIdString(plan) === lastVoucherId,
+    );
     const billingAnchorDay =
       typeof billing?.billingAnchorDay === "number" &&
       Number.isInteger(billing.billingAnchorDay) &&
@@ -202,6 +211,9 @@ export function normalizeCourseMembers({
               ? billing.notes.trim()
               : "",
         },
+        lastVoucher: lastVoucherSource
+          ? toStudentPlanListDTO(lastVoucherSource)
+          : null,
       },
     ];
   });

@@ -77,11 +77,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
     await course.save();
     await course.populate({
       path: "studentIds",
-      select: "fullName contactEmail level isActive",
+      select: "fullName contactEmail level isActive activePlans",
+      ...(user.role === "admin"
+        ? {}
+        : { match: { teacherId: currentUserObjectId } }),
     });
     await course.populate({
       path: "members.studentId",
       select: "fullName contactEmail level isActive",
+      ...(user.role === "admin"
+        ? {}
+        : { match: { teacherId: currentUserObjectId } }),
     });
 
     return NextResponse.json({

@@ -6,9 +6,8 @@ import {
   DBPlanStatus,
 } from "@/lib/types/student";
 import { FormattedPlan } from "../students/ActiveVouchersPanel";
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
-import { Circle, CircleAlert } from "lucide-react";
+import { useState } from "react";
+import { CircleAlert } from "lucide-react";
 
 const BillingTypes = ["single", "package", "subscription"];
 

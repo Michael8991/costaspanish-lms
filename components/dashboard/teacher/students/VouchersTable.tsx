@@ -2,16 +2,42 @@
 
 import CustomModal from "@/components/ui/CustomModal";
 import { DBPlanDoc } from "@/lib/types/student";
+import {
+  getVoucherPaymentStatusClassName,
+  getVoucherPaymentStatusLabel,
+  getVoucherStatusClassName,
+  getVoucherStatusLabel,
+} from "@/lib/utils/voucher-visuals";
 import { Pencil, Trash, RefreshCw, AlertCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import EditVoucherForm, { EditVoucherFormData } from "../forms/EditVoucherForm";
-import RemoveVoucherForm, {
-  RemoveVoucherFormData,
-} from "../forms/RemoveVoucherForm";
+import RemoveVoucherForm from "../forms/RemoveVoucherForm";
 
 import { FormattedPlan } from "../students/ActiveVouchersPanel";
+
+function resolveVoucherStatus(plan: DBPlanDoc): string {
+  if (typeof plan.status === "string" && plan.status.trim()) {
+    return plan.status;
+  }
+  if ((plan.creditsRemaining ?? 0) <= 0) return "exhausted";
+  if (plan.validUntil) {
+    const validUntil = new Date(plan.validUntil);
+    if (!Number.isNaN(validUntil.getTime()) && validUntil < new Date()) {
+      return "expired";
+    }
+  }
+  return "active";
+}
+
+function toDateOnly(value?: Date | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? null
+    : date.toISOString().split("T")[0];
+}
 
 export default function VouchersTable({
   id,
@@ -37,10 +63,7 @@ export default function VouchersTable({
 
   const [planToEdit, setPlanToEdit] = useState<FormattedPlan | null>(null);
 
-  const handleRemoveVoucher = async (
-    planId: string,
-    formData: RemoveVoucherFormData,
-  ) => {
+  const handleRemoveVoucher = async (planId: string) => {
     setIsSubmittingRemoveVoucher(true);
     try {
       const res = await fetch(`/api/students/${id}/plans/${planId}`, {
@@ -139,8 +162,14 @@ export default function VouchersTable({
             validUntil: plan.validUntil
               ? new Date(plan.validUntil).toISOString().split("T")[0]
               : "",
-            status: plan.status,
-            price: plan.price || 0,
+            status: resolveVoucherStatus(plan),
+            paymentStatus: plan.paymentStatus ?? null,
+            price: plan.priceTotal ?? plan.price ?? 0,
+            priceTotal: plan.priceTotal ?? plan.price ?? null,
+            amountPaid: plan.amountPaid ?? 0,
+            paidAt: toDateOnly(plan.paidAt),
+            billingPeriodStart: toDateOnly(plan.billingPeriodStart),
+            billingPeriodEnd: toDateOnly(plan.billingPeriodEnd),
           };
         });
 
@@ -161,41 +190,6 @@ export default function VouchersTable({
     fetchVoucher();
   }, [id]);
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "active":
-        return (
-          <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-            Activo
-          </span>
-        );
-      case "exhausted":
-        return (
-          <span className="px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
-            Agotado
-          </span>
-        );
-      case "expired":
-        return (
-          <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
-            Caducado
-          </span>
-        );
-      case "canceled":
-        return (
-          <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-200 text-gray-500">
-            Cancelado
-          </span>
-        );
-      default:
-        return (
-          <span className="px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">
-            {status}
-          </span>
-        );
-    }
-  };
-
   return (
     <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
       <table className="w-full text-left text-sm">
@@ -208,7 +202,7 @@ export default function VouchersTable({
             <th className="px-6 py-3">Inicio</th>
             <th className="px-6 py-3">Vencimiento</th>
             <th className="px-6 py-3">Precio</th>
-            <th className="px-6 py-3">Estado</th>
+            <th className="px-6 py-3">Estados</th>
             <th className="px-6 py-3 text-center">Acciones</th>
           </tr>
         </thead>
@@ -236,7 +230,7 @@ export default function VouchersTable({
             </tr>
           ) : (
             vouchers.map((v) => {
-              const isCanceled = v.status === "canceled";
+              const isCanceled = ["canceled", "cancelled"].includes(v.status);
 
               return (
                 <tr
@@ -274,7 +268,22 @@ export default function VouchersTable({
                       </p>
                     )}
                   </td>
-                  <td className="px-6 py-4">{getStatusBadge(v.status)}</td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-wrap gap-1.5">
+                      <span
+                        className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${getVoucherStatusClassName(v.status)}`}
+                      >
+                        {getVoucherStatusLabel(v.status)}
+                      </span>
+                      {v.paymentStatus && (
+                        <span
+                          className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${getVoucherPaymentStatusClassName(v.paymentStatus)}`}
+                        >
+                          {getVoucherPaymentStatusLabel(v.paymentStatus)}
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-2 py-4 flex justify-center">
                     {isCanceled ? (
                       <button

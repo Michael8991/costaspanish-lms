@@ -2,7 +2,7 @@
 import {
   DBClassType,
   DBPlanBillingType,
-  DBPlanStatus,
+  DBPlanPaymentStatus,
 } from "@/lib/types/student";
 import {
   ArrowRight,
@@ -21,21 +21,25 @@ import { toast } from "sonner";
 import CustomModal from "@/components/ui/CustomModal";
 import NewVoucherForm from "../forms/NewVoucherForm";
 import EditVoucherForm, { EditVoucherFormData } from "../forms/EditVoucherForm";
-import RemoveVoucherForm, {
-  RemoveVoucherFormData,
-} from "../forms/RemoveVoucherForm";
+import RemoveVoucherForm from "../forms/RemoveVoucherForm";
 
 export interface FormattedPlan {
   id: string;
   name: string;
   totalCredits: number;
   remainingCredits: number;
-  status: DBPlanStatus;
+  status: string;
+  paymentStatus?: DBPlanPaymentStatus | null;
   billingType: DBPlanBillingType;
   classType: DBClassType;
   validFrom: string;
   validUntil: string;
   price: number;
+  priceTotal?: number | null;
+  amountPaid?: number;
+  paidAt?: string | null;
+  billingPeriodStart?: string | null;
+  billingPeriodEnd?: string | null;
 }
 
 interface ActivePlansPanelProps {
@@ -66,10 +70,7 @@ export default function ActiveVouchersPanel({
 
   const router = useRouter();
 
-  const handleRemoveVoucher = async (
-    planId: string,
-    formData: RemoveVoucherFormData,
-  ) => {
+  const handleRemoveVoucher = async (planId: string) => {
     setIsSubmittingRemoveVoucher(true);
     try {
       const res = await fetch(`/api/students/${studentId}/plans/${planId}`, {

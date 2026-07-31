@@ -3,6 +3,7 @@ import { QueryFilter, Types } from "mongoose";
 import { z } from "zod";
 
 import { requireAuth, requireRole, type Role } from "@/lib/auth/apiAuth";
+import { getStudentOwnershipFilter } from "@/lib/auth/studentOwnership";
 import { toCourseProfileDetailDTO } from "@/lib/utils/course-profile.mapper";
 import { updateCourseProfileSchema } from "@/lib/validators/courseProfile.validator";
 import dbConnect from "@/lib/mongo";
@@ -111,11 +112,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const course = await CourseProfile.findOne(getCourseQuery(id, user))
       .populate({
         path: "members.studentId",
-        select: "fullName contactEmail level isActive",
+        select: "fullName contactEmail level isActive activePlans",
+        ...(user.role === "admin"
+          ? {}
+          : { match: { teacherId: new Types.ObjectId(user.id) } }),
       })
       .populate({
         path: "studentIds",
         select: "fullName contactEmail level isActive",
+        ...(user.role === "admin"
+          ? {}
+          : { match: { teacherId: new Types.ObjectId(user.id) } }),
       })
       .lean();
 
@@ -207,17 +214,21 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     if (hasMembersUpdate || hasStudentIdsUpdate) {
-      const studentsCount = await StudentProfile.countDocuments({
+      const studentFilter = getStudentOwnershipFilter(user, {
         _id: {
           $in: derivedStudentIds.map(
             (studentId) => new Types.ObjectId(studentId),
           ),
         },
       });
+      if (!studentFilter) {
+        return NextResponse.json({ error: "Invalid user id" }, { status: 500 });
+      }
+      const studentsCount = await StudentProfile.countDocuments(studentFilter);
 
       if (studentsCount !== derivedStudentIds.length) {
         return NextResponse.json(
-          { error: "One or more students do not exist" },
+          { error: "Some students are invalid or not accessible" },
           { status: 400 },
         );
       }
@@ -313,11 +324,17 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     await course.save();
     await course.populate({
       path: "studentIds",
-      select: "fullName contactEmail level isActive",
+      select: "fullName contactEmail level isActive activePlans",
+      ...(user.role === "admin"
+        ? {}
+        : { match: { teacherId: new Types.ObjectId(user.id) } }),
     });
     await course.populate({
       path: "members.studentId",
       select: "fullName contactEmail level isActive",
+      ...(user.role === "admin"
+        ? {}
+        : { match: { teacherId: new Types.ObjectId(user.id) } }),
     });
     const template = course.policies
       ? null

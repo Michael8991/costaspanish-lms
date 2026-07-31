@@ -1,4 +1,5 @@
 import { requireAuth, requireRole } from "@/lib/auth/apiAuth";
+import { getStudentOwnerMatch } from "@/lib/auth/studentOwnership";
 import dbConnect from "@/lib/mongo";
 import {
     StudentProfile,
@@ -15,6 +16,7 @@ import mongoose, { QueryFilter, Types } from "mongoose";
 import {
     toStudentListDTO,
 } from "@/lib/dto/student.dto";
+import { createStudentProfileSchema } from "@/lib/validators/student";
 import type {
     StudentListResponse,
     StudentListSource,
@@ -39,40 +41,28 @@ export async function POST(req: NextRequest){
         );
     }
 
-    const body = await req.json().catch(() => null);
-    if (!body) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
-    
-    const { fullName,contactEmail, email, name, billingType, classType, validUntil, price } = body; 
+    const body: unknown = await req.json().catch(() => null);
+    const parsed = createStudentProfileSchema.safeParse(body);
+    if (!parsed.success) {
+        return NextResponse.json(
+            {
+                error: "Invalid student payload",
+                details: parsed.error.issues.map((issue) => ({
+                    path: issue.path.join("."),
+                    message: issue.message,
+                })),
+            },
+            { status: 400 },
+        );
+    }
 
-    const rawEmail = (typeof contactEmail === "string" ? contactEmail : typeof email === "string" ? email : "").trim();
+    const payload = parsed.data;
+    const rawEmail = (payload.contactEmail ?? payload.email ?? "").trim();
     const contactEmailLower = rawEmail.toLowerCase();
 
-   if (price === undefined || isNaN(Number(price))) {
-        return NextResponse.json({error: "Price is required and must be a valid number"}, {status: 400});
-    }
-    
-    if (!fullName) {
-        return NextResponse.json({error: "Full name is required"}, {status: 400})
-    }
-    if (!rawEmail) return NextResponse.json({ error: "Contact email is required" }, { status: 400 });
-    if (!name) {
-        return NextResponse.json({error: "Plan name is required"}, {status: 400})
-    }
-    if (!billingType) {
-        return NextResponse.json({error: "Billing type is required"}, {status: 400})
-    }
-    if (!classType) {
-        return NextResponse.json({error: "Class type is required"}, {status: 400})
-    }
-    if (!validUntil) {
-        return NextResponse.json({error: "Valid until is required"}, {status: 400})
-    }
-
-    const creditsTotal = Number(body.creditsTotal ?? 0);
-    const creditsRemaining = Number(
-        body.creditsRemaining ?? body.creditsTotal ?? 0,
-    );
-    const validUntilDate = new Date(validUntil);
+    const creditsTotal = payload.creditsTotal ?? 0;
+    const creditsRemaining = payload.creditsRemaining ?? creditsTotal;
+    const validUntilDate = payload.validUntil;
     const planStatus: PlanStatus =
         creditsRemaining <= 0
             ? "exhausted"
@@ -87,25 +77,25 @@ export async function POST(req: NextRequest){
             teacherId: new Types.ObjectId(user.id),
             contactEmail: rawEmail,
             contactEmailLower,
-            fullName: body.fullName,
-            phone: body.phone,
-            country: body.country,
-            timezone: body.timezone,
-            level: body.level,
-            nativeLanguage: body.nativeLanguage,
-            goals: body.goals,
-            internalNotes: body.internalNotes,
+            fullName: payload.fullName,
+            phone: payload.phone,
+            country: payload.country,
+            timezone: payload.timezone,
+            level: payload.level,
+            nativeLanguage: payload.nativeLanguage,
+            goals: payload.goals,
+            internalNotes: payload.internalNotes,
 
             activePlans: [
                 {
-                    name: name,
-                    billingType: billingType,
-                    classType: classType,
+                    name: payload.name,
+                    billingType: payload.billingType,
+                    classType: payload.classType,
                     validUntil: validUntilDate,
                     creditsTotal,
                     creditsRemaining,
                     status: planStatus,
-                    price: price,
+                    price: payload.price,
                 }
             ]
         });
@@ -433,9 +423,14 @@ export async function GET(req: NextRequest) {
             return invalidQueryResponse("statusPlan");
         }
 
-        // TODO: Re-enable teacher ownership filter after StudentProfile documents
-        // are migrated to include teacherId.
-        const baseFilter: StudentMongoFilter = {};
+        const ownerMatch = getStudentOwnerMatch(user);
+        if (!ownerMatch) {
+            return NextResponse.json(
+                { error: "Invalid authenticated user id" },
+                { status: 500 },
+            );
+        }
+        const baseFilter: StudentMongoFilter = ownerMatch;
         const andConditions: StudentMongoFilter[] = [];
 
         if (search) {

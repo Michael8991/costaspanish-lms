@@ -1,5 +1,7 @@
 import { Types } from "mongoose";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/mongo";
 import { PlanDoc, StudentProfile } from "@/models/StudentProfile";
 import VouchersTable from "@/components/dashboard/teacher/students/VouchersTable";
@@ -15,12 +17,23 @@ export default async function VouchersHistory({
   params: Promise<{ locale: string; id: string }>;
 }) {
   const { locale, id } = await params;
+  const session = await getServerSession(authOptions);
 
-  if (!Types.ObjectId.isValid(id)) {
+  if (!session?.user) redirect("/login");
+  if (session.user.role === "student") redirect(`/${locale}/dashboard`);
+
+  if (!Types.ObjectId.isValid(id) || !Types.ObjectId.isValid(session.user.id)) {
     notFound();
   }
   await dbConnect();
-  const rawStudent = await StudentProfile.findById(id).lean();
+  const rawStudent = await StudentProfile.findOne(
+    session.user.role === "admin"
+      ? { _id: new Types.ObjectId(id) }
+      : {
+          _id: new Types.ObjectId(id),
+          teacherId: new Types.ObjectId(session.user.id),
+        },
+  ).lean();
 
   if (!rawStudent) {
     notFound();
@@ -50,6 +63,12 @@ export default async function VouchersHistory({
         validUntil: plan.validUntil,
         status: plan.status,
         price: plan.price,
+        paymentStatus: plan.paymentStatus,
+        amountPaid: plan.amountPaid,
+        paidAt: plan.paidAt,
+        billingPeriodStart: plan.billingPeriodStart ?? undefined,
+        billingPeriodEnd: plan.billingPeriodEnd ?? undefined,
+        priceTotal: plan.priceTotal,
       }),
     ),
   };

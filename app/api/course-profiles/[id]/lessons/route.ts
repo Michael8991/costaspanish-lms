@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireAuth, requireRole, type Role } from "@/lib/auth/apiAuth";
+import { getStudentOwnershipFilter } from "@/lib/auth/studentOwnership";
 import {
   CEFR_LEVELS,
   LESSON_BLOCK_TYPES,
@@ -190,9 +191,15 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
+    const studentFilter = getStudentOwnershipFilter(user, {
+      _id: { $in: studentIds },
+    });
+    if (!studentFilter) {
+      return NextResponse.json({ error: "Invalid user id" }, { status: 500 });
+    }
     const [rawTemplate, existingStudentsCount] = await Promise.all([
       CourseTemplate.findById(courseProfile.templateId).lean(),
-      StudentProfile.countDocuments({ _id: { $in: studentIds } }),
+      StudentProfile.countDocuments(studentFilter),
     ]);
     const template = rawTemplate as
       | (ICourseTemplate & { _id: Types.ObjectId })
@@ -206,7 +213,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
     if (existingStudentsCount !== studentIds.length) {
       return NextResponse.json(
-        { error: "One or more course students do not exist" },
+        { error: "Some students are invalid or not accessible" },
         { status: 400 },
       );
     }

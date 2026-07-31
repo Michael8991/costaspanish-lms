@@ -23,7 +23,7 @@ const objectIdSchema = z
   });
 
 const optionalObjectIdSchema = z.preprocess(
-  (value) => (value === "" ? undefined : value),
+  (value) => (value === "" || value === null ? undefined : value),
   objectIdSchema.optional(),
 );
 
@@ -34,11 +34,20 @@ const lessonCourseLinkSchema = z.object({
     "review",
     "makeup",
     "extra",
+    "imported_historical",
     "legacy_free",
   ]),
   linkedAt: z.coerce.date().optional(),
   linkedBy: objectIdSchema.optional(),
   notes: z.string().trim().optional(),
+  sourceTemplateLesson: z
+    .object({
+      moduleOrder: z.coerce.number().int().min(0),
+      lessonOrder: z.coerce.number().int().min(0),
+      moduleTitle: z.string().trim().max(140).optional(),
+      lessonTitle: z.string().trim().max(140).optional(),
+    })
+    .optional(),
 });
 
 const lessonPolicySnapshotSchema = z.object({
@@ -75,14 +84,15 @@ const lessonBlockOriginSchema = z.object({
   sourceBlockTitle: z.string().trim().optional(),
 });
 
-const lessonAttendeeSchema = z
-  .object({
+const lessonAttendeeBaseSchema = z.object({
     studentId: objectIdSchema,
     voucherId: optionalObjectIdSchema,
     attendanceStatus: z.enum(LESSON_ATTENDANCE_STATUSES).default("pending"),
     creditsToConsume: z.coerce.number().min(0).default(1),
     isTrial: z.boolean().default(false),
-  })
+  });
+
+const lessonAttendeeSchema = lessonAttendeeBaseSchema
   .superRefine((attendee, ctx) => {
     if (attendee.isTrial) {
       return;
@@ -115,6 +125,20 @@ const lessonAttendeeSchema = z
       creditsToConsume: 0,
     };
   });
+
+const lessonAttendeePatchSchema = lessonAttendeeBaseSchema.transform(
+  (attendee) => {
+    if (!attendee.isTrial) {
+      return attendee;
+    }
+
+    return {
+      ...attendee,
+      voucherId: undefined,
+      creditsToConsume: 0,
+    };
+  },
+);
 export const lessonBlockSchema = z
   .object({
     lineageId: z.string().trim().min(1).optional(),
@@ -327,7 +351,7 @@ const updateLessonBaseSchema = z.object({
   classType: z.enum(LESSON_CLASS_TYPES).optional(),
   isTrial: z.boolean().optional(),
 
-  attendees: z.array(lessonAttendeeSchema).optional(),
+  attendees: z.array(lessonAttendeePatchSchema).optional(),
   blocks: z.array(lessonBlockSchema).optional(),
 
   preparationNotes: z.string().trim().optional(),

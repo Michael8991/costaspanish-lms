@@ -3,6 +3,7 @@ import { Types } from "mongoose";
 import { z } from "zod";
 
 import { requireAuth, requireRole } from "@/lib/auth/apiAuth";
+import { getStudentOwnershipFilter } from "@/lib/auth/studentOwnership";
 import { toCourseProfileDetailDTO } from "@/lib/utils/course-profile.mapper";
 import { toCourseTemplateDetailDTO } from "@/lib/utils/course-template.mapper";
 import { createCourseProfileSchema } from "@/lib/validators/courseProfile.validator";
@@ -114,15 +115,19 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const studentObjectIds = derivedStudentIds.map(
       (studentId) => new Types.ObjectId(studentId),
     );
-    const students = await StudentProfile.find({
+    const studentFilter = getStudentOwnershipFilter(user, {
       _id: { $in: studentObjectIds },
-    })
+    });
+    if (!studentFilter) {
+      return NextResponse.json({ error: "Invalid user id" }, { status: 500 });
+    }
+    const students = await StudentProfile.find(studentFilter)
       .select("_id")
       .lean();
 
     if (students.length !== studentObjectIds.length) {
       return NextResponse.json(
-        { error: "One or more students do not exist" },
+        { error: "Some students are invalid or not accessible" },
         { status: 400 },
       );
     }
@@ -226,11 +231,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     await course.populate({
       path: "studentIds",
-      select: "fullName contactEmail level isActive",
+      select: "fullName contactEmail level isActive activePlans",
+      ...(user.role === "admin"
+        ? {}
+        : { match: { teacherId: teacherObjectId } }),
     });
     await course.populate({
       path: "members.studentId",
       select: "fullName contactEmail level isActive",
+      ...(user.role === "admin"
+        ? {}
+        : { match: { teacherId: teacherObjectId } }),
     });
 
     return NextResponse.json(

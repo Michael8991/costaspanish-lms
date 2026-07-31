@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Types } from "mongoose";
 import dbConnect from "@/lib/mongo";
 import { requireAuth, requireRole } from "@/lib/auth/apiAuth";
+import { getStudentOwnershipFilter } from "@/lib/auth/studentOwnership";
 import { toLessonDetailDTO } from "@/lib/utils/lesson.mapper";
 import Lesson from "@/models/Lesson";
 import "@/models/CourseProfile";
@@ -94,10 +95,14 @@ export async function GET(
       ),
     );
 
-    const students = await StudentProfile.find(
-      {
+    const studentFilter = getStudentOwnershipFilter(user, {
         _id: { $in: studentIds },
-      },
+    });
+    if (!studentFilter) {
+      return NextResponse.json({ error: "Invalid user id" }, { status: 500 });
+    }
+    const students = await StudentProfile.find(
+      studentFilter,
       {
         firstName: 1,
         lastName: 1,
@@ -284,6 +289,37 @@ export async function PATCH(
     }
 
     const payload = parsed.data;
+
+    if (payload.attendees !== undefined) {
+      const attendeeStudentIds = Array.from(
+        new Set(payload.attendees.map((attendee) => attendee.studentId)),
+      );
+      const studentFilter = getStudentOwnershipFilter(user, {
+        _id: {
+          $in: attendeeStudentIds.map(
+            (studentId) => new Types.ObjectId(studentId),
+          ),
+        },
+      });
+      if (!studentFilter) {
+        return NextResponse.json(
+          { ok: false, error: "Invalid user id" },
+          { status: 500 },
+        );
+      }
+      const accessibleStudents = await StudentProfile.countDocuments(
+        studentFilter,
+      );
+      if (accessibleStudents !== attendeeStudentIds.length) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Some students are invalid or not accessible",
+          },
+          { status: 400 },
+        );
+      }
+    }
 
     const set: Record<string, unknown> = {};
 

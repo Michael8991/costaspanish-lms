@@ -1,8 +1,10 @@
 import { requireAuth, requireRole } from '@/lib/auth/apiAuth';
+import { getStudentOwnershipFilter } from '@/lib/auth/studentOwnership';
 import dbConnect from '@/lib/mongo';
 import { getLessonDateRange } from '@/lib/utils/lesson-date-range';
 import { normalizeCourseMembers } from '@/lib/utils/course-members';
 import { normalizeCourseOperationalPolicies } from '@/lib/utils/course-policies';
+import { buildLessonPolicySnapshotFromCoursePolicies } from '@/lib/utils/lesson-policy-snapshot';
 import {
   generateWeeklyRecurringLessonDates,
   includeBaseLessonOccurrence,
@@ -26,66 +28,130 @@ function getCurrentUserId(user: { id?: string; _id?: string }) {
   return String(user.id ?? user._id ?? "");
 }
 
+type LessonListScope = "upcoming" | "history" | "all";
+
+type LessonListFilter = {
+  teacherId: string;
+  courseId?: Types.ObjectId;
+  scheduledStart?: {
+    $gte?: Date;
+    $lt?: Date;
+  };
+  status?: {
+    $in: string[];
+  };
+  $or?: Array<{
+    status?: { $in: string[] };
+    scheduledStart?: { $lt: Date };
+  }>;
+};
+
 export async function GET(req: NextRequest) {
-    try {
-        const user = await requireAuth(req);
-        if (!user) {
-            return NextResponse.json({ ok: false, error: "Unauthorizez" },
-                {status:401}
-            )
-        }
-        if (!requireRole(user,["admin","teacher"])) {
-            return NextResponse.json({ ok: false, error: "Forbidden" },
-                {status:403}
-            )
-        }
-       
-        const searchParams = req.nextUrl.searchParams;
-
-        const rawView = searchParams.get("view");
-        const view = rawView === "day" || rawView === "week" || rawView === "month" ? rawView : "week";
-
-        const rawDate = searchParams.get("date");
-
-        const date = rawDate ? new Date(rawDate) : new Date();
-
-        if (Number.isNaN(date.getTime())) {
-            return NextResponse.json(
-                { error: "Invalid date parameter" },
-                { status: 400 },
-            )
-        }
-
-        const { start, end } = getLessonDateRange({ view, date });
-
-        const filter = {
-            teacherId: getCurrentUserId(user),
-            scheduledStart: {
-                $gte: start,
-                $lt: end
-            }
-        }
-
-        await dbConnect();
-
-        const items = await Lesson.find(filter)
-          .populate({ path: "courseId", select: "name internalName classType" })
-          .sort({ scheduledStart: 1 })
-          .lean()
-          .limit(300);
-        
-        return NextResponse.json({ ok: true, view, range:{start: start.toISOString(), end: end.toISOString()}, items: items.map(toLessonListDTO)})
-
-       } catch (error) {
-          const message = error instanceof Error ? error.message : "Unknown error";
-
-  console.error("Error GET /api/lessons:", error);
-
-  return NextResponse.json(
-    { ok: false, error: message },
-    { status: 500 },
-  );
+  try {
+    const user = await requireAuth(req);
+    if (!user) {
+      return NextResponse.json(
+        { ok: false, error: "Unauthorized" },
+        { status: 401 },
+      );
     }
+    if (!requireRole(user, ["admin", "teacher"])) {
+      return NextResponse.json(
+        { ok: false, error: "Forbidden" },
+        { status: 403 },
+      );
+    }
+
+    const searchParams = req.nextUrl.searchParams;
+    const rawView = searchParams.get("view");
+    const view =
+      rawView === "day" || rawView === "week" || rawView === "month"
+        ? rawView
+        : "week";
+    const rawDate = searchParams.get("date");
+    const rawCourseId = searchParams.get("courseId");
+    const rawScope = searchParams.get("scope");
+    const scope =
+      rawScope === "upcoming" ||
+      rawScope === "history" ||
+      rawScope === "all"
+        ? (rawScope as LessonListScope)
+        : undefined;
+    const date = rawDate ? new Date(rawDate) : new Date();
+
+    if (rawScope && !scope) {
+      return NextResponse.json(
+        { error: "Invalid scope parameter" },
+        { status: 400 },
+      );
+    }
+
+    if (Number.isNaN(date.getTime())) {
+      return NextResponse.json(
+        { error: "Invalid date parameter" },
+        { status: 400 },
+      );
+    }
+
+    if (rawCourseId && !Types.ObjectId.isValid(rawCourseId)) {
+      return NextResponse.json(
+        { error: "Invalid courseId parameter" },
+        { status: 400 },
+      );
+    }
+
+    const { start, end } = getLessonDateRange({ view, date });
+    const filter: LessonListFilter = {
+      teacherId: getCurrentUserId(user),
+    };
+
+    if (!scope) {
+      filter.scheduledStart = { $gte: start, $lt: end };
+    } else if (scope === "upcoming") {
+      const upcomingMargin = new Date(Date.now() - 2 * 60 * 60 * 1000);
+      filter.scheduledStart = { $gte: upcomingMargin };
+      filter.status = { $in: ["scheduled", "in_progress"] };
+    } else if (scope === "history") {
+      filter.$or = [
+        {
+          status: {
+            $in: ["completed", "canceled_by_teacher", "voided"],
+          },
+        },
+        { scheduledStart: { $lt: new Date() } },
+      ];
+    }
+
+    if (rawCourseId) {
+      filter.courseId = new Types.ObjectId(rawCourseId);
+    }
+
+    await dbConnect();
+
+    const sortDirection = !scope || scope === "upcoming" ? 1 : -1;
+    const items = await Lesson.find(filter)
+      .populate({ path: "courseId", select: "name internalName classType" })
+      .sort({ scheduledStart: sortDirection })
+      .lean()
+      .limit(300);
+
+    return NextResponse.json({
+      ok: true,
+      view,
+      scope: scope ?? null,
+      range: { start: start.toISOString(), end: end.toISOString() },
+      items: items.map(toLessonListDTO),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+
+    console.error("Error GET /api/lessons:", error);
+
+    return NextResponse.json(
+      { ok: false, error: message },
+      { status: 500 },
+    );
+  }
 }
 
 
@@ -225,15 +291,12 @@ export async function POST(req: NextRequest) {
           linkedBy: new Types.ObjectId(currentUserObjectId),
           notes: "",
         },
-        policySnapshot: {
-          lessonDefaults: {
-            durationMinutes,
-            timezone,
-            defaultClassType: classType,
-          },
-          creditPolicy: { ...policies.creditPolicy },
-          preparationPolicy: { ...policies.preparationPolicy },
-        },
+        policySnapshot: buildLessonPolicySnapshotFromCoursePolicies({
+          policies,
+          durationMinutes,
+          timezone,
+          classType,
+        }),
         title: payload.title?.trim() || `${courseName} · Clase`,
         status: payload.status,
         preparationStatus:
@@ -292,13 +355,31 @@ export async function POST(req: NextRequest) {
       basePayload.attendees.length > 0 &&
       basePayload.attendees.every((attendee) => attendee.isTrial);
 
-    const studentProfiles = await StudentProfile.find({
+    const attendeeStudentIds = Array.from(
+      new Set(
+        basePayload.attendees.map((attendee) => attendee.studentId.toString()),
+      ),
+    );
+    const studentFilter = getStudentOwnershipFilter(user, {
       _id: {
-        $in: basePayload.attendees.map((attendee) => attendee.studentId),
+        $in: attendeeStudentIds.map((studentId) => new Types.ObjectId(studentId)),
       },
-    })
+    });
+    if (!studentFilter) {
+      return NextResponse.json(
+        { ok: false, error: "Invalid user id" },
+        { status: 500 },
+      );
+    }
+    const studentProfiles = await StudentProfile.find(studentFilter)
       .select("fullName contactEmail activePlans")
       .lean();
+    if (studentProfiles.length !== attendeeStudentIds.length) {
+      return NextResponse.json(
+        { ok: false, error: "Some students are invalid or not accessible" },
+        { status: 400 },
+      );
+    }
     const titleStudents: LessonTitleStudentInput[] = studentProfiles.map(
       (student) => ({
         _id: String(student._id),

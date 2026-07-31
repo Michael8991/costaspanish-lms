@@ -17,6 +17,7 @@ import type {
 } from "@/models/CourseProfile";
 import type { ClassType } from "@/models/StudentProfile";
 import type { CourseOperationalPolicies } from "@/lib/types/course-policies";
+import type { StudentPlanListDTO } from "@/lib/dto/student.dto";
 
 export type CourseOperationalPoliciesDTO = CourseOperationalPolicies;
 export type CoursePoliciesSource =
@@ -82,6 +83,7 @@ export interface CourseMemberDTO {
   joinedAt: string;
   leftAt: string | null;
   billing: CourseMemberBillingDTO;
+  lastVoucher: StudentPlanListDTO | null;
 }
 
 export interface CourseProfilePolicySummaryDTO {
