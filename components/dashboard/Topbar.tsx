@@ -40,6 +40,7 @@ type MenuItem =
 type NavMenuItem = {
   label: string;
   href: string;
+  roles?: Array<NonNullable<TopbarProps["role"]>>;
 };
 
 const menuItems: MenuItem[] = [
@@ -70,6 +71,11 @@ const navMenuItems: NavMenuItem[] = [
   { label: "Recursos", href: "/dashboard/resources" },
   { label: "Estudiantes", href: "/dashboard/students" },
   { label: "Lecciones", href: "/dashboard/lessons" },
+  {
+    label: "Economía",
+    href: "/dashboard/finance",
+    roles: ["teacher", "admin"],
+  },
 ];
 
 const roleLabels: Record<NonNullable<TopbarProps["role"]>, string> = {
@@ -96,6 +102,9 @@ export const Topbar = ({ userName, locale, role }: TopbarProps) => {
   const initials = getInitials(userName);
   const roleLabel = role ? roleLabels[role] : "Estudiante";
   const hasNotifications = true; // TODO: conectar con el estado real de notificaciones.
+  const visibleNavMenuItems = navMenuItems.filter(
+    (item) => !item.roles || (role ? item.roles.includes(role) : false),
+  );
 
   const withLocale = (path: string) => {
     const normalizedPath = path.startsWith("/") ? path : `/${path}`;
@@ -205,7 +214,7 @@ export const Topbar = ({ userName, locale, role }: TopbarProps) => {
           aria-label="Navegación principal"
           className="hidden shrink-0 items-center gap-0.5 lg:flex xl:gap-1"
         >
-          {navMenuItems.map((item) => {
+          {visibleNavMenuItems.map((item) => {
             const href = withLocale(item.href);
             const isActive = isNavItemActive(item);
 
@@ -355,7 +364,7 @@ export const Topbar = ({ userName, locale, role }: TopbarProps) => {
           aria-label="Navegación móvil"
           className="mx-auto flex max-w-screen-2xl flex-col gap-1 px-3 py-3 sm:px-6"
         >
-          {navMenuItems.map((item) => {
+          {visibleNavMenuItems.map((item) => {
             const href = withLocale(item.href);
             const isActive = isNavItemActive(item);
 
