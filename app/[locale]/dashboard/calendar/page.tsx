@@ -1,5 +1,8 @@
+import ClassBookPageClient from "@/components/dashboard/class-book/ClassBookPageClient";
 import Breadcrumbs from "@/components/ui/Breadcrumbs";
-import { OnProgressPage } from "@/components/ui/onProgressPage/OnProgressPage";
+import { authOptions } from "@/lib/auth";
+import { getServerSession } from "next-auth";
+import { redirect } from "next/navigation";
 
 export default async function CalendarPage({
   params,
@@ -7,12 +10,22 @@ export default async function CalendarPage({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  const breadcrumbItems = [{ label: "Calendar" }];
+  const session = await getServerSession(authOptions);
+  if (!session?.user) redirect("/login");
+  if (session.user.role === "student") redirect(`/${locale}/dashboard`);
+
   return (
-    <div className="container mx-auto py-8 px-4 md:px-8 text-gray-800 max-w-6xl">
-      <Breadcrumbs items={breadcrumbItems} locale={locale} />
-      <h1 className="text-2xl">Calendar Collection</h1>
-      <OnProgressPage locale={locale} />
-    </div>
+    <main className="container mx-auto max-w-screen-2xl px-4 py-8 text-slate-800 md:px-8">
+      <Breadcrumbs items={[{ label: "Libro de clases" }]} locale={locale} />
+      <div className="mb-6 mt-4">
+        <h1 className="text-2xl font-semibold text-slate-950">
+          Libro de clases
+        </h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Consulta clases planificadas y completadas por curso.
+        </p>
+      </div>
+      <ClassBookPageClient locale={locale} />
+    </main>
   );
 }

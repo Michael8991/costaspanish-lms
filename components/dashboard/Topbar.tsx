@@ -67,7 +67,11 @@ const menuItems: MenuItem[] = [
 const navMenuItems: NavMenuItem[] = [
   { label: "Inicio", href: "/dashboard" },
   { label: "Cursos", href: "/dashboard/courses" },
-  { label: "Libro de clases", href: "/dashboard/calendar" },
+  {
+    label: "Libro de clases",
+    href: "/dashboard/calendar",
+    roles: ["teacher", "admin"],
+  },
   { label: "Recursos", href: "/dashboard/resources" },
   { label: "Estudiantes", href: "/dashboard/students" },
   { label: "Lecciones", href: "/dashboard/lessons" },
