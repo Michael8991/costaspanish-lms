@@ -80,8 +80,16 @@ export const priceOptionSchema = z.object({
 export const storefrontSchema = z
   .object({
     isPublished: z.boolean().default(false),
-    publicTitle: nonEmptyTrimmedString("publicTitle", 140),
-    shortDescription: nonEmptyTrimmedString("shortDescription", 300),
+    publicTitle: z
+      .string()
+      .trim()
+      .max(140, "publicTitle must be at most 140 characters")
+      .default(""),
+    shortDescription: z
+      .string()
+      .trim()
+      .max(300, "shortDescription must be at most 300 characters")
+      .default(""),
     longDescription: optionalTrimmedString,
     seoTitle: optionalTrimmedString.pipe(
       z.string().max(70, "seoTitle must be at most 70 characters").optional(),
@@ -101,6 +109,23 @@ export const storefrontSchema = z
     ),
   })
   .superRefine((data, ctx) => {
+    if (data.isPublished && data.publicTitle.length === 0) {
+      ctx.addIssue({
+        code: "custom",
+        message: "publicTitle is required when the template is published",
+        path: ["publicTitle"],
+      });
+    }
+
+    if (data.isPublished && data.shortDescription.length === 0) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "shortDescription is required when the template is published",
+        path: ["shortDescription"],
+      });
+    }
+
     if (data.priceMode === "free") {
       for (const [index, option] of data.priceOptions.entries()) {
         if (typeof option.amount === "number" && option.amount !== 0) {

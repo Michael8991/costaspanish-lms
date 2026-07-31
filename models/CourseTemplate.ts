@@ -379,13 +379,13 @@ const StorefrontSchema = new Schema<IStorefront>(
     },
     publicTitle: {
       type: String,
-      required: true,
+      default: "",
       trim: true,
       maxlength: 140,
     },
     shortDescription: {
       type: String,
-      required: true,
+      default: "",
       trim: true,
       maxlength: 300,
     },

@@ -73,6 +73,58 @@ export type CourseTemplateSubmitValues = z.output<
   typeof createCourseTemplateSchema
 >;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function findFirstErrorMessage(value: unknown): string | null {
+  if (typeof value === "string" && value.trim()) return value;
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const message = findFirstErrorMessage(item);
+      if (message) return message;
+    }
+  }
+
+  if (isRecord(value)) {
+    for (const item of Object.values(value)) {
+      const message = findFirstErrorMessage(item);
+      if (message) return message;
+    }
+  }
+
+  return null;
+}
+
+function getApiErrorMessage(payload: unknown, fallback: string): string {
+  if (!isRecord(payload)) return fallback;
+
+  const error =
+    typeof payload.error === "string"
+      ? payload.error
+      : typeof payload.message === "string"
+        ? payload.message
+        : null;
+  const validationMessage = findFirstErrorMessage(payload.details);
+
+  if (error && validationMessage) return `${error}: ${validationMessage}`;
+  return error ?? validationMessage ?? fallback;
+}
+
+function getCreatedTemplateId(payload: unknown): string | null {
+  if (!isRecord(payload)) return null;
+
+  for (const key of ["data", "item"] as const) {
+    const candidate = payload[key];
+    if (isRecord(candidate) && typeof candidate.id === "string") {
+      return candidate.id;
+    }
+  }
+
+  return null;
+}
+
 const numberInputTransform = {
   setValueAs: (value: string) => {
     if (value === "" || value === null || value === undefined) return undefined;
@@ -558,6 +610,7 @@ function SectionCard({
   children,
   className = "",
   collapsible = false,
+  hasError = false,
 }: {
   title: string;
   description?: string;
@@ -565,6 +618,7 @@ function SectionCard({
   children: React.ReactNode;
   className?: string;
   collapsible?: boolean;
+  hasError?: boolean;
 }) {
   const header = (
     <div className="flex items-start gap-3">
@@ -583,7 +637,10 @@ function SectionCard({
   if (collapsible) {
     return (
       <details
-        className={`group overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm ${className}`}
+        open={hasError ? true : undefined}
+        className={`group overflow-hidden rounded-xl border bg-white shadow-sm ${
+          hasError ? "border-red-300" : "border-gray-200"
+        } ${className}`}
       >
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 bg-gray-50/60 px-5 py-4">
           {header}
@@ -1095,11 +1152,16 @@ export default function CourseTemplateForm({
         body: JSON.stringify(payload),
       });
 
-      const data = await response.json().catch(() => null);
+      const data: unknown = await response.json().catch(() => null);
 
       if (!response.ok) {
         throw new Error(
-          data?.error || data?.message || "Unable to create course template",
+          getApiErrorMessage(
+            data,
+            isEditMode
+              ? "No se pudo guardar la plantilla."
+              : "No se pudo crear la plantilla.",
+          ),
         );
       }
 
@@ -1132,7 +1194,17 @@ export default function CourseTemplateForm({
         return;
       }
 
-      router.push(detailUrl);
+      const createdTemplateId = getCreatedTemplateId(data);
+      if (!createdTemplateId) {
+        throw new Error(
+          "La plantilla se creó, pero la respuesta no incluye su identificador.",
+        );
+      }
+
+      router.push(
+        redirectTo ??
+          `/${locale}/dashboard/courses/templates/${encodeURIComponent(createdTemplateId)}`,
+      );
       router.refresh();
     } catch (error) {
       setSubmitError(
@@ -1142,9 +1214,19 @@ export default function CourseTemplateForm({
       );
     }
   };
+
+  const onInvalid = () => {
+    setSubmitError(
+      isEditMode
+        ? "Revisa los campos indicados antes de guardar la plantilla."
+        : "Revisa los campos obligatorios antes de crear la plantilla.",
+    );
+  };
+
   return (
     <form
-      onSubmit={handleSubmit(onSubmit)}
+      noValidate
+      onSubmit={handleSubmit(onSubmit, onInvalid)}
       onChange={() => {
         if (submitError) setSubmitError(null);
       }}
@@ -1391,6 +1473,7 @@ export default function CourseTemplateForm({
         icon={BookOpen}
         className="order-5"
         collapsible
+        hasError={Boolean(errors.storefront)}
       >
         <div className="mb-4">
           <label className="inline-flex items-center gap-2 text-sm text-gray-700">
@@ -1966,14 +2049,14 @@ export default function CourseTemplateForm({
           <p
             role="status"
             className={`text-sm font-medium ${
-              hasUnsavedChanges ? "text-amber-700" : "text-emerald-700"
+              shouldSave ? "text-amber-700" : "text-emerald-700"
             }`}
           >
-            {hasUnsavedChanges
-              ? "Cambios sin guardar"
-              : initialData
-                ? "Guardado"
-                : "Sin cambios pendientes"}
+            {isEditMode
+              ? hasUnsavedChanges
+                ? "Cambios sin guardar"
+                : "Guardado"
+              : "Pendiente de crear"}
           </p>
 
           <div className="flex items-center gap-3">
@@ -1999,7 +2082,9 @@ export default function CourseTemplateForm({
                 <Save size={16} />
               )}
               {isSubmitting
-                ? "Guardando..."
+                ? isEditMode
+                  ? "Guardando..."
+                  : "Creando..."
                 : shouldSave
                   ? submitLabel
                   : "Volver al detalle"}
