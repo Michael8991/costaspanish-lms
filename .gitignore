@@ -41,5 +41,23 @@ yarn-error.log*
 next-env.d.ts
 
 # Mis notas temporales (se subirán cuando estén limpias)
-/docs
-/docs
+/docs/arquitectura.md
+
+# Playwright
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+# Playwright generated artifacts
+/playwright-report/
+/test-results/
+/blob-report/
+
+# Playwright authentication state
+/playwright/.auth/
+
+# Local E2E environment
+.env.e2e
+.env.e2e.local
