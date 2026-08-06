@@ -168,6 +168,12 @@ npm run dev
 
 Open `http://localhost:3000` in your browser.
 
+## Environments
+
+The application uses isolated production and staging environments.
+
+See `docs/environments/staging.md` for the staging, demo and E2E workflow.
+
 ## Author
 
 Developed by **Michael Rodríguez Iranzo** as a full-stack solution for the real-world operational and teaching workflows of a private language academy.

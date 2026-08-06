@@ -45,7 +45,7 @@ export const LoginForm = ({ callbackUrl }: { callbackUrl?: string }) => {
 
     window.location.href = res.url ?? safeCallback;
   }
-
+  const isStaging = process.env.NEXT_PUBLIC_APP_ENV === "staging";
   return (
     <div className="bg-gray-50 flex w-full min-h-screen items-center align-middle text-black">
       <div className="login-wrap max-xl:mx-auto w-200 min-h-125 mx-auto shadow-lg rounded-lg bg-white p-2">
@@ -87,6 +87,11 @@ export const LoginForm = ({ callbackUrl }: { callbackUrl?: string }) => {
             <h1 className="text-4xl font-bold text-rose-500 text-center">
               Welcome
             </h1>
+            {isStaging && (
+              <div className="bg-amber-100 px-3 py-1 text-center text-sm font-medium text-amber-900">
+                Entorno de demostración — datos ficticios
+              </div>
+            )}
             <p className="text-gray-500 text-sm text-center font-light mt-2">
               Login with email for students
             </p>

@@ -175,6 +175,8 @@ export const Topbar = ({ userName, locale, role }: TopbarProps) => {
     };
   }, []);
 
+  const isStaging = process.env.NEXT_PUBLIC_APP_ENV === "staging";
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-[#30343f]">
       <div className="relative mx-auto flex h-16 w-full max-w-screen-2xl items-center px-3 sm:px-6 lg:px-8">
@@ -246,9 +248,7 @@ export const Topbar = ({ userName, locale, role }: TopbarProps) => {
         </nav>
 
         <div className="flex min-w-32 flex-1 items-center justify-end gap-1 sm:min-w-40 sm:gap-2 lg:min-w-56">
-          {(role === "teacher" || role === "admin") && (
-            <TeacherTasksLauncher />
-          )}
+          {(role === "teacher" || role === "admin") && <TeacherTasksLauncher />}
 
           <button
             type="button"

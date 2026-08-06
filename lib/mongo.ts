@@ -33,6 +33,7 @@
 // }
 
 import mongoose from "mongoose";
+import { assertStagingEnvironment } from "./env/assert-staging-environment";
 
 function getMongoUri(): string {
     const uri = process.env.MONGODB_URI ?? process.env.MONGO_URI;
@@ -63,6 +64,7 @@ const mongooseCache = global.__mongooseConn ?? {
 global.__mongooseConn = mongooseCache;
 
 export async function dbConnect() {
+    assertStagingEnvironment();
     const cached = mongooseCache;
 
     if (cached.conn) {
@@ -71,7 +73,7 @@ export async function dbConnect() {
 
     if (!cached.promise) {
         cached.promise = mongoose.connect(MONGODB_URI, {
-            //Opciones de mongoose. //TODO: Leer documentación
+            dbName: process.env.MONGODB_DB_NAME,
         }).then((m) => m);
     }
     try {

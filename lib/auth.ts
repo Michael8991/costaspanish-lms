@@ -25,10 +25,12 @@ export const authOptions: NextAuthOptions = {
         if (email.trim().length === 0 || password.trim().length === 0)
           return null;
 
+        const normalizedEmail = email.trim().toLowerCase();
+
         await dbConnect();
 
-        const user = await User.findOne({ email: email.toLowerCase().trim() });
-        if (!user) return null;
+        const user = await User.findOne({ email: normalizedEmail });
+        if (!user || !user.isActive || !user.passwordHash) return null;
 
         const ok = await bcrypt.compare(password, user.passwordHash);
         if (!ok) return null;

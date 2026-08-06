@@ -43,6 +43,8 @@ export default defineConfig({
     screenshot: "only-on-failure",
     video: "retain-on-failure",
   },
+    
+    
 
   /* Configure projects for major browsers */
     // Bloqueado el resto para empezar con chromium

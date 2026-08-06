@@ -1,9 +1,11 @@
 import { LoginForm } from "./LoginForm";
 
-export default function Login({
+export default async function Login({
   searchParams,
 }: {
-  searchParams: { callbackUrl?: string };
+  searchParams: Promise<{ callbackUrl?: string }>;
 }) {
-  return <LoginForm callbackUrl={searchParams.callbackUrl} />;
+  const { callbackUrl } = await searchParams;
+
+  return <LoginForm callbackUrl={callbackUrl} />;
 }
