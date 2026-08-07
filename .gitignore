@@ -61,3 +61,4 @@ node_modules/
 # Local E2E environment
 .env.e2e
 .env.e2e.local
+!.env.e2e.example
