@@ -661,10 +661,22 @@ export async function POST(req: NextRequest) {
     /**
      * Resto de errores no controlados.
      */
+    const errorName = error instanceof Error ? error.name : "UnknownError";
     const errorMessage =
       error instanceof Error ? error.message : "Error desconocido";
+    const errorCode =
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (typeof error.code === "string" || typeof error.code === "number")
+        ? error.code
+        : undefined;
 
-    console.error("Error en POST /api/resources:", errorMessage);
+    console.error("[POST /api/resources] Error inesperado", {
+      name: errorName,
+      message: errorMessage,
+      code: errorCode,
+    });
 
     return NextResponse.json(
       { error: "Error al crear un nuevo recurso" },

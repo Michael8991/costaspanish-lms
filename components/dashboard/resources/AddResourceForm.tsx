@@ -118,7 +118,7 @@ export default function AddResourceForm({
       levels: formData.levels,
       skills: formData.skills,
       deliveryModes: formData.deliveryModes,
-      lessonStage: formData.lessonStages, //?pllural o singular en singular deberia cambiarlo en el modelo tmb?
+      lessonStages: formData.lessonStages,
       grammarTopics: formData.grammarTopics,
       vocabularyTopics: formData.vocabularyTopics,
       tags: formData.tags,

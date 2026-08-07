@@ -27,10 +27,21 @@ export default function AddResourcePage() {
         body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
+      const responseData = (await response.json()) as {
+        error?: string;
+        item?: unknown;
+      };
 
       if (!response.ok) {
-        throw new Error(data.error || "Hubo un error al guardar el recurso.");
+        console.error("[CREATE RESOURCE ERROR]", {
+          status: response.status,
+          statusText: response.statusText,
+          body: responseData,
+        });
+        throw new Error(
+          responseData.error ??
+            `Error al crear un nuevo recurso (${response.status})`,
+        );
       }
 
       toast.success("Material añadido a la biblioteca!");

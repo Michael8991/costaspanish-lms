@@ -12,7 +12,7 @@ export type AddResourcePayload = {
   levels: CEFRLevel[];
   skills: SkillFocus[];
   deliveryModes: DeliveryModes[];
-  lessonStage: LessonStage[];
+  lessonStages: LessonStage[];
 
   grammarTopics: string[];
   vocabularyTopics: string[];
