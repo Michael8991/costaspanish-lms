@@ -383,14 +383,23 @@ ResourceSchema.index({
 
 ResourceSchema.index({
   ownerTeacherId: 1,
-  levels: 1,
-  skills: 1,
   pedagogicalType: 1,
+  levels: 1,
+});
+
+ResourceSchema.index({
+  ownerTeacherId: 1,
+  pedagogicalType: 1,
+  skills: 1,
 });
 
 ResourceSchema.index({
   ownerTeacherId: 1,
   deliveryModes: 1,
+});
+
+ResourceSchema.index({
+  ownerTeacherId: 1,
   lessonStages: 1,
 });
 

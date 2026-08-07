@@ -8,6 +8,7 @@
     "build": "next build",
     "backfill:students-teacher-known": "node --env-file=.env.staging.local --experimental-strip-types scripts/backfill-students-teacher-id.ts",
     "start": "next start",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
@@ -16,6 +17,9 @@
     "test:e2e:report": "playwright show-report",
     "seed:staging": "dotenv -e .env.staging.local -- tsx scripts/staging/seed-initial.ts",
     "seed:staging:init": "dotenv -e .env.staging.local -- tsx scripts/staging/seed-initial.ts",
+    "inspect:staging:resource-indexes": "dotenv -e .env.staging.local -- tsx scripts/staging/inspect-resource-indexes.ts",
+    "fix:staging:resource-indexes": "dotenv -e .env.staging.local -- tsx scripts/staging/fix-resource-indexes.ts",
+    "verify:staging:resource-create": "dotenv -e .env.staging.local -- tsx scripts/staging/verify-resource-create.ts",
     "verify:staging:login": "dotenv -e .env.staging.local -- tsx scripts/staging/verify-demo-login.ts",
     "reset:staging": "dotenv -e .env.staging.local -- tsx scripts/staging/reset-staging.ts"
   },
