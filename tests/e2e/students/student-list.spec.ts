@@ -1,7 +1,7 @@
 import test, { expect } from "@playwright/test";
 import { e2eEnv } from "../support/e2e-env";
 
-test.describe("Navigation",()=> {
+test.describe("Dynamic waits in service-based applications",()=> {
     test("teacher can inspect the student list", async ({ page }) => {
         await page.goto("/login")
         const emailInput = page.getByRole("textbox", { name: /email|correo/i, })
@@ -17,9 +17,12 @@ test.describe("Navigation",()=> {
         await page.getByRole('link', { name: /students|estudiantes/i }).click();
         await expect(page).toHaveURL(/\/dashboard\/students/,);
 
+        const tableBody = page.getByTestId("student-table-body")
+        await expect(tableBody).toHaveAttribute("aria-busy", "false")
         
-        const studentsRow = page.getByTestId("student-row")
-        await expect(studentsRow).not.toHaveCount(0)
+        const studentRows = page.getByTestId("student-row")
+        
+        await expect(studentRows).not.toHaveCount(0)
         
         const menuButtons = page.locator(".menu-button")
 

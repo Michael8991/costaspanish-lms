@@ -21,7 +21,7 @@ export default async function StudentsPage({
     { label: "Students", href: `/${locale}/dashboard/students` },
   ];
   return (
-    <div className="container mx-auto py-8 px-4 md:px-8 text-gray-800 max-w-6xl">
+    <div className="container mx-auto max-w-6xl px-4 py-5 text-gray-800 md:px-8 md:py-8">
       <Breadcrumbs items={breadcrumbItems} locale={locale} />
       <h1 className="text-2xl">Estudiantes</h1>
       <p className="text-sm font-light">

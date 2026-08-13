@@ -26,6 +26,7 @@ export default function SummaryStudentsData({
 }: SummaryStudentsDataProps) {
   const stats: Array<{
     title: string;
+    mobileTitle: string;
     value: number;
     filter: StudentsQuickFilter;
     icon: typeof Users;
@@ -34,6 +35,7 @@ export default function SummaryStudentsData({
   }> = [
     {
       title: "Alumnos Activos",
+      mobileTitle: "Activos",
       value: summary.activeStudents,
       filter: "active_students",
       icon: Users,
@@ -42,6 +44,7 @@ export default function SummaryStudentsData({
     },
     {
       title: "Bonos por terminar",
+      mobileTitle: "Bonos pendientes",
       value: summary.expiringPlansSoon,
       filter: "expiring_plans",
       icon: AlertCircle,
@@ -50,6 +53,7 @@ export default function SummaryStudentsData({
     },
     {
       title: "Nivel Pendiente",
+      mobileTitle: "Nivel pendiente",
       value: summary.pendingLevel,
       filter: "pending_level",
       icon: GraduationCap,
@@ -58,6 +62,7 @@ export default function SummaryStudentsData({
     },
     {
       title: "Sin bono activo",
+      mobileTitle: "Sin bono",
       value: summary.studentsWithoutActivePlan,
       filter: "without_active_plan",
       icon: CreditCard,
@@ -67,8 +72,8 @@ export default function SummaryStudentsData({
   ];
 
   return (
-    <div className="container mx-auto max-w-6xl px-4 py-8 text-gray-800 md:px-8">
-      <div className="mb-10 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="container mx-auto max-w-6xl px-0 py-5 text-gray-800 md:px-8 md:py-8">
+      <div className="mb-5 grid grid-cols-2 gap-2 md:mb-10 md:gap-4 xl:grid-cols-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
           const isActive = activeQuickFilter === stat.filter;
@@ -78,33 +83,40 @@ export default function SummaryStudentsData({
               type="button"
               key={stat.title}
               aria-pressed={isActive}
+              aria-label={`${stat.title}: ${isLoading ? "cargando" : stat.value}`}
               onClick={() => onQuickFilterSelect(stat.filter)}
-              className={`group flex cursor-pointer flex-col rounded-xl border p-5 text-left shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-[#9e2727] focus-visible:ring-offset-2 ${
+              className={`group flex min-h-20 min-w-0 cursor-pointer items-center gap-2.5 rounded-xl border p-3 text-left shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-[#9e2727] focus-visible:ring-offset-2 md:min-h-0 md:flex-col md:items-stretch md:gap-0 md:p-5 ${
                 isActive
                   ? "border-[#9e2727] bg-red-50/50 ring-2 ring-[#9e2727]/10"
                   : "border-gray-200 bg-white hover:border-[#9e2727]/30 hover:shadow-md"
               }`}
             >
-              <div className="flex w-full items-start justify-between gap-3">
-                <div className={`rounded-full p-3 ${stat.bg}`}>
-                  <Icon className={stat.color} size={24} strokeWidth={2} />
+              <div className="flex shrink-0 items-start justify-between gap-3 md:w-full">
+                <div className={`rounded-full p-2 md:p-3 ${stat.bg}`}>
+                  <Icon
+                    className={`h-5 w-5 md:h-6 md:w-6 ${stat.color}`}
+                    strokeWidth={2}
+                  />
                 </div>
                 {isActive && (
-                  <span className="rounded-full bg-[#9e2727] px-2 py-1 text-[11px] font-semibold text-white">
+                  <span className="hidden rounded-full bg-[#9e2727] px-2 py-1 text-[11px] font-semibold text-white md:inline-flex">
                     Filtro activo
                   </span>
                 )}
               </div>
 
-              <div className="mt-4">
-                <p className="text-sm font-medium text-gray-500">{stat.title}</p>
-                <p className="mt-1 text-3xl font-bold text-gray-900">
+              <div className="flex min-w-0 flex-col md:mt-4">
+                <p className="order-2 text-xs font-medium leading-tight text-gray-500 md:order-1 md:text-sm">
+                  <span className="md:hidden">{stat.mobileTitle}</span>
+                  <span className="hidden md:inline">{stat.title}</span>
+                </p>
+                <p className="order-1 text-xl font-bold leading-tight text-gray-900 md:order-2 md:mt-1 md:text-3xl">
                   {isLoading ? "—" : stat.value}
                 </p>
               </div>
 
               <span
-                className={`mt-4 inline-flex items-center gap-1 text-xs font-semibold ${
+                className={`mt-4 hidden items-center gap-1 text-xs font-semibold md:inline-flex ${
                   isActive ? "text-[#9e2727]" : "text-gray-500"
                 }`}
               >

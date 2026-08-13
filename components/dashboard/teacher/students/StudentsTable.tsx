@@ -144,14 +144,21 @@ export default function StudentsTable({
       setMenuPosition(null);
     } else {
       const rect = event.currentTarget.getBoundingClientRect();
-      const menuHeight = 260;
+      const menuHeight = 300;
       const menuWidth = 220;
       const spaceBelow = window.innerHeight - rect.bottom;
+      const preferredTop =
+        spaceBelow > menuHeight ? rect.bottom + 4 : rect.top - menuHeight - 4;
 
       setMenuPosition({
-        top:
-          spaceBelow > menuHeight ? rect.bottom + 4 : rect.top - menuHeight - 4,
-        left: rect.right - menuWidth,
+        top: Math.min(
+          Math.max(8, preferredTop),
+          Math.max(8, window.innerHeight - menuHeight - 8),
+        ),
+        left: Math.min(
+          Math.max(8, rect.right - menuWidth),
+          Math.max(8, window.innerWidth - menuWidth - 8),
+        ),
       });
       setIsOpenQO(studentId);
     }
@@ -161,25 +168,36 @@ export default function StudentsTable({
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
       if (
-        !target.closest(".menu-button") &&
+        !target.closest("[data-student-menu-trigger]") &&
         !target.closest(".menu-dropdown")
       ) {
         setIsOpenQO(null);
         setMenuPosition(null);
       }
     };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsOpenQO(null);
+        setMenuPosition(null);
+      }
+    };
 
     document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
     };
   }, []);
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-      <div className="p-5 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4 bg-gray-50/50">
+      <div className="flex flex-col items-stretch justify-between gap-3 border-b border-gray-200 bg-gray-50/50 p-4 md:flex-row md:items-center md:gap-4 md:p-5">
         <div className="flex items-center gap-3">
-          <h2 className="text-lg font-semibold text-gray-800">Estudiantes</h2>
+          <h2 className="text-lg font-semibold text-gray-800">
+            Estudiantes
+            <span className="md:hidden"> ({pagination.total})</span>
+          </h2>
           {isLoading && students.length > 0 && (
             <span className="text-xs italic text-gray-400">
               Actualizando...
@@ -189,26 +207,33 @@ export default function StudentsTable({
 
         <Link
           href={`/${locale}/dashboard/students/newStudent`}
-          className="w-full sm:w-auto bg-[#9e2727] hover:bg-[#a85d5d] text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-all shadow-sm font-medium text-sm"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#9e2727] px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-[#a85d5d] md:w-auto"
         >
           <Plus size={18} />
           <span>Nuevo Alumno</span>
         </Link>
       </div>
 
-      {isLoading && students.length === 0 && (
-        <div className="p-8 text-center text-gray-500">
-          <p className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#9e2727] mx-auto mb-4"></p>
-          Cargando estudiantes...
-        </div>
-      )}
+      <div
+        data-testid="student-table-body"
+        aria-busy={isLoading ? "true" : "false"}
+        className={`transition-opacity ${
+          isLoading && students.length > 0 ? "opacity-60" : "opacity-100"
+        }`}
+      >
+        {isLoading && students.length === 0 && (
+          <div className="p-8 text-center text-gray-500">
+            <p className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-b-2 border-[#9e2727]"></p>
+            Cargando estudiantes...
+          </div>
+        )}
 
-      {error && (
-        <div className="w-full flex items-center justify-center py-4 gap-2 text-red-500">
-          <AlertCircle size={16} />
-          No se pudieron cargar los estudiantes.
-        </div>
-      )}
+        {error && (
+          <div className="flex w-full items-center justify-center gap-2 py-4 text-red-500">
+            <AlertCircle size={16} />
+            No se pudieron cargar los estudiantes.
+          </div>
+        )}
 
       {!isLoading && !error && students.length <= 0 && (
         <div className="flex items-center justify-center py-5 gap-2 text-green-900">
@@ -220,13 +245,9 @@ export default function StudentsTable({
       )}
 
       {!error && students.length > 0 && (
-        <div
-          className={`overflow-x-auto transition-opacity ${
-            isLoading ? "opacity-60" : "opacity-100"
-          }`}
-        >
-          <table className="w-full text-left border-collapse">
-            <thead>
+        <div className="md:overflow-x-auto">
+          <table className="block w-full border-collapse text-left md:table">
+            <thead className="hidden md:table-header-group">
               <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 text-xs uppercase tracking-wider">
                 <th className="px-6 py-4 font-medium">Alumno</th>
                 <th className="px-6 py-4 font-medium">Nivel</th>
@@ -235,7 +256,7 @@ export default function StudentsTable({
                 <th className="px-6 py-4 font-medium text-right">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="block divide-y divide-gray-200 md:table-row-group">
               {students.map((student) => {
                 const progressPercentage =
                   student.highlightedPlanCreditsTotal > 0
@@ -254,9 +275,88 @@ export default function StudentsTable({
                   <tr
                     key={student.id}
                     data-testid="student-row"
-                    className="hover:bg-gray-50/50 transition-colors group"
+                    className="group block transition-colors hover:bg-gray-50/50 md:table-row"
                   >
-                    <td className="px-6 py-4">
+                    <td className="block p-4 md:hidden">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-200 text-sm font-bold text-gray-600">
+                          {student.name.charAt(0)}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium text-gray-900">
+                            {student.name}
+                          </p>
+                          <div className="mt-0.5 flex min-w-0 items-center gap-1 text-sm text-gray-500">
+                            <Mail className="shrink-0" size={13} aria-hidden="true" />
+                            <span className="truncate">{student.email}</span>
+                          </div>
+
+                          <div className="mt-2 flex min-w-0 flex-wrap gap-1.5">
+                            <span
+                              className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${getLevelBadge(student.level)}`}
+                            >
+                              {student.level}
+                            </span>
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                                student.status === "active"
+                                  ? "border-green-100 bg-green-50 text-green-700"
+                                  : "border-gray-200 bg-gray-100 text-gray-600"
+                              }`}
+                            >
+                              <span
+                                className={`h-1.5 w-1.5 rounded-full ${
+                                  student.status === "active"
+                                    ? "bg-green-500"
+                                    : "bg-gray-400"
+                                }`}
+                              />
+                              {student.status === "active" ? "Activo" : "Inactivo"}
+                            </span>
+                            <span
+                              className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                                student.activePlansCount > 0
+                                  ? "border-blue-100 bg-blue-50 text-blue-700"
+                                  : "border-red-100 bg-red-50 text-red-700"
+                              }`}
+                            >
+                              {student.activePlansCount > 0
+                                ? "Bono activo"
+                                : "Sin bono"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex shrink-0 flex-col items-center gap-1 min-[360px]:flex-row">
+                          <Link
+                            href={withLocale(
+                              `/dashboard/students/${student.id}/vouchersHistory`,
+                            )}
+                            aria-label={`Ver bonos de ${student.name}`}
+                            className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-gray-500 outline-none transition hover:border-[#9e2727] hover:bg-red-50 hover:text-[#9e2727] focus-visible:ring-2 focus-visible:ring-[#9e2727] focus-visible:ring-offset-2"
+                          >
+                            <CreditCard size={19} aria-hidden="true" />
+                          </Link>
+                          <button
+                            type="button"
+                            data-student-menu-trigger
+                            aria-label={`Más acciones para ${student.name}`}
+                            aria-haspopup="menu"
+                            aria-expanded={isOpenQO === student.id}
+                            aria-controls="student-actions-menu"
+                            onClick={(event) =>
+                              toggleQuickOptionsMenu(student.id, event)
+                            }
+                            className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg text-gray-500 outline-none transition hover:bg-red-50 hover:text-[#9e2727] focus-visible:ring-2 focus-visible:ring-[#9e2727] focus-visible:ring-offset-2"
+                          >
+                            <MoreVertical size={20} aria-hidden="true" />
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className="hidden px-6 py-4 md:table-cell">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center font-bold text-sm">
                           {student.name.charAt(0)}
@@ -273,7 +373,7 @@ export default function StudentsTable({
                       </div>
                     </td>
 
-                    <td className="px-6 py-4">
+                    <td className="hidden px-6 py-4 md:table-cell">
                       <span
                         className={`px-3 py-1 text-xs font-semibold rounded-full border ${getLevelBadge(student.level)}`}
                       >
@@ -281,7 +381,7 @@ export default function StudentsTable({
                       </span>
                     </td>
 
-                    <td className="px-6 py-4">
+                    <td className="hidden px-6 py-4 md:table-cell">
                       <span
                         className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium border ${
                           student.status === "active"
@@ -300,7 +400,7 @@ export default function StudentsTable({
                       </span>
                     </td>
 
-                    <td className="px-6 py-4 min-w-70">
+                    <td className="hidden min-w-70 px-6 py-4 md:table-cell">
                       {student.activePlansCount > 0 ? (
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
@@ -339,12 +439,18 @@ export default function StudentsTable({
                       )}
                     </td>
 
-                    <td className="px-6 py-4 text-right">
+                    <td className="hidden px-6 py-4 text-right md:table-cell">
                       <button
+                        type="button"
+                        data-student-menu-trigger
+                        aria-label={`Más acciones para ${student.name}`}
+                        aria-haspopup="menu"
+                        aria-expanded={isOpenQO === student.id}
+                        aria-controls="student-actions-menu"
                         onClick={(e) => toggleQuickOptionsMenu(student.id, e)}
-                        className="menu-button p-2 text-gray-400 hover:text-[#9e2727] hover:bg-red-50 rounded-lg transition-colors hover:cursor-pointer"
+                        className="menu-button cursor-pointer rounded-lg p-2 text-gray-400 outline-none transition-colors hover:bg-red-50 hover:text-[#9e2727] focus-visible:ring-2 focus-visible:ring-[#9e2727] focus-visible:ring-offset-2"
                       >
-                        <MoreVertical size={20} />
+                        <MoreVertical size={20} aria-hidden="true" />
                       </button>
                     </td>
                   </tr>
@@ -354,25 +460,26 @@ export default function StudentsTable({
           </table>
         </div>
       )}
+      </div>
 
       {!error && (!isLoading || students.length > 0) && (
-        <div className="flex flex-col gap-3 border-t border-gray-200 bg-gray-50/50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 border-t border-gray-200 bg-gray-50/50 px-4 py-3 md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
           <p className="text-sm text-gray-500">
             Mostrando {rangeStart}–{rangeEnd} de {pagination.total} estudiantes
           </p>
 
           {pagination.totalPages > 1 && (
-            <div className="flex items-center gap-2">
+            <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-1 md:flex md:w-auto md:gap-2">
               <button
                 type="button"
                 onClick={onPreviousPage}
                 disabled={!pagination.hasPreviousPage || isLoading}
-                className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 md:px-3"
               >
                 Anterior
               </button>
 
-              <span className="px-2 text-sm font-medium text-gray-600">
+              <span className="px-1 text-center text-xs font-medium text-gray-600 md:px-2 md:text-sm">
                 Página {pagination.page} de {pagination.totalPages}
               </span>
 
@@ -380,7 +487,7 @@ export default function StudentsTable({
                 type="button"
                 onClick={onNextPage}
                 disabled={!pagination.hasNextPage || isLoading}
-                className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg border border-gray-200 bg-white px-2 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 md:px-3"
               >
                 Siguiente
               </button>
@@ -391,20 +498,24 @@ export default function StudentsTable({
 
       {isOpenQO && menuPosition && (
         <div
-          className="menu-dropdown fixed z-9999 py-4 px-4 min-w-55 flex flex-col rounded-lg bg-[#9e2727] gap-3 shadow-xl"
+          id="student-actions-menu"
+          role="menu"
+          aria-label="Acciones del estudiante"
+          className="menu-dropdown fixed z-9999 flex max-h-[calc(100vh-1rem)] w-[min(13.75rem,calc(100vw-1rem))] flex-col gap-3 overflow-y-auto rounded-lg bg-[#9e2727] px-4 py-4 shadow-xl"
           style={{ top: menuPosition.top, left: menuPosition.left }}
         >
-          {quickOptionsMenu.map((object, index) => {
+          {quickOptionsMenu.map((object) => {
             const Icon = object.icon;
             return (
               <Link
-                key={index}
+                key={object.label}
+                role="menuitem"
                 onClick={() => {
                   setIsOpenQO(null);
                   setMenuPosition(null);
                 }}
                 href={withLocale(object.href(isOpenQO))}
-                className="flex items-center hover:bg-[#a85d5d] py-2 px-4 rounded-lg text-white transition-all duration-200"
+                className="flex items-center rounded-lg px-4 py-2 text-white outline-none transition-all duration-200 hover:bg-[#a85d5d] focus-visible:ring-2 focus-visible:ring-white"
               >
                 <Icon size={18} className="me-2" />
                 {object.label}
