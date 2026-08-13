@@ -101,7 +101,8 @@ function getVoucherProgressLabel(student: StudentTableRow): VoucherProgress {
   }
 
   const unit = total === 1 ? "crédito" : "créditos";
-  const remainingUnit = remaining === 1 ? "crédito restante" : "créditos restantes";
+  const remainingUnit =
+    remaining === 1 ? "crédito restante" : "créditos restantes";
   const colorClass =
     remaining === 0
       ? "bg-red-50 text-red-700"
@@ -331,13 +332,6 @@ export default function StudentsTable({
                           </div>
 
                           <div className="flex shrink-0 flex-col items-center gap-1 min-[360px]:flex-row">
-                            <Link
-                              href={withLocale(`/dashboard/students/${student.id}`)}
-                              aria-label={`Ver detalles de ${student.name}`}
-                              className="rounded-lg bg-transparent px-3 py-2 text-sm font-medium text-gray-600 outline-none transition-colors hover:bg-gray-50 hover:text-gray-900 focus-visible:ring-2 focus-visible:ring-[#9e2727]/30 focus-visible:ring-offset-2"
-                            >
-                              Detalles
-                            </Link>
                             <ActionMenu
                               items={actionItems}
                               triggerLabel={`Más acciones para ${student.name}`}
@@ -438,13 +432,6 @@ export default function StudentsTable({
 
                       <td className="hidden px-6 py-4 text-right md:table-cell">
                         <div className="flex items-center justify-end gap-1">
-                          <Link
-                            href={withLocale(`/dashboard/students/${student.id}`)}
-                            aria-label={`Ver detalles de ${student.name}`}
-                            className="rounded-lg bg-transparent px-3 py-1.5 text-sm font-medium text-gray-600 outline-none transition-colors hover:bg-gray-50 hover:text-gray-900 focus-visible:ring-2 focus-visible:ring-[#9e2727]/30 focus-visible:ring-offset-2"
-                          >
-                            Detalles
-                          </Link>
                           <ActionMenu
                             items={actionItems}
                             triggerLabel={`Más acciones para ${student.name}`}
@@ -495,7 +482,6 @@ export default function StudentsTable({
           )}
         </div>
       )}
-
     </div>
   );
 }
