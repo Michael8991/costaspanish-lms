@@ -1,5 +1,6 @@
 "use client";
 
+import { motion, useReducedMotion } from "framer-motion";
 import { RotateCcw, Search, SlidersHorizontal, Trash2 } from "lucide-react";
 import { useState } from "react";
 
@@ -90,7 +91,7 @@ function FilterSelect({
         id={id}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition-shadow focus:border-transparent focus:ring-2 focus:ring-[#9e2727]"
+        className="w-full rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700 outline-none transition focus:bg-white focus:ring-2 focus:ring-[#9e2727]/20"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -118,6 +119,7 @@ export default function StudentsFilters({
   onClearFilters,
 }: StudentsFiltersProps) {
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const shouldReduceMotion = useReducedMotion();
   const hasActiveFilters = Boolean(
     search.trim() || level || status || planType || classType || planHealth,
   );
@@ -146,7 +148,7 @@ export default function StudentsFilters({
   return (
     <section
       aria-label="Filtros de estudiantes"
-      className="mb-5 rounded-xl border border-gray-200 bg-white p-3 shadow-sm md:p-4"
+      className="mb-6 rounded-xl bg-white p-3 shadow-[0_2px_12px_-3px_rgba(15,23,42,0.10)] md:p-4"
     >
       <div className="grid grid-cols-[minmax(0,1fr)_2.75rem] gap-2 md:grid-cols-2 md:gap-3 lg:grid-cols-4 xl:grid-cols-8">
         <label
@@ -168,7 +170,7 @@ export default function StudentsFilters({
               value={search}
               onChange={(event) => onSearchChange(event.target.value)}
               placeholder="Buscar alumno..."
-              className="h-11 w-full min-w-0 rounded-lg border border-gray-200 py-2 pl-10 pr-3 text-sm outline-none transition-shadow focus:border-transparent focus:ring-2 focus:ring-[#9e2727] md:h-auto md:pr-4"
+              className="h-11 w-full min-w-0 rounded-lg bg-gray-100/70 py-2 pl-10 pr-3 text-sm text-gray-700 outline-none transition placeholder:text-gray-400 focus:bg-white focus:ring-2 focus:ring-[#9e2727]/20 md:h-auto md:pr-4"
             />
           </span>
         </label>
@@ -179,10 +181,10 @@ export default function StudentsFilters({
           aria-expanded={filtersOpen}
           aria-controls="student-mobile-filters"
           onClick={() => setFiltersOpen((current) => !current)}
-          className={`relative flex h-11 w-11 cursor-pointer items-center justify-center self-end rounded-lg border text-gray-600 outline-none transition focus-visible:ring-2 focus-visible:ring-[#9e2727] focus-visible:ring-offset-2 md:hidden ${
+          className={`relative flex h-11 w-11 cursor-pointer items-center justify-center self-end rounded-lg text-gray-600 outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-[#9e2727]/30 focus-visible:ring-offset-2 motion-reduce:transition-none md:hidden ${
             activeAdvancedFilterCount > 0
-              ? "border-[#9e2727] bg-red-50 text-[#9e2727]"
-              : "border-gray-200 bg-white hover:border-[#9e2727] hover:text-[#9e2727]"
+              ? "bg-red-50 text-[#9e2727]"
+              : "bg-gray-100/70 hover:bg-gray-100 hover:text-gray-900"
           }`}
         >
           <SlidersHorizontal size={19} aria-hidden="true" />
@@ -193,78 +195,98 @@ export default function StudentsFilters({
           )}
         </button>
 
-        <div
+        <motion.div
           id="student-mobile-filters"
-          className={`${filtersOpen ? "col-span-2 grid" : "hidden"} grid-cols-2 gap-3 border-t border-gray-100 pt-3 md:contents`}
+          initial={false}
+          animate={{
+            height: filtersOpen ? "auto" : 0,
+            opacity: filtersOpen ? 1 : 0,
+            y: filtersOpen ? 0 : -4,
+          }}
+          transition={{
+            duration: shouldReduceMotion ? 0 : 0.2,
+            ease: "easeOut",
+          }}
+          className={`col-span-2 overflow-hidden md:contents md:!h-auto md:!transform-none md:!overflow-visible md:!opacity-100 ${
+            filtersOpen ? "pointer-events-auto" : "pointer-events-none md:pointer-events-auto"
+          }`}
         >
-          <FilterSelect
-            id="student-level"
-            label="Nivel"
-            value={level}
-            options={LEVEL_OPTIONS}
-            onChange={onLevelChange}
-          />
-          <FilterSelect
-            id="student-status"
-            label="Estado"
-            value={status}
-            options={STATUS_OPTIONS}
-            onChange={onStatusChange}
-          />
-          <FilterSelect
-            id="student-plan-type"
-            label="Tipo de bono"
-            value={planType}
-            options={PLAN_TYPE_OPTIONS}
-            onChange={onPlanTypeChange}
-          />
-          <FilterSelect
-            id="student-class-type"
-            label="Tipo de clase"
-            value={classType}
-            options={CLASS_TYPE_OPTIONS}
-            onChange={onClassTypeChange}
-          />
-          <div className="col-span-2 md:col-span-1">
-            <FilterSelect
-              id="student-plan-health"
-              label="Estado del bono"
-              value={planHealth}
-              options={PLAN_HEALTH_OPTIONS}
-              onChange={onPlanHealthChange}
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={onClearFilters}
-            disabled={!hasActiveFilters}
-            className="col-span-2 flex min-h-11 cursor-pointer items-center justify-center gap-2 self-end rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 transition hover:border-[#9e2727] hover:bg-red-50 hover:text-[#9e2727] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-gray-200 disabled:hover:bg-transparent disabled:hover:text-gray-600 md:col-span-1 md:min-h-0"
+          <div
+            className={`min-h-0 overflow-hidden transition-[visibility] duration-200 motion-reduce:transition-none md:contents ${
+              filtersOpen
+                ? "visible"
+                : "invisible md:visible"
+            }`}
           >
-            <RotateCcw className="md:hidden" size={16} aria-hidden="true" />
-            <Trash2 className="hidden md:block" size={16} aria-hidden="true" />
-            <span className="md:sr-only">Limpiar filtros</span>
-          </button>
-        </div>
-      </div>
+            <div className="grid grid-cols-2 gap-3 pt-3 md:contents">
+              <FilterSelect
+                id="student-level"
+                label="Nivel"
+                value={level}
+                options={LEVEL_OPTIONS}
+                onChange={onLevelChange}
+              />
+              <FilterSelect
+                id="student-status"
+                label="Estado"
+                value={status}
+                options={STATUS_OPTIONS}
+                onChange={onStatusChange}
+              />
+              <FilterSelect
+                id="student-plan-type"
+                label="Tipo de bono"
+                value={planType}
+                options={PLAN_TYPE_OPTIONS}
+                onChange={onPlanTypeChange}
+              />
+              <FilterSelect
+                id="student-class-type"
+                label="Tipo de clase"
+                value={classType}
+                options={CLASS_TYPE_OPTIONS}
+                onChange={onClassTypeChange}
+              />
+              <div className="col-span-2 md:col-span-1">
+                <FilterSelect
+                  id="student-plan-health"
+                  label="Estado del bono"
+                  value={planHealth}
+                  options={PLAN_HEALTH_OPTIONS}
+                  onChange={onPlanHealthChange}
+                />
+              </div>
 
-      {activeFilters.length > 0 && (
-        <div
-          className={`${filtersOpen ? "flex" : "hidden"} mt-3 flex-wrap items-center gap-2 border-t border-gray-100 pt-3 md:flex`}
-        >
-          <span className="text-xs font-medium text-gray-500">
-            Filtros activos:
-          </span>
-          {activeFilters.map((filter) => (
-            <span
-              key={filter}
-              className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-[#9e2727]"
-            >
-              {filter}
-            </span>
-          ))}
-        </div>
-      )}
+              <button
+                type="button"
+                onClick={onClearFilters}
+                disabled={!hasActiveFilters}
+                className="col-span-2 flex min-h-11 cursor-pointer items-center justify-center gap-2 self-end rounded-lg bg-gray-50 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40 md:col-span-1 md:min-h-0"
+              >
+                <RotateCcw className="md:hidden" size={16} aria-hidden="true" />
+                <Trash2 className="hidden md:block" size={16} aria-hidden="true" />
+                <span className="md:sr-only">Limpiar filtros</span>
+              </button>
+
+              {activeFilters.length > 0 && (
+                <div className="col-span-2 mt-1 flex flex-wrap items-center gap-2 pt-2 md:mt-3 md:pt-3 lg:col-span-4 xl:col-span-8">
+                  <span className="text-xs font-medium text-gray-500">
+                    Filtros activos:
+                  </span>
+                  {activeFilters.map((filter) => (
+                    <span
+                      key={filter}
+                      className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-[#9e2727]"
+                    >
+                      {filter}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </motion.div>
+      </div>
     </section>
   );
 }

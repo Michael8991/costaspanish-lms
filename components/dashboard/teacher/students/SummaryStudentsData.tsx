@@ -30,8 +30,6 @@ export default function SummaryStudentsData({
     value: number;
     filter: StudentsQuickFilter;
     icon: typeof Users;
-    color: string;
-    bg: string;
   }> = [
     {
       title: "Alumnos Activos",
@@ -39,8 +37,6 @@ export default function SummaryStudentsData({
       value: summary.activeStudents,
       filter: "active_students",
       icon: Users,
-      color: "text-blue-600",
-      bg: "bg-blue-50",
     },
     {
       title: "Bonos por terminar",
@@ -48,8 +44,6 @@ export default function SummaryStudentsData({
       value: summary.expiringPlansSoon,
       filter: "expiring_plans",
       icon: AlertCircle,
-      color: "text-red-600",
-      bg: "bg-red-50",
     },
     {
       title: "Nivel Pendiente",
@@ -57,8 +51,6 @@ export default function SummaryStudentsData({
       value: summary.pendingLevel,
       filter: "pending_level",
       icon: GraduationCap,
-      color: "text-amber-600",
-      bg: "bg-amber-50",
     },
     {
       title: "Sin bono activo",
@@ -66,14 +58,12 @@ export default function SummaryStudentsData({
       value: summary.studentsWithoutActivePlan,
       filter: "without_active_plan",
       icon: CreditCard,
-      color: "text-purple-600",
-      bg: "bg-purple-50",
     },
   ];
 
   return (
-    <div className="container mx-auto max-w-6xl px-0 py-5 text-gray-800 md:px-8 md:py-8">
-      <div className="mb-5 grid grid-cols-2 gap-2 md:mb-10 md:gap-4 xl:grid-cols-4">
+    <div className="container mx-auto max-w-6xl py-6 text-gray-800 md:py-8">
+      <div className="mb-6 grid grid-cols-2 gap-3 md:mb-10 md:gap-5 xl:grid-cols-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
           const isActive = activeQuickFilter === stat.filter;
@@ -85,16 +75,16 @@ export default function SummaryStudentsData({
               aria-pressed={isActive}
               aria-label={`${stat.title}: ${isLoading ? "cargando" : stat.value}`}
               onClick={() => onQuickFilterSelect(stat.filter)}
-              className={`group flex min-h-20 min-w-0 cursor-pointer items-center gap-2.5 rounded-xl border p-3 text-left shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-[#9e2727] focus-visible:ring-offset-2 md:min-h-0 md:flex-col md:items-stretch md:gap-0 md:p-5 ${
+              className={`group flex min-h-28 min-w-0 cursor-pointer flex-col items-start justify-between gap-3 rounded-xl bg-white p-5 text-left shadow-[0_2px_12px_-3px_rgba(15,23,42,0.10)] outline-none transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-8px_rgba(15,23,42,0.16)] focus-visible:ring-2 focus-visible:ring-[#9e2727]/30 focus-visible:ring-offset-2 ${
                 isActive
-                  ? "border-[#9e2727] bg-red-50/50 ring-2 ring-[#9e2727]/10"
-                  : "border-gray-200 bg-white hover:border-[#9e2727]/30 hover:shadow-md"
+                  ? "ring-2 ring-[#9e2727]/25"
+                  : ""
               }`}
             >
-              <div className="flex shrink-0 items-start justify-between gap-3 md:w-full">
-                <div className={`rounded-full p-2 md:p-3 ${stat.bg}`}>
+              <div className="flex w-full items-start justify-between gap-3">
+                <div className="rounded-lg bg-[#9e2727]/10 p-2.5">
                   <Icon
-                    className={`h-5 w-5 md:h-6 md:w-6 ${stat.color}`}
+                    className="h-5 w-5 text-[#9e2727]"
                     strokeWidth={2}
                   />
                 </div>
@@ -105,18 +95,18 @@ export default function SummaryStudentsData({
                 )}
               </div>
 
-              <div className="flex min-w-0 flex-col md:mt-4">
-                <p className="order-2 text-xs font-medium leading-tight text-gray-500 md:order-1 md:text-sm">
+              <div className="flex min-w-0 flex-col">
+                <p className="order-2 mt-1 text-sm font-medium leading-tight text-gray-500 md:order-1 md:mt-0">
                   <span className="md:hidden">{stat.mobileTitle}</span>
                   <span className="hidden md:inline">{stat.title}</span>
                 </p>
-                <p className="order-1 text-xl font-bold leading-tight text-gray-900 md:order-2 md:mt-1 md:text-3xl">
+                <p className="order-1 text-3xl font-semibold leading-none tracking-tight text-gray-900 md:order-2 md:mt-2">
                   {isLoading ? "—" : stat.value}
                 </p>
               </div>
 
               <span
-                className={`mt-4 hidden items-center gap-1 text-xs font-semibold md:inline-flex ${
+                className={`mt-1 hidden items-center gap-1 text-xs font-medium md:inline-flex ${
                   isActive ? "text-[#9e2727]" : "text-gray-500"
                 }`}
               >
