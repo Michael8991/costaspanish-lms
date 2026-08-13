@@ -253,6 +253,7 @@ export default function StudentsTable({
                 return (
                   <tr
                     key={student.id}
+                    data-testid="student-row"
                     className="hover:bg-gray-50/50 transition-colors group"
                   >
                     <td className="px-6 py-4">

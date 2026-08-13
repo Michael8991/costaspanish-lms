@@ -27,4 +27,15 @@ test.describe("Authentication", () => {
         
         await expect(page).toHaveURL(/\/dashboard/,);
     });
+
+    test("rejects invalid teacher credentials", async ({ page, }) => {
+        await page.goto("/login")
+
+        await page.getByRole("textbox", { name: /email|correo/i }).fill(e2eEnv.teacherEmail)
+        await page.getByRole("textbox", { name: /password|contraseña/i }).fill(`${e2eEnv.teacherPassword}_invalid`)
+        await page.getByRole("button", { name: /login|iniciar sesion/i }).click()
+
+        const errorMessage = page.getByText("Invalid Credentials");
+        await expect(errorMessage).toBeVisible();
+    })
 });

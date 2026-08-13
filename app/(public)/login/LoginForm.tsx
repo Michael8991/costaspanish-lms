@@ -149,7 +149,10 @@ export const LoginForm = ({ callbackUrl }: { callbackUrl?: string }) => {
                 </a>
               </div>
               {error && (
-                <p className="text-sm text-white bg-red-400 my-2 py-2 px-4 w-full rounded-md shadow-sm text-center">
+                <p
+                  role="alert"
+                  className="text-sm text-white bg-red-400 my-2 py-2 px-4 w-full rounded-md shadow-sm text-center"
+                >
                   {error}
                 </p>
               )}
