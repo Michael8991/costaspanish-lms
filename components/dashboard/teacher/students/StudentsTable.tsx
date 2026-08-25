@@ -75,7 +75,7 @@ type VoucherProgress = {
 };
 
 function getVoucherProgressLabel(student: StudentTableRow): VoucherProgress {
-  if (student.activePlansCount === 0) {
+  if (!student.hasHighlightedVoucher) {
     return {
       label: "Sin bono",
       accessibleLabel: "Sin bono activo",
@@ -124,6 +124,7 @@ type StudentTableRow = {
   level: string;
   status: "active" | "inactive";
   activePlansCount: number;
+  hasHighlightedVoucher: boolean;
   highlightedPlanName: string;
   highlightedPlanCreditsRemaining: number;
   highlightedPlanCreditsTotal: number;
@@ -160,7 +161,12 @@ export default function StudentsTable({
       const highlightedPlan =
         [...activePlans].sort(
           (a, b) => (b.creditsRemaining ?? 0) - (a.creditsRemaining ?? 0),
-        )[0] ?? null;
+        )[0] ??
+        student.activePlans.find(
+          (plan) =>
+            plan.status === "exhausted" && plan.creditsRemaining === 0,
+        ) ??
+        null;
 
       return {
         id: student.id,
@@ -169,6 +175,7 @@ export default function StudentsTable({
         level: student.level,
         status: student.status,
         activePlansCount: activePlans.length,
+        hasHighlightedVoucher: highlightedPlan !== null,
         highlightedPlanName: highlightedPlan?.name ?? "Sin planes activos",
         highlightedPlanCreditsRemaining: highlightedPlan?.creditsRemaining ?? 0,
         highlightedPlanCreditsTotal: highlightedPlan?.creditsTotal ?? 0,
@@ -436,7 +443,6 @@ export default function StudentsTable({
                             items={actionItems}
                             triggerLabel={`Más acciones para ${student.name}`}
                             menuLabel={`Acciones para ${student.name}`}
-                            triggerClassName="menu-button"
                           />
                         </div>
                       </td>

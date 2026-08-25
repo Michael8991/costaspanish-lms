@@ -37,6 +37,9 @@ type LessonListFilter = {
     $gte?: Date;
     $lt?: Date;
   };
+  scheduledEnd?: {
+    $gt?: Date;
+  };
   status?: {
     $in: string[];
   };
@@ -69,6 +72,8 @@ export async function GET(req: NextRequest) {
         ? rawView
         : "week";
     const rawDate = searchParams.get("date");
+    const rawStart = searchParams.get("start");
+    const rawEnd = searchParams.get("end");
     const rawCourseId = searchParams.get("courseId");
     const rawScope = searchParams.get("scope");
     const scope =
@@ -78,6 +83,8 @@ export async function GET(req: NextRequest) {
         ? (rawScope as LessonListScope)
         : undefined;
     const date = rawDate ? new Date(rawDate) : new Date();
+    const explicitStart = rawStart ? new Date(rawStart) : null;
+    const explicitEnd = rawEnd ? new Date(rawEnd) : null;
 
     if (rawScope && !scope) {
       return NextResponse.json(
@@ -93,6 +100,18 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    if (
+      Boolean(rawStart) !== Boolean(rawEnd) ||
+      (explicitStart && Number.isNaN(explicitStart.getTime())) ||
+      (explicitEnd && Number.isNaN(explicitEnd.getTime())) ||
+      (explicitStart && explicitEnd && explicitStart >= explicitEnd)
+    ) {
+      return NextResponse.json(
+        { error: "Invalid start/end range parameters" },
+        { status: 400 },
+      );
+    }
+
     if (rawCourseId && !Types.ObjectId.isValid(rawCourseId)) {
       return NextResponse.json(
         { error: "Invalid courseId parameter" },
@@ -100,13 +119,20 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const { start, end } = getLessonDateRange({ view, date });
+    const fallbackRange = getLessonDateRange({ view, date });
+    const start = explicitStart ?? fallbackRange.start;
+    const end = explicitEnd ?? fallbackRange.end;
     const filter: LessonListFilter = {
       teacherId: getCurrentUserId(user),
     };
 
     if (!scope) {
-      filter.scheduledStart = { $gte: start, $lt: end };
+      if (explicitStart && explicitEnd) {
+        filter.scheduledStart = { $lt: end };
+        filter.scheduledEnd = { $gt: start };
+      } else {
+        filter.scheduledStart = { $gte: start, $lt: end };
+      }
     } else if (scope === "upcoming") {
       const upcomingMargin = new Date(Date.now() - 2 * 60 * 60 * 1000);
       filter.scheduledStart = { $gte: upcomingMargin };

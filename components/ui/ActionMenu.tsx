@@ -26,7 +26,7 @@ export type ActionMenuItem = {
   variant?: "default" | "danger";
 };
 
-interface ActionMenuProps {
+export interface ActionMenuProps {
   items: ActionMenuItem[];
   triggerLabel: string;
   menuLabel?: string;
@@ -300,7 +300,7 @@ export default function ActionMenu({
             setIsOpen(true);
           }
         }}
-        className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg p-2 outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-[#9e2727]/30 focus-visible:ring-offset-2 ${
+        className={`menu-button flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg p-2 outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-[#9e2727]/30 focus-visible:ring-offset-2 ${
           isOpen
             ? "bg-gray-100 text-gray-700"
             : "text-gray-400 hover:bg-gray-50 hover:text-gray-700"

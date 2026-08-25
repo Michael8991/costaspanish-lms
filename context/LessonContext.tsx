@@ -1,16 +1,25 @@
 "use client";
 
-import { createContext, useContext, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { createContext, useContext, useMemo } from "react";
 
-export type LessonViewMode = "day" | "week" | "month";
+import { dateValueToLocalDate, formatLocalDateValue } from "@/lib/utils/lesson-datetime";
+import {
+  getLessonViewNavigationDate,
+  getTodayLessonDateValue,
+  type LessonCalendarView,
+} from "@/lib/utils/lesson-calendar";
+
+export type LessonViewMode = LessonCalendarView;
 
 interface LessonContextValue {
+  locale: string;
   viewMode: LessonViewMode;
-  setViewMode: (value: LessonViewMode) => void;
-
   selectedDate: Date;
+  selectedDateValue: string;
+  setViewMode: (value: LessonViewMode) => void;
   setSelectedDate: (date: Date) => void;
-
+  navigateTo: (date: Date, view?: LessonViewMode) => void;
   goToday: () => void;
   goPrevious: () => void;
   goNext: () => void;
@@ -18,56 +27,64 @@ interface LessonContextValue {
 
 const LessonContext = createContext<LessonContextValue | null>(null);
 
-function addDays(date: Date, amount: number) {
-  const d = new Date(date);
-  d.setDate(d.getDate() + amount);
-  return d;
+interface LessonProviderProps {
+  children: React.ReactNode;
+  locale: string;
+  initialViewMode: LessonViewMode;
+  initialDateValue: string;
 }
 
-function addMonths(date: Date, amount: number) {
-  const d = new Date(date);
-  d.setMonth(d.getMonth() + amount);
-  return d;
-}
+export function LessonProvider({
+  children,
+  locale,
+  initialViewMode,
+  initialDateValue,
+}: LessonProviderProps) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const selectedDate = useMemo(
+    () => dateValueToLocalDate(initialDateValue) ?? new Date(),
+    [initialDateValue],
+  );
 
-export function LessonProvider({ children }: { children: React.ReactNode }) {
-  const [viewMode, setViewMode] = useState<LessonViewMode>("week");
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-
-  const goToday = () => {
-    setSelectedDate(new Date());
+  const updateUrl = (view: LessonViewMode, date: Date) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("view", view);
+    params.set("date", formatLocalDateValue(date));
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
   };
 
-  const goPrevious = () => {
-    setSelectedDate((current) => {
-      if (viewMode === "day") return addDays(current, -1);
-      if (viewMode === "week") return addDays(current, -7);
-      return addMonths(current, -1);
-    });
+  const navigateTo = (date: Date, view = initialViewMode) => {
+    updateUrl(view, date);
   };
 
-  const goNext = () => {
-    setSelectedDate((current) => {
-      if (viewMode === "day") return addDays(current, 1);
-      if (viewMode === "week") return addDays(current, 7);
-      return addMonths(current, 1);
-    });
+  const value: LessonContextValue = {
+    locale,
+    viewMode: initialViewMode,
+    selectedDate,
+    selectedDateValue: initialDateValue,
+    setViewMode: (view) => updateUrl(view, selectedDate),
+    setSelectedDate: (date) => updateUrl(initialViewMode, date),
+    navigateTo,
+    goToday: () => {
+      const today = dateValueToLocalDate(getTodayLessonDateValue());
+      if (today) updateUrl(initialViewMode, today);
+    },
+    goPrevious: () =>
+      updateUrl(
+        initialViewMode,
+        getLessonViewNavigationDate(initialViewMode, selectedDate, -1),
+      ),
+    goNext: () =>
+      updateUrl(
+        initialViewMode,
+        getLessonViewNavigationDate(initialViewMode, selectedDate, 1),
+      ),
   };
 
   return (
-    <LessonContext.Provider
-      value={{
-        viewMode,
-        setViewMode,
-        selectedDate,
-        setSelectedDate,
-        goToday,
-        goPrevious,
-        goNext,
-      }}
-    >
-      {children}
-    </LessonContext.Provider>
+    <LessonContext.Provider value={value}>{children}</LessonContext.Provider>
   );
 }
 

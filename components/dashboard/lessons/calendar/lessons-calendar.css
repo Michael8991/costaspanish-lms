@@ -1,0 +1,232 @@
+.lessons-calendar-horizontal-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.lessons-calendar-horizontal-scroll.is-week .lessons-calendar-shell {
+  min-width: 67rem;
+}
+
+.lessons-calendar-shell {
+  height: max(38rem, calc(100dvh - 17rem));
+  min-width: 0;
+  font-family: inherit;
+  --fc-classic-border: #f1f5f9;
+  --fc-classic-strong-border: #e5e7eb;
+  --fc-classic-background: #ffffff;
+  --fc-classic-faint: #f8fafc;
+  --fc-classic-muted: #f3f4f6;
+  --fc-classic-strong: #e5e7eb;
+  --fc-classic-foreground: #111827;
+  --fc-classic-faint-foreground: #9ca3af;
+  --fc-classic-muted-foreground: #6b7280;
+  --fc-classic-today: #9e27270a;
+  --fc-classic-now: #9e2727;
+  --fc-classic-primary: #9e2727;
+}
+
+.lessons-calendar-view,
+.lessons-calendar-table {
+  background: #ffffff;
+  color: #374151;
+}
+
+.lessons-calendar-day-header {
+  background: #ffffff;
+  color: #6b7280;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+}
+
+.lessons-calendar-day-header.is-today {
+  color: #9e2727;
+}
+
+.lessons-calendar-day-cell {
+  background: #ffffff;
+}
+
+.lessons-calendar-day-cell.is-today {
+  background: #9e272708;
+}
+
+.lessons-calendar-day-cell.is-outside-month {
+  background: #f8fafc99;
+  color: #9ca3af;
+}
+
+.lessons-calendar-slot-lane {
+  border-color: #f3f4f6 !important;
+}
+
+.lessons-calendar-slot-header {
+  color: #9ca3af;
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.lesson-calendar-event {
+  --lesson-event-foreground: #1d4ed8;
+  border: 1px solid #bfdbfe !important;
+  border-radius: 0.5rem !important;
+  background: #eff6ff !important;
+  color: var(--lesson-event-foreground) !important;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.05);
+  overflow: hidden;
+  text-decoration: none !important;
+  transition:
+    box-shadow 150ms ease,
+    filter 150ms ease;
+}
+
+.lesson-calendar-event:hover {
+  box-shadow: 0 5px 14px -8px rgb(15 23 42 / 0.35);
+  filter: saturate(1.04);
+}
+
+.lesson-calendar-event:focus-visible {
+  outline: 2px solid rgb(158 39 39 / 0.45) !important;
+  outline-offset: 1px;
+}
+
+.lesson-calendar-event--in_progress {
+  --lesson-event-foreground: #a16207;
+  border-color: #fde68a !important;
+  background: #fffbeb !important;
+  color: #a16207 !important;
+}
+
+.lesson-calendar-event--completed {
+  --lesson-event-foreground: #047857;
+  border-color: #a7f3d0 !important;
+  background: #ecfdf5 !important;
+  color: #047857 !important;
+}
+
+.lesson-calendar-event--canceled_by_teacher,
+.lesson-calendar-event--voided {
+  --lesson-event-foreground: #6b7280;
+  border-color: #e5e7eb !important;
+  background: #f9fafb !important;
+  color: #6b7280 !important;
+}
+
+.lesson-calendar-event--canceled_by_teacher .lesson-calendar-event-title,
+.lesson-calendar-event--voided .lesson-calendar-event-title {
+  text-decoration: line-through;
+}
+
+.lesson-calendar-event-content {
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.25rem 0.375rem;
+  overflow: hidden;
+  color: var(--lesson-event-foreground) !important;
+}
+
+.lesson-calendar-event-title {
+  overflow: hidden;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lesson-calendar-event-time,
+.lesson-calendar-event-status {
+  overflow: hidden;
+  font-size: 0.625rem;
+  line-height: 0.875rem;
+  opacity: 0.85;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lesson-calendar-event-content--month {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.25rem;
+}
+
+.lesson-calendar-event-content--month .lesson-calendar-event-title {
+  flex: 1;
+  font-size: 0.6875rem;
+  line-height: 0.875rem;
+}
+
+.lesson-calendar-event-content--month .lesson-calendar-event-time {
+  order: -1;
+  font-size: 0.625rem;
+}
+
+.lesson-calendar-event-dot {
+  display: none;
+  width: 0.35rem;
+  height: 0.35rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.lessons-calendar-more-link {
+  color: #9e2727 !important;
+  font-size: 0.6875rem !important;
+  font-weight: 600 !important;
+}
+
+.lessons-calendar-now-line {
+  border-color: #9e2727 !important;
+  border-width: 1px 0 0 !important;
+}
+
+.lessons-calendar-now-dot {
+  border-color: #9e2727 !important;
+  background: #9e2727 !important;
+}
+
+@media (max-width: 639px) {
+  .lessons-calendar-shell {
+    height: max(36rem, calc(100dvh - 16rem));
+  }
+
+  .lessons-calendar-day-header {
+    font-size: 0.6875rem;
+  }
+
+  .lesson-calendar-event-content--month {
+    padding-inline: 0.125rem;
+  }
+
+  .lesson-calendar-event-content--month .lesson-calendar-event-time {
+    display: none;
+  }
+
+  .lesson-calendar-event-content--month .lesson-calendar-event-title {
+    font-size: 0.625rem;
+  }
+
+  .lesson-calendar-event-content--month .lesson-calendar-event-dot {
+    display: block;
+  }
+}
+
+@media (min-width: 1280px) {
+  .lessons-calendar-horizontal-scroll.is-week .lessons-calendar-shell {
+    min-width: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lesson-calendar-event {
+    transition: none;
+  }
+}

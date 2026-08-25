@@ -210,7 +210,7 @@ export const Topbar = ({ userName, locale, role }: TopbarProps) => {
             }
             aria-expanded={isMobileMenuOpen}
             aria-controls="mobile-navigation"
-            className="grid size-10 shrink-0 place-items-center rounded-full text-gray-300 transition-colors duration-150 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e34040] focus-visible:ring-offset-2 focus-visible:ring-offset-[#30343f] lg:hidden"
+            className="grid size-10 shrink-0 place-items-center rounded-full text-gray-300 transition-colors duration-150 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e34040] focus-visible:ring-offset-2 focus-visible:ring-offset-[#30343f] xl:hidden"
           >
             {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
@@ -218,7 +218,7 @@ export const Topbar = ({ userName, locale, role }: TopbarProps) => {
 
         <nav
           aria-label="Navegación principal"
-          className="hidden shrink-0 items-center gap-0.5 lg:flex xl:gap-1"
+          className="hidden shrink-0 items-center gap-1 xl:flex"
         >
           {visibleNavMenuItems.map((item) => {
             const href = withLocale(item.href);
@@ -358,7 +358,7 @@ export const Topbar = ({ userName, locale, role }: TopbarProps) => {
       <div
         id="mobile-navigation"
         aria-hidden={!isMobileMenuOpen}
-        className={`overflow-hidden border-t bg-[#272a33] transition-all duration-200 ease-out lg:hidden ${
+        className={`overflow-hidden border-t bg-[#272a33] transition-all duration-200 ease-out xl:hidden ${
           isMobileMenuOpen
             ? "visible max-h-[32rem] border-white/10 opacity-100"
             : "pointer-events-none invisible max-h-0 border-transparent opacity-0"
