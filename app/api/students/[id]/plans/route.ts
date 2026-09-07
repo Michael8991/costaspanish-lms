@@ -7,8 +7,14 @@ import { getCurrentUserObjectId } from "@/lib/auth/getCurrentUserObjectId";
 import { getStudentOwnershipFilter } from "@/lib/auth/studentOwnership";
 import dbConnect from "@/lib/mongo";
 import { ensurePaymentLedgerForVoucher } from "@/lib/services/payment-ledger.service";
+import {
+  assertNoOverlappingVoucherPeriod,
+  validateVoucherEnrollment,
+  VoucherDomainError,
+} from "@/lib/services/voucher.service";
 import { createStudentVoucherSchema } from "@/lib/validators/voucher";
 import { StudentProfile, type PlanDoc } from "@/models/StudentProfile";
+import { CourseProfile } from "@/models/CourseProfile";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -76,6 +82,26 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       ? priceTotal / creditsTotal
       : null;
   const voucherObjectId = new mongoose.Types.ObjectId();
+  await dbConnect();
+  let enrollment;
+  try {
+    enrollment = payload.enrollmentId
+      ? await validateVoucherEnrollment({
+          enrollmentId: payload.enrollmentId,
+          studentId: id,
+          actorId: user.id,
+          actorRole: user.role,
+        })
+      : null;
+  } catch (error) {
+    if (error instanceof VoucherDomainError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    throw error;
+  }
+  const enrollmentCourse = enrollment
+    ? await CourseProfile.findById(enrollment.courseId).select("name internalName").lean()
+    : null;
   const plan: PlanDoc = {
     _id: voucherObjectId,
     name: payload.name,
@@ -87,10 +113,12 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     creditsRemaining,
     status: payload.status,
     price: priceTotal,
-    courseId: payload.courseId
+    enrollmentId: enrollment?._id,
+    courseId: enrollment?.courseId ?? (payload.courseId
       ? new mongoose.Types.ObjectId(payload.courseId)
-      : undefined,
-    courseNameSnapshot: payload.courseNameSnapshot,
+      : undefined),
+    courseNameSnapshot: payload.courseNameSnapshot ??
+      (enrollmentCourse?.name?.trim() || enrollmentCourse?.internalName?.trim() || undefined),
     generatedFromCourse: payload.generatedFromCourse,
     generatedFromCourseMember: payload.generatedFromCourseMember,
     billingMode: payload.billingMode ?? undefined,
@@ -112,7 +140,6 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     createdFrom: payload.createdFrom,
   };
 
-  await dbConnect();
   const ownershipFilter = getStudentOwnershipFilter(user, {
     _id: new mongoose.Types.ObjectId(id),
   });
@@ -123,16 +150,38 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   if (!accessibleStudent) {
     return NextResponse.json({ error: "Student not found" }, { status: 404 });
   }
+  if (enrollment) {
+    const current = await StudentProfile.findOne(ownershipFilter).select("activePlans").lean();
+    try {
+      assertNoOverlappingVoucherPeriod({
+        vouchers: current?.activePlans ?? [],
+        enrollmentId: enrollment._id.toString(),
+        classType: payload.classType,
+        validFrom: plan.validFrom,
+        validUntil: plan.validUntil,
+      });
+    } catch (error) {
+      if (error instanceof VoucherDomainError) {
+        return NextResponse.json({ error: error.message }, { status: error.status });
+      }
+      throw error;
+    }
+  }
   const studentFilter = getStudentOwnershipFilter(user, {
     _id: new mongoose.Types.ObjectId(id),
-    activePlans: {
-      $not: {
-        $elemMatch: {
-          classType: payload.classType,
-          status: "active",
+    ...(enrollment ? {
+      activePlans: {
+        $not: {
+          $elemMatch: {
+            enrollmentId: enrollment._id,
+            classType: payload.classType,
+            status: { $ne: "canceled" },
+            validFrom: { $lte: plan.validUntil },
+            validUntil: { $gte: plan.validFrom },
+          },
         },
       },
-    },
+    } : {}),
   });
   if (!studentFilter) {
     return NextResponse.json({ error: "Invalid user id" }, { status: 500 });
@@ -146,7 +195,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   if (!updated) {
     return NextResponse.json(
       {
-        error: `El alumno ya tiene un plan activo del modelo '${payload.classType}'. Finaliza o archiva el actual antes de añadir otro.`,
+        error: enrollment
+          ? "Ya existe un bono del mismo tipo para esta matrícula con un periodo solapado."
+          : "No se pudo crear el bono.",
       },
       { status: 409 },
     );

@@ -8,6 +8,7 @@ import { authOptions } from "@/lib/auth";
 import { toCourseProfileDetailDTO } from "@/lib/utils/course-profile.mapper";
 import { toCourseTemplateDetailDTO } from "@/lib/utils/course-template.mapper";
 import { toLessonListDTO } from "@/lib/utils/lesson.mapper";
+import { courseEnrollmentService } from "@/lib/services/course-enrollment.service";
 import dbConnect from "@/lib/mongo";
 import { CourseProfile } from "@/models/CourseProfile";
 import { CourseTemplate } from "@/models/CourseTemplate";
@@ -77,6 +78,10 @@ export default async function CourseProfilePage({
   const course = toCourseProfileDetailDTO(rawCourse, {
     templateOperationalDefaults: template?.operationalDefaults,
   });
+  const enrollments = await courseEnrollmentService.listCourseEnrollments({
+    courseId: id,
+    actor: { id: session.user.id, role: session.user.role },
+  });
   const createdLessons = rawCreatedLessons.map(toLessonListDTO);
 
   return (
@@ -93,6 +98,7 @@ export default async function CourseProfilePage({
         template={template}
         locale={locale}
         createdLessons={createdLessons}
+        initialEnrollments={enrollments}
         initialEdit={query.edit === "1"}
       />
     </div>

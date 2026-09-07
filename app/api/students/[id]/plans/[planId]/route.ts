@@ -6,6 +6,7 @@ import { getCurrentUserObjectId } from "@/lib/auth/getCurrentUserObjectId";
 import { getStudentOwnershipFilter } from "@/lib/auth/studentOwnership";
 import dbConnect from "@/lib/mongo";
 import { ensurePaymentLedgerForVoucher } from "@/lib/services/payment-ledger.service";
+import { validateVoucherEnrollment, VoucherDomainError } from "@/lib/services/voucher.service";
 import { updateStudentVoucherSchema } from "@/lib/validators/voucher";
 import {
   StudentProfile,
@@ -72,6 +73,22 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     }
 
     const payload = parsed.data;
+    let selectedEnrollment = null;
+    if (payload.enrollmentId) {
+      try {
+        selectedEnrollment = await validateVoucherEnrollment({
+          enrollmentId: payload.enrollmentId,
+          studentId: id,
+          actorId: user.id,
+          actorRole: user.role,
+        });
+      } catch (error) {
+        if (error instanceof VoucherDomainError) {
+          return NextResponse.json({ error: error.message }, { status: error.status });
+        }
+        throw error;
+      }
+    }
     const currentPlan = current.activePlans[0];
     const finalCreditsTotal = payload.creditsTotal ?? currentPlan.creditsTotal;
     const finalCreditsRemaining =
@@ -147,6 +164,10 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       set["activePlans.$.courseId"] = new mongoose.Types.ObjectId(
         payload.courseId,
       );
+    }
+    if (selectedEnrollment) {
+      set["activePlans.$.enrollmentId"] = selectedEnrollment._id;
+      set["activePlans.$.courseId"] = selectedEnrollment.courseId;
     }
 
     const priceWasUpdated =

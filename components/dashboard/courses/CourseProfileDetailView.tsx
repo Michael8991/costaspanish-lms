@@ -13,8 +13,11 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import { toast } from "sonner";
 
+import AddStudentToCourseModal from "@/components/dashboard/courses/AddStudentToCourseModal";
+import CourseEnrollmentsSection from "@/components/dashboard/courses/CourseEnrollmentsSection";
 import CourseProfileTemplatePlan from "@/components/dashboard/courses/CourseProfileTemplatePlan";
 import CourseProfilePoliciesSummary from "@/components/dashboard/courses/CourseProfilePoliciesSummary";
 import CourseProfileMembersSection from "@/components/dashboard/courses/CourseProfileMembersSection";
@@ -27,6 +30,7 @@ import type {
 } from "@/lib/dto/course-profile.dto";
 import type { CourseTemplateDetailDTO } from "@/lib/dto/course-template.dto";
 import type { LessonListDTO } from "@/lib/dto/lesson.dto";
+import type { CourseEnrollmentListItemDTO } from "@/lib/dto/course-enrollment.dto";
 import {
   COURSE_PROFILE_CLASS_TYPES,
 } from "@/lib/validators/courseProfile.validator";
@@ -37,6 +41,7 @@ type CourseProfileDetailViewProps = {
   template: CourseTemplateDetailDTO | null;
   locale: string;
   createdLessons: LessonListDTO[];
+  initialEnrollments: CourseEnrollmentListItemDTO[];
   initialEdit?: boolean;
 };
 
@@ -70,6 +75,7 @@ export default function CourseProfileDetailView({
   template,
   locale,
   createdLessons,
+  initialEnrollments,
   initialEdit = false,
 }: CourseProfileDetailViewProps) {
   const router = useRouter();
@@ -82,6 +88,16 @@ export default function CourseProfileDetailView({
   const [editingVoucherMember, setEditingVoucherMember] =
     useState<CourseMemberDTO | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [enrollments, setEnrollments] = useState(initialEnrollments);
+  const [isAddingStudent, setIsAddingStudent] = useState(false);
+
+  useEffect(() => {
+    setCourse(initialCourse);
+  }, [initialCourse]);
+
+  useEffect(() => {
+    setEnrollments(initialEnrollments);
+  }, [initialEnrollments]);
 
   const archiveCourse = async () => {
     if (!window.confirm(`¿Archivar el curso “${course.name}”?`)) return;
@@ -202,6 +218,15 @@ export default function CourseProfileDetailView({
           detail={`${course.lessonsCount} clases · ${course.blocksCount} bloques`}
         />
       </section>
+
+      <CourseEnrollmentsSection
+        enrollments={enrollments}
+        onAddStudent={
+          course.status === "archived"
+            ? undefined
+            : () => setIsAddingStudent(true)
+        }
+      />
 
       <CourseProfileMembersSection
         members={course.members}
@@ -332,6 +357,19 @@ export default function CourseProfileDetailView({
             ),
           }));
           setEditingVoucherMember(null);
+          router.refresh();
+        }}
+      />
+
+      <AddStudentToCourseModal
+        isOpen={isAddingStudent}
+        courseId={course.id}
+        enrollments={enrollments}
+        onClose={() => setIsAddingStudent(false)}
+        onEnrolled={(enrollment) => {
+          setEnrollments((current) => [enrollment, ...current]);
+          setIsAddingStudent(false);
+          toast.success("Alumno matriculado correctamente.");
           router.refresh();
         }}
       />

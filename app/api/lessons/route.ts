@@ -16,6 +16,8 @@ import {
 import { toLessonDetailDTO, toLessonListDTO } from '@/lib/utils/lesson.mapper';
 import { isoToDatetimeLocalValue, zonedDateTimeToISOString } from '@/lib/utils/time-zone';
 import { getCurrentLessonNumber, isPlanCompatible } from '@/lib/utils/lesson-voucher';
+import { resolveVoucherForLesson, VoucherDomainError } from '@/lib/services/voucher.service';
+import { CourseEnrollment } from '@/models/CourseEnrollment';
 import { createLessonSchema } from '@/lib/validators/lesson';
 import Lesson from '@/models/Lesson';
 import { CourseProfile } from '@/models/CourseProfile';
@@ -334,7 +336,7 @@ export async function POST(req: NextRequest) {
         isTrial: false,
         attendees: activeMembers.map((member) => ({
           studentId: member.studentId,
-          voucherId: undefined,
+          voucherId: undefined as string | undefined,
           attendanceStatus: "pending" as const,
           creditsToConsume: policies.creditPolicy.creditsPerLesson,
           isTrial: false,
@@ -405,6 +407,39 @@ export async function POST(req: NextRequest) {
         { ok: false, error: "Some students are invalid or not accessible" },
         { status: 400 },
       );
+    }
+    if (isCourseMode && basePayload.courseId) {
+      const enrollments = await CourseEnrollment.find({
+        courseId: basePayload.courseId,
+        studentId: { $in: attendeeStudentIds.map((studentId) => new Types.ObjectId(studentId)) },
+        status: "active",
+      }).lean();
+      const enrollmentByStudent = new Map(
+        enrollments.map((item) => [item.studentId.toString(), item._id.toString()]),
+      );
+      try {
+        basePayload.attendees = basePayload.attendees.map((attendee) => {
+          if (attendee.isTrial || attendee.creditsToConsume <= 0) return attendee;
+          const student = studentProfiles.find((item) => item._id.toString() === attendee.studentId.toString());
+          const voucher = resolveVoucherForLesson({
+            vouchers: student?.activePlans ?? [],
+            enrollmentId: enrollmentByStudent.get(attendee.studentId.toString()),
+            courseId: basePayload.courseId?.toString(),
+            classType: basePayload.classType,
+            lessonDate: basePayload.scheduledStart,
+            requiredCredits: attendee.creditsToConsume,
+          });
+          if (!voucher) {
+            throw new VoucherDomainError("El alumno no tiene un bono de este curso válido para la fecha de la clase.");
+          }
+          return { ...attendee, voucherId: voucher._id.toString() };
+        });
+      } catch (error) {
+        if (error instanceof VoucherDomainError) {
+          return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
+        }
+        throw error;
+      }
     }
     const titleStudents: LessonTitleStudentInput[] = studentProfiles.map(
       (student) => ({

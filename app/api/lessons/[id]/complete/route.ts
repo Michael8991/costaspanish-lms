@@ -19,9 +19,10 @@ import {
 } from "@/lib/utils/lesson-credit-policy";
 import { buildLessonPolicySnapshotFromCoursePolicies } from "@/lib/utils/lesson-policy-snapshot";
 import {
-  isPlanCompatible,
-  selectBestCompatiblePlan,
-} from "@/lib/utils/lesson-voucher";
+  resolveVoucherForLesson,
+  VoucherDomainError,
+} from "@/lib/services/voucher.service";
+import { CourseEnrollment } from "@/models/CourseEnrollment";
 import { normalizeCourseOperationalPolicies } from "@/lib/utils/course-policies";
 import { toLessonDetailDTO } from "@/lib/utils/lesson.mapper";
 import { CourseProfile } from "@/models/CourseProfile";
@@ -74,6 +75,9 @@ type StudentPlanForComplete = {
   creditsRemaining?: number;
   creditsTotal?: number;
   validUntil?: Date | null;
+  validFrom: Date;
+  enrollmentId?: Types.ObjectId | null;
+  courseId?: Types.ObjectId | null;
 };
 
 type StudentForComplete = {
@@ -106,32 +110,6 @@ function getPlanCredits(plan: StudentPlanForComplete) {
     Number.isFinite(plan.creditsRemaining)
     ? plan.creditsRemaining
     : 0;
-}
-
-function isActivePlanWithAvailableCredits(
-  plan: StudentPlanForComplete | undefined,
-  requiredCredits: number,
-  reservedCredits: number,
-) {
-  return (
-    plan?.status === "active" &&
-    getPlanCredits(plan) - reservedCredits >= requiredCredits
-  );
-}
-
-function getCourseMemberVoucherIds(course: CourseForComplete | null) {
-  const voucherIds = new Map<string, string>();
-
-  for (const member of course?.members ?? []) {
-    const studentId = getIdString(member.studentId);
-    const voucherId = getIdString(member.billing?.lastVoucherId);
-
-    if (studentId && voucherId) {
-      voucherIds.set(studentId, voucherId);
-    }
-  }
-
-  return voucherIds;
 }
 
 async function getResponseLesson(filter: Record<string, unknown>) {
@@ -512,7 +490,13 @@ export async function POST(
     const studentsById = new Map(
       students.map((student) => [student._id.toString(), student]),
     );
-    const memberVoucherIds = getCourseMemberVoucherIds(course);
+    const courseEnrollmentByStudent = courseObjectId
+      ? new Map((await CourseEnrollment.find({
+          courseId: courseObjectId,
+          studentId: { $in: studentObjectIds },
+          status: "active",
+        }).lean()).map((item) => [item.studentId.toString(), item._id.toString()]))
+      : new Map<string, string>();
     const reservedByVoucher = new Map<string, number>();
     const resolvedConsumptions: ResolvedConsumption[] = [];
     const settlementItems: LessonCreditSettlementItem[] = [];
@@ -552,56 +536,27 @@ export async function POST(
 
       const activePlans = student.activePlans ?? [];
       const requestedVoucherId = getIdString(attendee.voucherId);
-      const memberVoucherId = memberVoucherIds.get(studentId) ?? "";
       const getReservedCredits = (plan: StudentPlanForComplete) =>
         reservedByVoucher.get(`${studentId}:${plan._id.toString()}`) ?? 0;
       const requestedPlan = activePlans.find(
         (plan) => plan._id.toString() === requestedVoucherId,
       );
-      const memberPlan = activePlans.find(
-        (plan) => plan._id.toString() === memberVoucherId,
-      );
-      let selectedPlan = isActivePlanWithAvailableCredits(
-        requestedPlan,
-        calculation.creditsConsumed,
-        requestedPlan ? getReservedCredits(requestedPlan) : 0,
-      )
+      const resolvedPlan = resolveVoucherForLesson<StudentPlanForComplete>({
+        vouchers: activePlans,
+        enrollmentId: courseEnrollmentByStudent.get(studentId),
+        courseId: getIdString(lesson.courseId),
+        classType: lesson.classType,
+        lessonDate: lesson.scheduledStart,
+        requiredCredits: calculation.creditsConsumed,
+        reservedCredits: getReservedCredits,
+      });
+      // A reservation made when scheduling is authoritative, but only while
+      // it still satisfies the immutable student/course/period constraints.
+      const selectedPlan = requestedPlan && resolvedPlan?._id.toString() === requestedPlan._id.toString()
         ? requestedPlan
-        : undefined;
-
-      if (
-        !selectedPlan &&
-        isActivePlanWithAvailableCredits(
-          memberPlan,
-          calculation.creditsConsumed,
-          memberPlan ? getReservedCredits(memberPlan) : 0,
-        )
-      ) {
-        selectedPlan = memberPlan;
-      }
-
-      if (!selectedPlan) {
-        const compatibleCandidates = activePlans
-          .map((plan) => ({
-            plan,
-            _id: plan._id.toString(),
-            classType: plan.classType,
-            status: plan.status,
-            creditsRemaining: plan.creditsRemaining,
-            creditsTotal: plan.creditsTotal,
-            validUntil: plan.validUntil,
-          }))
-          .filter(
-            (candidate) =>
-              isPlanCompatible(candidate, lesson.classType, now) &&
-              getPlanCredits(candidate.plan) -
-                getReservedCredits(candidate.plan) >=
-                calculation.creditsConsumed,
-          );
-
-        selectedPlan =
-          selectBestCompatiblePlan(compatibleCandidates)?.plan;
-      }
+        : !requestedVoucherId
+          ? resolvedPlan
+          : undefined;
 
       if (!selectedPlan) {
         creditErrors.push(
@@ -900,6 +855,9 @@ export async function POST(
     const message =
       error instanceof Error ? error.message : "Unknown error";
 
+    if (error instanceof VoucherDomainError) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: error.status });
+    }
     return NextResponse.json(
       {
         ok: false,

@@ -30,6 +30,7 @@ export interface DBPlanDoc {
     validUntil?: Date;
     status?: DBPlanStatus | "cancelled" | "archived" | "deleted";
     price?: number;
+    enrollmentId?: string;
     courseId?: string;
     courseNameSnapshot?: string;
     billingPeriodStart?: Date;

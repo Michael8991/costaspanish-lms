@@ -18,6 +18,7 @@ const nullableDateSchema = z.preprocess(
 );
 
 const voucherMetadataShape = {
+  enrollmentId: optionalObjectIdSchema,
   courseId: optionalObjectIdSchema,
   courseNameSnapshot: z.string().trim().max(160).optional(),
   generatedFromCourse: z.boolean().optional().default(false),

@@ -8,6 +8,7 @@ import {
 import { FormattedPlan } from "../students/ActiveVouchersPanel";
 import { useState } from "react";
 import { CircleAlert } from "lucide-react";
+import type { VoucherEnrollmentOption } from "./NewVoucherForm";
 
 const BillingTypes = ["single", "package", "subscription"];
 
@@ -25,6 +26,7 @@ interface EditVoucherFormProps {
   onSubmitForm: (planId: string, data: EditVoucherFormData) => void;
   isSubmitting: boolean;
   onClose: () => void;
+  enrollments?: VoucherEnrollmentOption[];
 }
 
 export interface EditVoucherFormData {
@@ -37,6 +39,7 @@ export interface EditVoucherFormData {
   validUntil: string;
   status: DBPlanStatus;
   price: number;
+  enrollmentId?: string;
 }
 
 export default function EditVoucherForm({
@@ -45,6 +48,7 @@ export default function EditVoucherForm({
   onSubmitForm,
   isSubmitting,
   onClose,
+  enrollments = [],
 }: EditVoucherFormProps) {
   const [formData, setFormData] = useState<EditVoucherFormData>({
     name: plan.name,
@@ -56,6 +60,7 @@ export default function EditVoucherForm({
     validUntil: plan.validUntil,
     price: plan.price,
     status: plan.status as DBPlanStatus,
+    enrollmentId: plan.enrollmentId ?? "",
   });
 
   const [formError, setFormError] = useState<string>("");
@@ -102,6 +107,15 @@ export default function EditVoucherForm({
         onSubmit={handleSubmit}
         className="w-full flex flex-col justify-center font-light text-sm mt-3 gap-4"
       >
+        <div className="flex flex-col w-full">
+          <label htmlFor="enrollmentId" className={labelClass}>Curso</label>
+          <select id="enrollmentId" name="enrollmentId" value={formData.enrollmentId} onChange={handleChange} className={inputClass}>
+            <option value="" className="bg-gray-800">Sin asignar</option>
+            {enrollments.map((enrollment) => (
+              <option key={enrollment.id} value={enrollment.id} className="bg-gray-800">{enrollment.courseName}</option>
+            ))}
+          </select>
+        </div>
         <div className="flex flex-col w-full">
           <label htmlFor="name" className={labelClass}>
             Nombre del Bono

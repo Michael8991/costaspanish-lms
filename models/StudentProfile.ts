@@ -31,6 +31,7 @@ export interface PlanDoc {
     validUntil: Date;
     status: PlanStatus;
     price: number;
+    enrollmentId?: Types.ObjectId;
     courseId?: Types.ObjectId;
     courseNameSnapshot?: string;
     billingPeriodStart?: Date | null;
@@ -87,6 +88,7 @@ const PlanSchema = new Schema<PlanDoc>({
     validUntil: { type: Date, required: true },
     status: { type: String, enum: ["active", "exhausted", "expired", "canceled"], default: "active" },
     price: { type: Number, required: true, default: 0 },
+    enrollmentId: { type: Schema.Types.ObjectId, ref: "CourseEnrollment" },
     courseId: { type: Schema.Types.ObjectId, ref: "CourseProfile" },
     courseNameSnapshot: { type: String, trim: true, maxlength: 160 },
     billingPeriodStart: { type: Date },
@@ -155,6 +157,12 @@ StudentProfileSchema.index(
 StudentProfileSchema.index({ teacherId: 1, isActive: 1, createdAt: -1 });
 StudentProfileSchema.index({ teacherId: 1, fullName: 1 });
 StudentProfileSchema.index({ teacherId: 1, contactEmail: 1 });
+
+StudentProfileSchema.index({
+    "activePlans.enrollmentId": 1,
+    "activePlans.validFrom": 1,
+    "activePlans.validUntil": 1,
+});
 
 StudentProfileSchema.index({
     "activePlans.courseId": 1,

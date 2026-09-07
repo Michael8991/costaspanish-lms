@@ -48,6 +48,7 @@ export interface StudentPlanListDTO {
   creditsTotal: number;
   validFrom: string | null;
   validUntil: string | null;
+  enrollmentId: string | null;
   courseId: string | null;
   courseNameSnapshot: string | null;
   generatedFromCourse: boolean;
@@ -66,6 +67,7 @@ export interface StudentPlanListDTO {
   currency: "EUR";
   unitCreditPriceSnapshot: number | null;
   createdFrom: VoucherCreatedFrom;
+  temporalStatus: "upcoming" | "active" | "expired" | "exhausted" | "canceled";
   consumedCredits: number | null;
   remainingValue: number | null;
   consumedValue: number | null;
@@ -163,6 +165,18 @@ export function toStudentPlanListDTO(
       : validUntil && new Date(validUntil) < new Date()
         ? "expired"
         : "active";
+  const now = Date.now();
+  const validFrom = toISOStringOrNull(plan.validFrom);
+  const temporalStatus =
+    (plan.status ?? fallbackStatus) === "canceled"
+      ? "canceled" as const
+      : creditsRemaining !== null && creditsRemaining <= 0
+        ? "exhausted" as const
+        : validFrom && new Date(validFrom).getTime() > now
+          ? "upcoming" as const
+          : validUntil && new Date(validUntil).getTime() < now
+            ? "expired" as const
+            : "active" as const;
 
   return {
     id,
@@ -176,8 +190,9 @@ export function toStudentPlanListDTO(
     status: plan.status ?? fallbackStatus,
     creditsRemaining: creditsRemaining ?? 0,
     creditsTotal: creditsTotal ?? 0,
-    validFrom: toISOStringOrNull(plan.validFrom),
+    validFrom,
     validUntil,
+    enrollmentId: plan.enrollmentId ? String(plan.enrollmentId) : null,
     courseId: plan.courseId ? String(plan.courseId) : null,
     courseNameSnapshot: plan.courseNameSnapshot?.trim() || null,
     generatedFromCourse: plan.generatedFromCourse ?? false,
@@ -196,6 +211,7 @@ export function toStudentPlanListDTO(
     currency: plan.currency ?? "EUR",
     unitCreditPriceSnapshot,
     createdFrom: plan.createdFrom ?? "legacy",
+    temporalStatus,
     consumedCredits,
     remainingValue:
       creditsRemaining !== null && unitCreditPriceSnapshot !== null

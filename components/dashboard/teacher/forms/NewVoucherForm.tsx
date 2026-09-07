@@ -38,7 +38,10 @@ export interface NewVoucherFormData {
   validUntil: string;
   status: DBPlanStatus;
   price: number;
+  enrollmentId?: string;
 }
+
+export type VoucherEnrollmentOption = { id: string; courseName: string };
 
 interface NewVoucherProps {
   onSubmitForm: (data: NewVoucherFormData) => void;
@@ -49,6 +52,7 @@ interface NewVoucherProps {
   variant?: "full" | "quick";
   initialClassType?: DBClassType;
   submitError?: string;
+  enrollments?: VoucherEnrollmentOption[];
 }
 
 export default function NewVoucherForm({
@@ -60,6 +64,7 @@ export default function NewVoucherForm({
   variant = "full",
   initialClassType,
   submitError,
+  enrollments = [],
 }: NewVoucherProps) {
   const isQuick = variant === "quick";
   const [formData, setFormData] = useState<NewVoucherFormData>({
@@ -72,6 +77,7 @@ export default function NewVoucherForm({
     validUntil: "",
     status: "active",
     price: 0,
+    enrollmentId: "",
   });
   const [formError, setFormError] = useState("");
 
@@ -168,6 +174,18 @@ export default function NewVoucherForm({
       {(formError || submitError) && (
         <div className="rounded-md border border-red-500/50 bg-red-500/20 px-3 py-2 text-sm text-red-200">
           {formError || submitError}
+        </div>
+      )}
+
+      {!isQuick && (
+        <div className="flex flex-col">
+          <label htmlFor="enrollmentId" className={labelClass}>Curso</label>
+          <select id="enrollmentId" name="enrollmentId" value={formData.enrollmentId} onChange={handleChange} className={inputClass}>
+            <option value="" className="bg-gray-800">Sin asignar (bono histórico/general)</option>
+            {enrollments.map((enrollment) => (
+              <option key={enrollment.id} value={enrollment.id} className="bg-gray-800">{enrollment.courseName}</option>
+            ))}
+          </select>
         </div>
       )}
 

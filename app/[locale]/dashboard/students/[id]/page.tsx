@@ -123,6 +123,8 @@ export default async function StudentPage({
       ? new Date(plan.validUntil).toISOString().split("T")[0]
       : "",
     price: plan.price || 0,
+    enrollmentId: plan.enrollmentId?.toString() ?? null,
+    courseNameSnapshot: plan.courseNameSnapshot ?? null,
   }));
 
   const breadcrumbItems = [

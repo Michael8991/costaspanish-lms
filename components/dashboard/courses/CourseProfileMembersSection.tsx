@@ -84,7 +84,7 @@ export default function CourseProfileMembersSection({
             <UsersRound className="h-4 w-4" />
           </span>
           <div>
-            <h2 className="font-semibold text-slate-900">Integrantes</h2>
+            <h2 className="font-semibold text-slate-900">Bonos por alumno</h2>
             <p className="mt-1 text-sm text-slate-500">
               La facturación se calculará individualmente por alumno cuando se
               creen bonos desde el curso.

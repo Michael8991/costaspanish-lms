@@ -7,6 +7,7 @@ import { requireAuth, requireRole } from "@/lib/auth/apiAuth";
 import { getCurrentUserObjectId } from "@/lib/auth/getCurrentUserObjectId";
 import { getStudentOwnershipFilter } from "@/lib/auth/studentOwnership";
 import type { GeneratedCourseVoucherDTO } from "@/lib/dto/course-voucher.dto";
+import { CourseEnrollment } from "@/models/CourseEnrollment";
 import dbConnect from "@/lib/mongo";
 import {
   ensurePaymentLedgerForVoucher,
@@ -144,6 +145,14 @@ export async function POST(
     }
 
     const courseName = context.preview.courseSummary.courseName;
+    const enrollments = await CourseEnrollment.find({
+      courseId,
+      studentId: { $in: context.preview.items.map((item) => new Types.ObjectId(item.studentId)) },
+      status: "active",
+    }).lean();
+    const enrollmentByStudent = new Map(
+      enrollments.map((enrollment) => [enrollment.studentId.toString(), enrollment._id]),
+    );
     const generatedItems: GeneratedCourseVoucherDTO[] = [];
     const plansByStudentId = new Map<string, PlanDoc>();
 
@@ -172,6 +181,7 @@ export async function POST(
         validUntil: periodEnd,
         status: "active",
         price: item.priceTotal,
+        enrollmentId: enrollmentByStudent.get(item.studentId),
         courseId,
         courseNameSnapshot: courseName,
         billingPeriodStart: periodStart,

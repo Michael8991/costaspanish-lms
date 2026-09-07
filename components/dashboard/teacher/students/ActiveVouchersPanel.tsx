@@ -16,7 +16,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { VoucherEnrollmentOption } from "../forms/NewVoucherForm";
 import { NewVoucherFormData } from "../forms";
 import { toast } from "sonner";
 import CustomModal from "@/components/ui/CustomModal";
@@ -43,6 +44,8 @@ export interface FormattedPlan {
   paymentNotes?: string;
   billingPeriodStart?: string | null;
   billingPeriodEnd?: string | null;
+  enrollmentId?: string | null;
+  courseNameSnapshot?: string | null;
 }
 
 interface ActivePlansPanelProps {
@@ -70,6 +73,14 @@ export default function ActiveVouchersPanel({
     useState(false);
 
   const [planToEdit, setPlanToEdit] = useState<FormattedPlan | null>(null);
+  const [enrollments, setEnrollments] = useState<VoucherEnrollmentOption[]>([]);
+
+  useEffect(() => {
+    fetch(`/api/students/${studentId}/enrollments`, { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : { items: [] })
+      .then((payload) => setEnrollments(payload.items ?? []))
+      .catch(() => setEnrollments([]));
+  }, [studentId]);
 
   const router = useRouter();
 
@@ -192,6 +203,14 @@ export default function ActiveVouchersPanel({
           {activePlans
             .filter((plan) => plan.status === "active")
             .map((plan) => {
+              const temporalStatus =
+                plan.remainingCredits <= 0
+                  ? "exhausted"
+                  : new Date(plan.validFrom).getTime() > Date.now()
+                    ? "upcoming"
+                    : new Date(plan.validUntil).getTime() < Date.now()
+                      ? "expired"
+                      : plan.status;
               const percentage =
                 (plan.remainingCredits / plan.totalCredits) * 100;
               const isLow =
@@ -208,12 +227,12 @@ export default function ActiveVouchersPanel({
                         {plan.name}
                         <span
                           className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded-full border ${
-                            plan.status === "active"
+                            temporalStatus === "active"
                               ? "bg-green-50 text-green-700 border-green-200"
                               : "bg-gray-100 text-gray-500 border-gray-200"
                           }`}
                         >
-                          {plan.status}
+                          {temporalStatus}
                         </span>
                       </h3>
                       <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-1">
@@ -223,6 +242,9 @@ export default function ActiveVouchersPanel({
                           {new Date(plan.validUntil).toLocaleDateString()}
                         </span>
                       </div>
+                      <p className="mt-1 text-xs text-gray-600">
+                        {plan.courseNameSnapshot || "Sin curso asignado"} · {new Date(plan.validFrom).toLocaleDateString("es-ES", { month: "long", year: "numeric" })}
+                      </p>
                     </div>
 
                     <div className="text-right w-full sm:w-auto">
@@ -304,6 +326,7 @@ export default function ActiveVouchersPanel({
               onSubmitForm={handleEditVoucher}
               isSubmitting={isSubmittingEditVoucher}
               onClose={() => setIsEditVoucherModalOpen(false)}
+              enrollments={enrollments}
             />
           )}
         </div>
@@ -339,6 +362,7 @@ export default function ActiveVouchersPanel({
             isSubmitting={isSubmittingNewVoucher}
             onClose={() => setIsVoucherModalOpen(false)}
             activeVouchersCount={activeVouchersCount}
+            enrollments={enrollments}
           />
         </div>
       </CustomModal>
