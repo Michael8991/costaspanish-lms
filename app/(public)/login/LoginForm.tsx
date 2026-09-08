@@ -74,7 +74,7 @@ export const LoginForm = ({ callbackUrl }: { callbackUrl?: string }) => {
               </p>
 
               <a
-                href="https://costaspanish.com"
+                href="https://costaspanishclass.com"
                 target="_blank"
                 className="text-sm text-rose-300 hover:text-rose-500 mt-2"
               >
