@@ -220,6 +220,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         set[`activePlans.$.${field}`] = payload[field];
       }
     }
+    // For course vouchers these pairs describe the same calendar interval.
+    // Keeping only billingPeriod* in sync made the UI show an edited period
+    // while lesson settlement continued to evaluate the stale validFrom/Until.
+    if (payload.billingPeriodStart !== undefined) {
+      set["activePlans.$.validFrom"] = payload.billingPeriodStart;
+    }
+    if (payload.billingPeriodEnd !== undefined) {
+      set["activePlans.$.validUntil"] = payload.billingPeriodEnd;
+    }
 
     const finalPriceTotal =
       payload.priceTotal ??

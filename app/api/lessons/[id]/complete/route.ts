@@ -19,7 +19,7 @@ import {
 } from "@/lib/utils/lesson-credit-policy";
 import { buildLessonPolicySnapshotFromCoursePolicies } from "@/lib/utils/lesson-policy-snapshot";
 import {
-  resolveVoucherForLesson,
+  resolveVoucherForLessonResult,
   VoucherDomainError,
 } from "@/lib/services/voucher.service";
 import { CourseEnrollment } from "@/models/CourseEnrollment";
@@ -538,11 +538,9 @@ export async function POST(
       const requestedVoucherId = getIdString(attendee.voucherId);
       const getReservedCredits = (plan: StudentPlanForComplete) =>
         reservedByVoucher.get(`${studentId}:${plan._id.toString()}`) ?? 0;
-      const requestedPlan = activePlans.find(
-        (plan) => plan._id.toString() === requestedVoucherId,
-      );
-      const resolvedPlan = resolveVoucherForLesson<StudentPlanForComplete>({
+      const resolution = resolveVoucherForLessonResult<StudentPlanForComplete>({
         vouchers: activePlans,
+        reservedVoucherId: requestedVoucherId || undefined,
         enrollmentId: courseEnrollmentByStudent.get(studentId),
         courseId: getIdString(lesson.courseId),
         classType: lesson.classType,
@@ -550,15 +548,14 @@ export async function POST(
         requiredCredits: calculation.creditsConsumed,
         reservedCredits: getReservedCredits,
       });
-      // A reservation made when scheduling is authoritative, but only while
-      // it still satisfies the immutable student/course/period constraints.
-      const selectedPlan = requestedPlan && resolvedPlan?._id.toString() === requestedPlan._id.toString()
-        ? requestedPlan
-        : !requestedVoucherId
-          ? resolvedPlan
-          : undefined;
+      const selectedPlan = resolution.voucher;
 
       if (!selectedPlan) {
+        console.warn("Voucher resolution failed while completing lesson", {
+          lessonId: lesson._id.toString(),
+          reasonCodes: resolution.reasons,
+          hadReservation: Boolean(requestedVoucherId),
+        });
         creditErrors.push(
           `No se puede completar la clase: ${studentName} necesita ${calculation.creditsConsumed} crédito${calculation.creditsConsumed === 1 ? "" : "s"}, pero no tiene un bono activo suficiente.`,
         );

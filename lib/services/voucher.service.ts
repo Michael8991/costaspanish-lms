@@ -2,6 +2,10 @@ import { Types } from "mongoose";
 
 import { CourseEnrollment } from "@/models/CourseEnrollment";
 import { CourseProfile } from "@/models/CourseProfile";
+import {
+  isDateWithinVoucherValidity,
+  voucherPeriodsOverlap,
+} from "@/lib/utils/voucher-period";
 
 export class VoucherDomainError extends Error {
   constructor(message: string, readonly status = 400) {
@@ -21,17 +25,93 @@ type VoucherCandidate = {
   creditsRemaining?: number;
 };
 
-function time(value: Date | string) {
-  return new Date(value).getTime();
-}
-
 export function voucherCoversLesson(
   voucher: VoucherCandidate,
   lessonDate: Date,
 ) {
-  const lessonTime = lessonDate.getTime();
   if (!voucher.validFrom || !voucher.validUntil) return false;
-  return time(voucher.validFrom) <= lessonTime && lessonTime <= time(voucher.validUntil);
+  return isDateWithinVoucherValidity(
+    lessonDate,
+    voucher.validFrom,
+    voucher.validUntil,
+  );
+}
+
+export type VoucherRejectionReason =
+  | "NO_VOUCHER_FOR_COURSE"
+  | "NO_VOUCHER_FOR_CLASS_TYPE"
+  | "VOUCHER_CANCELLED"
+  | "NO_VOUCHER_FOR_PERIOD"
+  | "VOUCHER_EXHAUSTED"
+  | "VOUCHER_NOT_FOUND";
+
+function rejectionReason<T extends VoucherCandidate>(args: {
+  voucher: T;
+  enrollmentId?: string | null;
+  courseId?: string | null;
+  classType: string;
+  lessonDate: Date;
+  requiredCredits: number;
+  reservedCredits: (voucher: T) => number;
+}): VoucherRejectionReason | null {
+  const linkedToEnrollment = args.enrollmentId &&
+    args.voucher.enrollmentId?.toString() === args.enrollmentId;
+  const linkedToLegacyCourse = !args.voucher.enrollmentId && args.courseId &&
+    args.voucher.courseId?.toString() === args.courseId;
+  if (!linkedToEnrollment && !linkedToLegacyCourse) {
+    return "NO_VOUCHER_FOR_COURSE";
+  }
+  if (args.voucher.classType !== args.classType) {
+    return "NO_VOUCHER_FOR_CLASS_TYPE";
+  }
+  if (args.voucher.status !== "active") return "VOUCHER_CANCELLED";
+  if (!voucherCoversLesson(args.voucher, args.lessonDate)) {
+    return "NO_VOUCHER_FOR_PERIOD";
+  }
+  if ((args.voucher.creditsRemaining ?? 0) -
+      args.reservedCredits(args.voucher) < args.requiredCredits) {
+    return "VOUCHER_EXHAUSTED";
+  }
+  return null;
+}
+
+export function resolveVoucherForLessonResult<T extends VoucherCandidate>(args: {
+  vouchers: T[];
+  reservedVoucherId?: string | null;
+  enrollmentId?: string | null;
+  courseId?: string | null;
+  classType: string;
+  lessonDate: Date;
+  requiredCredits: number;
+  reservedCredits?: (voucher: T) => number;
+}): { voucher?: T; reasons: VoucherRejectionReason[] } {
+  const reserved = args.reservedCredits ?? (() => 0);
+  const candidates = args.reservedVoucherId
+    ? args.vouchers.filter(
+        (voucher) => voucher._id.toString() === args.reservedVoucherId,
+      )
+    : args.vouchers;
+  if (args.reservedVoucherId && candidates.length === 0) {
+    return { reasons: ["VOUCHER_NOT_FOUND"] };
+  }
+  const evaluated = candidates.map((voucher) => ({
+    voucher,
+    reason: rejectionReason({ ...args, voucher, reservedCredits: reserved }),
+  }));
+  const matches = evaluated.filter((item) => item.reason === null);
+
+  if (matches.length > 1) {
+    throw new VoucherDomainError(
+      "Hay varios bonos utilizables para el mismo alumno, curso y periodo. Corrige los periodos solapados antes de continuar.",
+      409,
+    );
+  }
+  return {
+    voucher: matches[0]?.voucher,
+    reasons: Array.from(new Set(
+      evaluated.flatMap((item) => item.reason ? [item.reason] : []),
+    )),
+  };
 }
 
 export function resolveVoucherForLesson<T extends VoucherCandidate>(args: {
@@ -43,28 +123,7 @@ export function resolveVoucherForLesson<T extends VoucherCandidate>(args: {
   requiredCredits: number;
   reservedCredits?: (voucher: T) => number;
 }): T | undefined {
-  const reserved = args.reservedCredits ?? (() => 0);
-  const matches = args.vouchers.filter((voucher) => {
-    const linkedToEnrollment = args.enrollmentId &&
-      voucher.enrollmentId?.toString() === args.enrollmentId;
-    // courseId is retained as a safe compatibility projection for vouchers
-    // created by the pre-enrollment course generator.
-    const linkedToLegacyCourse = !voucher.enrollmentId && args.courseId &&
-      voucher.courseId?.toString() === args.courseId;
-    return Boolean(linkedToEnrollment || linkedToLegacyCourse) &&
-      voucher.classType === args.classType &&
-      voucher.status === "active" &&
-      voucherCoversLesson(voucher, args.lessonDate) &&
-      (voucher.creditsRemaining ?? 0) - reserved(voucher) >= args.requiredCredits;
-  });
-
-  if (matches.length > 1) {
-    throw new VoucherDomainError(
-      "Hay varios bonos utilizables para el mismo alumno, curso y periodo. Corrige los periodos solapados antes de continuar.",
-      409,
-    );
-  }
-  return matches[0];
+  return resolveVoucherForLessonResult(args).voucher;
 }
 
 export async function validateVoucherEnrollment(args: {
@@ -106,8 +165,12 @@ export function assertNoOverlappingVoucherPeriod(args: {
     voucher.enrollmentId?.toString() === args.enrollmentId &&
     voucher.classType === args.classType &&
     voucher.validFrom && voucher.validUntil &&
-    time(voucher.validFrom) <= args.validUntil.getTime() &&
-    time(voucher.validUntil) >= args.validFrom.getTime(),
+    voucherPeriodsOverlap({
+      firstStart: voucher.validFrom,
+      firstEnd: voucher.validUntil,
+      secondStart: args.validFrom,
+      secondEnd: args.validUntil,
+    }),
   );
   if (overlap) {
     throw new VoucherDomainError(

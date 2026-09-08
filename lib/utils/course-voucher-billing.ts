@@ -33,6 +33,30 @@ function addMonthsClamped(value: Date, months: number, anchorDay: number) {
   );
 }
 
+function resolveBillingAnchorDay(
+  periodStart: Date,
+  existingBillingAnchorDay?: number | null,
+) {
+  const startDay = periodStart.getUTCDate();
+  const lastDayOfStartMonth = new Date(
+    Date.UTC(periodStart.getUTCFullYear(), periodStart.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  const existingAnchorIsValid =
+    typeof existingBillingAnchorDay === "number" &&
+    existingBillingAnchorDay >= 1 &&
+    existingBillingAnchorDay <= 31;
+
+  // Preserve a larger anchor only when this period genuinely starts on a
+  // clamped month-end (31 January -> 28/29 February -> 31 March). If the
+  // current month can represent the stored anchor, the selected period start
+  // is authoritative: a period beginning on the 9th renews on the 9th.
+  return existingAnchorIsValid &&
+      existingBillingAnchorDay > lastDayOfStartMonth &&
+      startDay === lastDayOfStartMonth
+    ? existingBillingAnchorDay
+    : startDay;
+}
+
 export function calculateIndividualBillingPeriod({
   memberJoinedAt,
   billingStartedAt,
@@ -49,15 +73,10 @@ export function calculateIndividualBillingPeriod({
   const periodStart = startOfUtcDay(
     nextBillingDate ?? selectedStartDate ?? memberJoinedAt,
   );
-  const billingAnchorDay =
-    billingStartedAt &&
-    typeof existingBillingAnchorDay === "number" &&
-    existingBillingAnchorDay >= 1 &&
-    existingBillingAnchorDay <= 31
-      ? existingBillingAnchorDay
-      : billingStartedAt
-        ? startOfUtcDay(billingStartedAt).getUTCDate()
-        : periodStart.getUTCDate();
+  const billingAnchorDay = resolveBillingAnchorDay(
+    periodStart,
+    billingStartedAt ? existingBillingAnchorDay : null,
+  );
   const followingBillingDate = addMonthsClamped(
     periodStart,
     1,
