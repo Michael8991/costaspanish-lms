@@ -278,7 +278,11 @@ export const mongooseCourseEnrollmentRepository: CourseEnrollmentRepository = {
   },
 
   async countActiveEnrollments(courseId) {
-    return CourseEnrollment.countDocuments({ courseId, status: "active" });
+    const studentIds = await CourseEnrollment.distinct("studentId", {
+      courseId,
+      status: "active",
+    });
+    return studentIds.length;
   },
 
   async updateActiveEnrollmentCount(courseId, activeCount) {
@@ -289,7 +293,7 @@ export const mongooseCourseEnrollmentRepository: CourseEnrollmentRepository = {
   },
 };
 
-function getCapacity(course: EnrollmentCourseRecord): number | null {
+export function getCourseCapacity(course: EnrollmentCourseRecord): number | null {
   const candidates = [
     course.policies?.participantPolicy?.maxStudents,
     course.privateFlexiblePolicy?.maxStudents,
@@ -301,7 +305,9 @@ function getCapacity(course: EnrollmentCourseRecord): number | null {
       typeof value === "number" && Number.isInteger(value) && value > 0,
   );
 
-  return candidates.length > 0 ? Math.min(...candidates) : null;
+  // The course policy snapshot is authoritative. Older capacity fields are
+  // fallbacks, not additional limits to combine with the current policy.
+  return candidates[0] ?? null;
 }
 
 function assertActor(actor: EnrollmentActor) {
@@ -418,7 +424,7 @@ export function createCourseEnrollmentService(
         );
       }
 
-      const capacity = getCapacity(course);
+      const capacity = getCourseCapacity(course);
       if (
         capacity !== null &&
         (await repository.countActiveEnrollments(courseObjectId)) >= capacity

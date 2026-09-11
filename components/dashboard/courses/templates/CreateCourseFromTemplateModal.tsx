@@ -50,7 +50,9 @@ export default function CreateCourseFromTemplateModal({
   const router = useRouter();
   const [name, setName] = useState(template.internalName);
   const [nameWasEdited, setNameWasEdited] = useState(false);
-  const [classType, setClassType] = useState<ClassType>("private");
+  const [classType, setClassType] = useState<ClassType>(
+    template.operationalDefaults.lessonDefaults.defaultClassType,
+  );
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [students, setStudents] = useState<StudentListDTO[]>([]);
   const [search, setSearch] = useState("");

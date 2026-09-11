@@ -6,6 +6,7 @@ import {
   buildLegacyEnrollmentBulkOperations,
   CourseEnrollmentError,
   createCourseEnrollmentService,
+  getCourseCapacity,
   type CourseEnrollmentRepository,
   type EnrollmentCourseRecord,
   type EnrollmentRecord,
@@ -55,8 +56,10 @@ class FakeEnrollmentRepository implements CourseEnrollmentRepository {
     return this.student;
   }
 
-  async findEnrollment() {
-    return this.enrollments[0] ?? null;
+  async findEnrollment(_courseId: Types.ObjectId, requestedStudentId: Types.ObjectId) {
+    return this.enrollments.find(
+      (enrollment) => String(enrollment.studentId) === String(requestedStudentId),
+    ) ?? null;
   }
 
   async createEnrollment(input: {
@@ -93,9 +96,9 @@ class FakeEnrollmentRepository implements CourseEnrollmentRepository {
   }
 
   async countActiveEnrollments() {
-    return this.enrollments.filter(
+    return new Set(this.enrollments.filter(
       (enrollment) => enrollment.status === "active",
-    ).length;
+    ).map((enrollment) => String(enrollment.studentId))).size;
   }
 
   async updateActiveEnrollmentCount() {}
@@ -131,6 +134,85 @@ test("teacher enrolls a valid student and receives a clean DTO", async () => {
   assert.equal(result.status, "active");
   assert.equal(repository.enrollments.length, 1);
   assert.equal(repository.projectionWasSynced, true);
+});
+
+function enrollmentFor(
+  enrolledStudentId: Types.ObjectId,
+  status: "active" | "inactive" = "active",
+): EnrollmentRecord {
+  return {
+    _id: new Types.ObjectId(),
+    courseId,
+    studentId: enrolledStudentId,
+    status,
+    enrolledAt: new Date("2026-09-01T10:00:00.000Z"),
+  };
+}
+
+async function expectCapacityResult(capacity: number, occupied: number, allowed: boolean) {
+  const repository = new FakeEnrollmentRepository();
+  repository.course = {
+    ...activeCourse(),
+    policies: { participantPolicy: { maxStudents: capacity } },
+  };
+  repository.enrollments = Array.from(
+    { length: occupied },
+    () => enrollmentFor(new Types.ObjectId()),
+  );
+  const operation = createCourseEnrollmentService(repository).enrollStudentInCourse({
+    courseId: courseId.toHexString(),
+    studentId: studentId.toHexString(),
+    actor,
+  });
+
+  if (allowed) {
+    await operation;
+    assert.equal(repository.enrollments.length, occupied + 1);
+  } else {
+    await expectEnrollmentError(operation, "COURSE_CAPACITY_REACHED");
+  }
+}
+
+test("A1 regular regression: capacity 8 with one active student allows enrollment", async () => {
+  await expectCapacityResult(8, 1, true);
+});
+
+test("capacity 2 allows the second student and rejects a third", async () => {
+  await expectCapacityResult(2, 1, true);
+  await expectCapacityResult(2, 2, false);
+});
+
+test("inactive and duplicate historical enrollments do not inflate occupied seats", async () => {
+  const repository = new FakeEnrollmentRepository();
+  repository.course = {
+    ...activeCourse(),
+    policies: { participantPolicy: { maxStudents: 2 } },
+    studentIds: [otherTeacherId],
+    members: [{ studentId: otherTeacherId, status: "active" }],
+  };
+  const occupiedStudent = new Types.ObjectId();
+  repository.enrollments = [
+    enrollmentFor(occupiedStudent),
+    enrollmentFor(occupiedStudent),
+    enrollmentFor(new Types.ObjectId(), "inactive"),
+  ];
+
+  await createCourseEnrollmentService(repository).enrollStudentInCourse({
+    courseId: courseId.toHexString(),
+    studentId: studentId.toHexString(),
+    actor,
+  });
+  assert.equal(await repository.countActiveEnrollments(), 2);
+});
+
+test("course profile capacity is authoritative and private fallback remains one", () => {
+  assert.equal(getCourseCapacity({
+    ...activeCourse(),
+    policies: { participantPolicy: { maxStudents: 6 } },
+    publicationMeta: { maxStudents: 1 },
+  }), 6);
+  assert.equal(getCourseCapacity({ ...activeCourse(), classType: "private" }), 1);
+  assert.equal(getCourseCapacity({ ...activeCourse(), classType: "group_regular" }), null);
 });
 
 test("an existing enrollment is rejected", async () => {

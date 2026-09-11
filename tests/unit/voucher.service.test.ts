@@ -116,33 +116,77 @@ test("a reservation remains subject to course, period, status and credit checks"
   assert.deepEqual(result.reasons, ["NO_VOUCHER_FOR_PERIOD"]);
 });
 
-test("Claire regression: linked active voucher covers lesson and spends exactly one credit", () => {
-  const claireEnrollment = new Types.ObjectId();
-  const claireCourse = new Types.ObjectId();
-  const claireVoucher = {
-    ...voucher(9, 2, claireEnrollment),
-    courseId: claireCourse,
+test("Pierre regression: a stale reserved voucher falls back to the valid course voucher", () => {
+  const pierreEnrollment = new Types.ObjectId();
+  const pierreCourse = new Types.ObjectId();
+  const staleVoucher = {
+    ...voucher(7, 0, undefined),
+    enrollmentId: undefined,
+    courseId: undefined,
+    status: "expired" as const,
+    validUntil: new Date("2026-08-12T00:00:00.000Z"),
+  };
+  const pierreVoucher = {
+    ...voucher(9, 2, undefined),
+    enrollmentId: undefined,
+    courseId: pierreCourse,
     validFrom: new Date("2026-09-09T00:00:00.000Z"),
     validUntil: new Date("2026-10-08T00:00:00.000Z"),
   };
   const lesson = {
     studentId: new Types.ObjectId(),
-    courseId: claireCourse,
+    courseId: pierreCourse,
     scheduledStart: new Date("2026-10-08T20:00:00.000Z"),
     status: "scheduled",
   };
-  const selected = resolveVoucherForLesson({
-    vouchers: [claireVoucher],
-    enrollmentId: claireEnrollment.toString(),
+  const result = resolveVoucherForLessonResult({
+    vouchers: [staleVoucher, pierreVoucher],
+    reservedVoucherId: staleVoucher._id.toString(),
+    enrollmentId: pierreEnrollment.toString(),
     courseId: lesson.courseId.toString(),
     classType: "group_regular",
     lessonDate: lesson.scheduledStart,
     requiredCredits: 1,
   });
 
-  assert.equal(selected?._id, claireVoucher._id);
-  const creditsAfterSettlement = (selected?.creditsRemaining ?? 0) - 1;
+  assert.equal(result.voucher?._id, pierreVoucher._id);
+  assert.deepEqual(result.reasons, []);
+  const creditsAfterSettlement = (result.voucher?.creditsRemaining ?? 0) - 1;
   assert.equal(creditsAfterSettlement, 1);
+});
+
+test("an unknown reserved voucher id falls back to a usable voucher", () => {
+  const usable = voucher(9, 1);
+  const result = resolveVoucherForLessonResult({
+    vouchers: [usable],
+    reservedVoucherId: new Types.ObjectId().toString(),
+    enrollmentId: studentEnrollment.toString(),
+    courseId: courseId.toString(),
+    classType: "group_regular",
+    lessonDate: new Date("2026-09-10T10:00:00.000Z"),
+    requiredCredits: 1,
+  });
+
+  assert.equal(result.voucher?._id, usable._id);
+  assert.deepEqual(result.reasons, []);
+});
+
+test("legacy course-linked voucher remains supported with equivalent ObjectId strings", () => {
+  const legacy = {
+    ...voucher(9, 1),
+    enrollmentId: undefined,
+    courseId,
+  };
+  const selected = resolveVoucherForLesson({
+    vouchers: [legacy],
+    enrollmentId: new Types.ObjectId().toString(),
+    courseId: new Types.ObjectId(courseId.toString()).toString(),
+    classType: "group_regular",
+    lessonDate: new Date("2026-09-10T10:00:00.000Z"),
+    requiredCredits: 1,
+  });
+
+  assert.equal(selected?._id, legacy._id);
 });
 
 test("monthly billing periods end on the day before the next anchored period", () => {

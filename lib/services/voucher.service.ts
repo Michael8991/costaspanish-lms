@@ -86,15 +86,27 @@ export function resolveVoucherForLessonResult<T extends VoucherCandidate>(args: 
   reservedCredits?: (voucher: T) => number;
 }): { voucher?: T; reasons: VoucherRejectionReason[] } {
   const reserved = args.reservedCredits ?? (() => 0);
-  const candidates = args.reservedVoucherId
-    ? args.vouchers.filter(
+  const reservedVoucher = args.reservedVoucherId
+    ? args.vouchers.find(
         (voucher) => voucher._id.toString() === args.reservedVoucherId,
       )
-    : args.vouchers;
-  if (args.reservedVoucherId && candidates.length === 0) {
-    return { reasons: ["VOUCHER_NOT_FOUND"] };
+    : undefined;
+
+  // A lesson's voucherId is a preference/reservation, not a permanent lock.
+  // Keep it when it is still usable; otherwise resolve against the student's
+  // current vouchers so stale lesson data cannot hide a valid replacement.
+  if (reservedVoucher) {
+    const reservedReason = rejectionReason({
+      ...args,
+      voucher: reservedVoucher,
+      reservedCredits: reserved,
+    });
+    if (reservedReason === null) {
+      return { voucher: reservedVoucher, reasons: [] };
+    }
   }
-  const evaluated = candidates.map((voucher) => ({
+
+  const evaluated = args.vouchers.map((voucher) => ({
     voucher,
     reason: rejectionReason({ ...args, voucher, reservedCredits: reserved }),
   }));
@@ -108,9 +120,14 @@ export function resolveVoucherForLessonResult<T extends VoucherCandidate>(args: 
   }
   return {
     voucher: matches[0]?.voucher,
-    reasons: Array.from(new Set(
-      evaluated.flatMap((item) => item.reason ? [item.reason] : []),
-    )),
+    reasons: matches.length > 0
+      ? []
+      : Array.from(new Set([
+          ...(args.reservedVoucherId && !reservedVoucher
+            ? ["VOUCHER_NOT_FOUND" as const]
+            : []),
+          ...evaluated.flatMap((item) => item.reason ? [item.reason] : []),
+        ])),
   };
 }
 
