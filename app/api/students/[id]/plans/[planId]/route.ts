@@ -2,10 +2,8 @@ import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireAuth, requireRole } from "@/lib/auth/apiAuth";
-import { getCurrentUserObjectId } from "@/lib/auth/getCurrentUserObjectId";
 import { getStudentOwnershipFilter } from "@/lib/auth/studentOwnership";
 import dbConnect from "@/lib/mongo";
-import { ensurePaymentLedgerForVoucher } from "@/lib/services/payment-ledger.service";
 import { validateVoucherEnrollment, VoucherDomainError } from "@/lib/services/voucher.service";
 import { updateStudentVoucherSchema } from "@/lib/validators/voucher";
 import {
@@ -148,11 +146,6 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       "billingPeriodStart",
       "billingPeriodEnd",
       "billingAnchorDay",
-      "paymentMethod",
-      "paymentNotes",
-      "internalNotes",
-      "currency",
-      "createdFrom",
     ] as const;
 
     for (const field of directFields) {
@@ -170,10 +163,8 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       set["activePlans.$.courseId"] = selectedEnrollment.courseId;
     }
 
-    const priceWasUpdated =
-      payload.price !== undefined || payload.priceTotal !== undefined;
+    const priceWasUpdated = payload.price !== undefined;
     const finalPriceTotal =
-      payload.priceTotal ??
       payload.price ??
       currentPlan.priceTotal ??
       currentPlan.price;
@@ -186,25 +177,6 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         finalCreditsTotal !== undefined && finalCreditsTotal > 0
           ? finalPriceTotal / finalCreditsTotal
           : null;
-    }
-
-    const finalPaymentStatus =
-      payload.paymentStatus ?? currentPlan.paymentStatus ?? "pending";
-    if (payload.paymentStatus !== undefined) {
-      set["activePlans.$.paymentStatus"] = finalPaymentStatus;
-    }
-    if (payload.amountPaid !== undefined) {
-      set["activePlans.$.amountPaid"] = payload.amountPaid;
-    } else if (
-      payload.paymentStatus === "paid" &&
-      (currentPlan.amountPaid ?? 0) === 0
-    ) {
-      set["activePlans.$.amountPaid"] = finalPriceTotal;
-    }
-    if (payload.paidAt !== undefined) {
-      set["activePlans.$.paidAt"] = payload.paidAt;
-    } else if (payload.paymentStatus === "paid" && !currentPlan.paidAt) {
-      set["activePlans.$.paidAt"] = new Date();
     }
 
     let finalStatus: PlanStatus = payload.status ?? currentPlan.status;
@@ -255,34 +227,6 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         { status: 409 },
       );
     }
-
-    const updatedPlan = updated.activePlans.find(
-      (plan) => plan._id.toString() === planObjectId.toString(),
-    );
-    const changedBy = getCurrentUserObjectId(user);
-    const ledgerTeacherId = updated.teacherId ?? changedBy;
-    if (!updatedPlan || !changedBy || !ledgerTeacherId) {
-      return NextResponse.json(
-        { error: "No se pudo registrar el cambio de pago." },
-        { status: 500 },
-      );
-    }
-
-    const wasPaid =
-      currentPlan.paymentStatus === "paid" ||
-      currentPlan.paymentStatus === "partial";
-    const isPaid =
-      updatedPlan.paymentStatus === "paid" ||
-      updatedPlan.paymentStatus === "partial";
-    await ensurePaymentLedgerForVoucher({
-      teacherId: ledgerTeacherId,
-      student: updated,
-      voucher: updatedPlan,
-      changedBy,
-      source: !wasPaid && isPaid
-        ? "voucher_marked_paid"
-        : "voucher_payment_updated",
-    });
 
     return NextResponse.json(updated);
   } catch (error) {

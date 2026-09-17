@@ -34,29 +34,13 @@ const courseVoucherRequestBaseSchema = z.object({
   priceByStudent: z
     .record(z.string(), z.coerce.number().min(0))
     .default({}),
-  paymentStatusByStudent: z
-    .record(z.string(), z.enum(["pending", "paid", "partial", "waived"]))
-    .default({}),
-  amountPaidByStudent: z
-    .record(z.string(), z.coerce.number().min(0))
-    .default({}),
-  paidAtByStudent: z.record(z.string(), optionalDateOnlySchema).default({}),
-  paymentMethodByStudent: z
-    .record(
-      z.string(),
-      z.enum(["cash", "bank_transfer", "bizum", "card", "other", ""]),
-    )
-    .default({}),
-  paymentNotesByStudent: z
-    .record(z.string(), z.string().trim().max(1000))
-    .default({}),
   notesByStudent: z
     .record(z.string(), z.string().trim().max(1000))
     .default({}),
   internalNotesByStudent: z
     .record(z.string(), z.string().trim().max(2000))
     .default({}),
-});
+}).strict();
 
 export const previewCourseVouchersSchema = courseVoucherRequestBaseSchema;
 

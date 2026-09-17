@@ -9,15 +9,7 @@ import type {
   CourseProfileDetailDTO,
 } from "@/lib/dto/course-profile.dto";
 import type { StudentPlanListDTO } from "@/lib/dto/student.dto";
-import {
-  formatUnitCreditPrice,
-  getPaymentMethodLabel,
-  getVoucherPaymentStatusLabel,
-} from "@/lib/utils/voucher-visuals";
-import type {
-  VoucherPaymentMethod,
-  VoucherPaymentStatus,
-} from "@/models/StudentProfile";
+import { formatUnitCreditPrice } from "@/lib/utils/voucher-visuals";
 
 interface EditCourseVoucherModalProps {
   isOpen: boolean;
@@ -31,10 +23,6 @@ function dateOnly(value: string | null) {
   return value?.slice(0, 10) ?? "";
 }
 
-function todayDateOnly() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 export default function EditCourseVoucherModal({
   isOpen,
   onClose,
@@ -46,13 +34,6 @@ export default function EditCourseVoucherModal({
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
   const [priceTotal, setPriceTotal] = useState("");
-  const [paymentStatus, setPaymentStatus] =
-    useState<VoucherPaymentStatus>("pending");
-  const [amountPaid, setAmountPaid] = useState("0");
-  const [paidAt, setPaidAt] = useState("");
-  const [paymentMethod, setPaymentMethod] =
-    useState<VoucherPaymentMethod>("");
-  const [paymentNotes, setPaymentNotes] = useState("");
   const [internalNotes, setInternalNotes] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -84,11 +65,6 @@ export default function EditCourseVoucherModal({
         setPeriodStart(dateOnly(item.billingPeriodStart));
         setPeriodEnd(dateOnly(item.billingPeriodEnd));
         setPriceTotal(item.priceTotal?.toString() ?? "");
-        setPaymentStatus(item.paymentStatus);
-        setAmountPaid(item.amountPaid.toString());
-        setPaidAt(dateOnly(item.paidAt));
-        setPaymentMethod(item.paymentMethod);
-        setPaymentNotes(item.paymentNotes);
         setInternalNotes(item.internalNotes);
       } catch (loadError) {
         if (loadError instanceof DOMException && loadError.name === "AbortError") {
@@ -123,11 +99,6 @@ export default function EditCourseVoucherModal({
             billingPeriodStart: periodStart || null,
             billingPeriodEnd: periodEnd || null,
             priceTotal: priceTotal === "" ? undefined : Number(priceTotal),
-            paymentStatus,
-            amountPaid: Number(amountPaid || 0),
-            paidAt: paidAt || null,
-            paymentMethod,
-            paymentNotes,
             internalNotes,
           }),
         },
@@ -203,40 +174,7 @@ export default function EditCourseVoucherModal({
                   )}
                 </span>
               </label>
-              <label className="text-sm font-medium text-slate-700">
-                Estado de pago
-                <select value={paymentStatus} onChange={(event) => {
-                  const nextStatus = event.target.value as VoucherPaymentStatus;
-                  setPaymentStatus(nextStatus);
-                  if (nextStatus === "paid") {
-                    if (Number(amountPaid) === 0 && priceTotal) {
-                      setAmountPaid(priceTotal);
-                    }
-                    if (!paidAt) setPaidAt(todayDateOnly());
-                  }
-                }} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2">
-                  {(["pending", "paid", "partial", "waived"] as const).map((status) => <option key={status} value={status}>{getVoucherPaymentStatusLabel(status)}</option>)}
-                </select>
-              </label>
-              <label className="text-sm font-medium text-slate-700">
-                Importe pagado
-                <input type="number" min="0" step="0.01" value={amountPaid} onChange={(event) => setAmountPaid(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" />
-              </label>
-              <label className="text-sm font-medium text-slate-700">
-                Fecha de pago
-                <input type="date" value={paidAt} onChange={(event) => setPaidAt(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" />
-              </label>
-              <label className="text-sm font-medium text-slate-700">
-                Método de pago
-                <select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value as VoucherPaymentMethod)} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2">
-                  {(["", "cash", "bank_transfer", "bizum", "card", "other"] as const).map((method) => <option key={method} value={method}>{getPaymentMethodLabel(method)}</option>)}
-                </select>
-              </label>
             </div>
-            <label className="block text-sm font-medium text-slate-700">
-              Notas de pago
-              <textarea value={paymentNotes} onChange={(event) => setPaymentNotes(event.target.value)} rows={2} maxLength={1000} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" />
-            </label>
             <label className="block text-sm font-medium text-slate-700">
               Notas internas
               <textarea value={internalNotes} onChange={(event) => setInternalNotes(event.target.value)} rows={3} maxLength={2000} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" />

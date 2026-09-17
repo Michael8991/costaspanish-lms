@@ -2,11 +2,9 @@ import { QueryFilter, Types } from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireAuth, requireRole, type Role } from "@/lib/auth/apiAuth";
-import { getCurrentUserObjectId } from "@/lib/auth/getCurrentUserObjectId";
 import { getStudentOwnershipFilter } from "@/lib/auth/studentOwnership";
 import { toStudentPlanListDTO } from "@/lib/dto/student.dto";
 import dbConnect from "@/lib/mongo";
-import { ensurePaymentLedgerForVoucher } from "@/lib/services/payment-ledger.service";
 import { normalizeCourseMembers } from "@/lib/utils/course-members";
 import { editCourseVoucherSchema } from "@/lib/validators/voucher";
 import {
@@ -208,11 +206,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const allowedFields = [
       "billingPeriodStart",
       "billingPeriodEnd",
-      "paymentStatus",
-      "amountPaid",
-      "paidAt",
-      "paymentMethod",
-      "paymentNotes",
       "internalNotes",
     ] as const;
     for (const field of allowedFields) {
@@ -230,10 +223,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       set["activePlans.$.validUntil"] = payload.billingPeriodEnd;
     }
 
-    const finalPriceTotal =
-      payload.priceTotal ??
-      result.voucher.priceTotal ??
-      result.voucher.price;
     if (payload.priceTotal !== undefined) {
       set["activePlans.$.price"] = payload.priceTotal;
       set["activePlans.$.priceTotal"] = payload.priceTotal;
@@ -241,20 +230,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         result.voucher.creditsTotal && result.voucher.creditsTotal > 0
           ? payload.priceTotal / result.voucher.creditsTotal
           : null;
-    }
-    if (
-      payload.paymentStatus === "paid" &&
-      payload.amountPaid === undefined &&
-      (result.voucher.amountPaid ?? 0) === 0
-    ) {
-      set["activePlans.$.amountPaid"] = finalPriceTotal;
-    }
-    if (
-      payload.paymentStatus === "paid" &&
-      payload.paidAt === undefined &&
-      !result.voucher.paidAt
-    ) {
-      set["activePlans.$.paidAt"] = new Date();
     }
 
     if (Object.keys(set).length === 0) {
@@ -285,30 +260,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         { status: 404 },
       );
     }
-
-    const changedBy = getCurrentUserObjectId(user);
-    if (!changedBy) {
-      return NextResponse.json(
-        { error: "Invalid current user id" },
-        { status: 500 },
-      );
-    }
-
-    const wasPaid =
-      result.voucher.paymentStatus === "paid" ||
-      result.voucher.paymentStatus === "partial";
-    const isPaid =
-      updatedVoucher.paymentStatus === "paid" ||
-      updatedVoucher.paymentStatus === "partial";
-    await ensurePaymentLedgerForVoucher({
-      teacherId: result.course.ownerTeacherId,
-      student: updated,
-      voucher: updatedVoucher,
-      changedBy,
-      source: !wasPaid && isPaid
-        ? "voucher_marked_paid"
-        : "voucher_payment_updated",
-    });
 
     // TODO: Add full voucher history per course member.
     // TODO: Add payment reversal workflow.

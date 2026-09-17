@@ -145,7 +145,15 @@ const updateStudentVoucherBaseSchema = z
       .enum(["active", "exhausted", "expired", "canceled"])
       .optional(),
     price: z.coerce.number().min(0).optional(),
-    ...voucherMetadataShape,
+    enrollmentId: optionalObjectIdSchema,
+    courseId: optionalObjectIdSchema,
+    courseNameSnapshot: z.string().trim().max(160).optional(),
+    generatedFromCourse: z.boolean().optional(),
+    generatedFromCourseMember: z.boolean().optional(),
+    billingMode: z.enum(["individual_cycle"]).nullable().optional(),
+    billingPeriodStart: nullableDateSchema,
+    billingPeriodEnd: nullableDateSchema,
+    billingAnchorDay: z.coerce.number().int().min(1).max(31).nullable().optional(),
   })
   .partial()
   .strict();
@@ -153,18 +161,14 @@ const updateStudentVoucherBaseSchema = z
 export const updateStudentVoucherSchema =
   updateStudentVoucherBaseSchema.superRefine(validateVoucherRanges);
 
-export const editCourseVoucherSchema = updateStudentVoucherBaseSchema
-  .pick({
-    billingPeriodStart: true,
-    billingPeriodEnd: true,
-    paymentStatus: true,
-    amountPaid: true,
-    paidAt: true,
-    paymentMethod: true,
-    paymentNotes: true,
-    internalNotes: true,
-    priceTotal: true,
+export const editCourseVoucherSchema = z
+  .object({
+    billingPeriodStart: nullableDateSchema,
+    billingPeriodEnd: nullableDateSchema,
+    internalNotes: z.string().trim().max(2000).optional(),
+    priceTotal: z.coerce.number().min(0).optional(),
   })
+  .partial()
   .strict()
   .superRefine(validateVoucherRanges);
 
