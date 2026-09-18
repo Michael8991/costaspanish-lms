@@ -1,12 +1,10 @@
 "use client";
 
-import type {
-  DBPlanPaymentStatus,
-  DBVoucherPaymentMethod,
-} from "@/lib/types/student";
+import type { DBVoucherPaymentMethod } from "@/lib/types/student";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { toast } from "sonner";
+import { toCents } from "@/lib/utils/money";
 
 import type { FormattedPlan } from "./ActiveVouchersPanel";
 
@@ -18,11 +16,11 @@ interface VoucherPaymentEditorProps {
 }
 
 interface VoucherPaymentPatchPayload {
-  paymentStatus: DBPlanPaymentStatus;
-  amountPaid: number;
-  paidAt: string | null;
+  amountCents: number;
+  paidAt: string;
   paymentMethod: DBVoucherPaymentMethod;
-  paymentNotes: string;
+  notes: string;
+  idempotencyKey: string;
 }
 
 const paymentMethods: Array<{
@@ -55,20 +53,14 @@ export default function VoucherPaymentEditor({
   onCancel,
   onSaved,
 }: VoucherPaymentEditorProps) {
-  const [paymentStatus, setPaymentStatus] = useState<DBPlanPaymentStatus>(
-    voucher.paymentStatus ?? "pending",
-  );
-  const [amountPaid, setAmountPaid] = useState(
-    String(voucher.amountPaid ?? 0),
-  );
-  const [paidAt, setPaidAt] = useState(voucher.paidAt ?? "");
+  const [amountPaid, setAmountPaid] = useState("");
+  const [paidAt, setPaidAt] = useState(getTodayDateOnly());
   const [paymentMethod, setPaymentMethod] =
     useState<DBVoucherPaymentMethod>(voucher.paymentMethod ?? "");
-  const [paymentNotes, setPaymentNotes] = useState(
-    voucher.paymentNotes ?? "",
-  );
+  const [paymentNotes, setPaymentNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
 
   const markAsPaid = () => {
     const currentAmount = Number(amountPaid);
@@ -79,8 +71,8 @@ export default function VoucherPaymentEditor({
           ? currentAmount
           : 0;
 
-    setPaymentStatus("paid");
-    setAmountPaid(String(suggestedAmount));
+    const outstanding = Math.max(0, suggestedAmount - (voucher.amountPaid ?? 0));
+    setAmountPaid(String(outstanding));
     setPaidAt(getTodayDateOnly());
     setError(null);
   };
@@ -95,8 +87,7 @@ export default function VoucherPaymentEditor({
       return;
     }
     if (
-      (paymentStatus === "paid" || paymentStatus === "partial") &&
-      (parsedAmount <= 0 || !paidAt)
+      parsedAmount <= 0 || !paidAt
     ) {
       setError(
         "Los cobros pagados o parciales necesitan un importe mayor que cero y una fecha.",
@@ -109,19 +100,19 @@ export default function VoucherPaymentEditor({
     }
 
     const payload: VoucherPaymentPatchPayload = {
-      paymentStatus,
-      amountPaid: parsedAmount,
-      paidAt: paidAt || null,
+      amountCents: toCents(parsedAmount),
+      paidAt,
       paymentMethod,
-      paymentNotes,
+      notes: paymentNotes,
+      idempotencyKey,
     };
 
     setIsSubmitting(true);
     try {
       const response = await fetch(
-        `/api/students/${studentId}/plans/${voucher.id}`,
+        `/api/students/${studentId}/plans/${voucher.id}/payments`,
         {
-          method: "PATCH",
+          method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
           cache: "no-store",
@@ -136,6 +127,7 @@ export default function VoucherPaymentEditor({
       }
 
       await onSaved();
+      setIdempotencyKey(crypto.randomUUID());
       toast.success("Cobro guardado.");
     } catch (caughtError: unknown) {
       setError(
@@ -155,7 +147,7 @@ export default function VoucherPaymentEditor({
     >
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h3 className="font-semibold text-slate-900">Editar cobro</h3>
+          <h3 className="font-semibold text-slate-900">Registrar cobro</h3>
           <p className="text-xs text-slate-600">
             Solo se actualizarán los datos económicos de este bono.
           </p>
@@ -173,24 +165,7 @@ export default function VoucherPaymentEditor({
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <label className="text-sm font-medium text-slate-700">
-          Estado del pago
-          <select
-            value={paymentStatus}
-            onChange={(event) =>
-              setPaymentStatus(event.target.value as DBPlanPaymentStatus)
-            }
-            disabled={isSubmitting}
-            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-[#9e2727] focus:ring-2 focus:ring-[#9e2727]/10"
-          >
-            <option value="pending">Pendiente</option>
-            <option value="paid">Pagado</option>
-            <option value="partial">Parcial</option>
-            <option value="waived">Exento</option>
-          </select>
-        </label>
-
-        <label className="text-sm font-medium text-slate-700">
-          Importe cobrado
+          Importe de este cobro
           <input
             type="number"
             min="0"
@@ -268,7 +243,7 @@ export default function VoucherPaymentEditor({
           className="inline-flex min-w-32 items-center justify-center gap-2 rounded-lg bg-[#9e2727] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#862121] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isSubmitting && <Loader2 size={16} className="animate-spin" />}
-          {isSubmitting ? "Guardando..." : "Guardar cobro"}
+          {isSubmitting ? "Registrando..." : "Registrar cobro"}
         </button>
       </div>
     </form>

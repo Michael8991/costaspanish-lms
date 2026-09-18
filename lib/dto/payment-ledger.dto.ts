@@ -17,6 +17,7 @@ export interface PaymentLedgerEntryDTO {
   billingPeriodStart: string | null;
   billingPeriodEnd: string | null;
   amount: number;
+  amountCents: number;
   currency: "EUR";
   paymentStatusSnapshot: PaymentLedgerPaymentStatus;
   paymentMethod: PaymentLedgerPaymentMethod;

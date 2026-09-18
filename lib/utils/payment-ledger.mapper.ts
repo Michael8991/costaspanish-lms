@@ -19,6 +19,7 @@ type PaymentLedgerMapperSource = {
   billingPeriodStart?: unknown;
   billingPeriodEnd?: unknown;
   amount?: unknown;
+  amountCents?: unknown;
   currency?: unknown;
   paymentStatusSnapshot?: unknown;
   paymentMethod?: unknown;
@@ -43,6 +44,7 @@ const sources: PaymentLedgerSource[] = [
   "voucher_created_paid",
   "voucher_marked_paid",
   "voucher_payment_updated",
+  "voucher_payment_registered",
   "manual_adjustment",
 ];
 const statuses: PaymentLedgerStatus[] = ["active", "reversed"];
@@ -95,7 +97,12 @@ export function toPaymentLedgerEntryDTO(
     voucherNameSnapshot: toString(source.voucherNameSnapshot),
     billingPeriodStart: toIso(source.billingPeriodStart),
     billingPeriodEnd: toIso(source.billingPeriodEnd),
-    amount: toNumber(source.amount),
+    amount: typeof source.amountCents === "number"
+      ? source.amountCents / 100
+      : toNumber(source.amount),
+    amountCents: typeof source.amountCents === "number"
+      ? source.amountCents
+      : Math.round(toNumber(source.amount) * 100),
     currency: source.currency === "EUR" ? "EUR" : "EUR",
     paymentStatusSnapshot: oneOf(
       source.paymentStatusSnapshot,

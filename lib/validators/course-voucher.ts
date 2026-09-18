@@ -31,6 +31,14 @@ const courseVoucherRequestBaseSchema = z.object({
   manualCreditsByStudent: z
     .record(z.string(), z.coerce.number().min(0))
     .default({}),
+  /**
+   * Precio comercial asignado a cada bono.
+   *
+   * Key: Student ObjectId
+   * Value: precio en euros.
+   *
+   * No representa dinero recibido ni estado de pago.
+  */
   priceByStudent: z
     .record(z.string(), z.coerce.number().min(0))
     .default({}),

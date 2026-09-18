@@ -6,10 +6,6 @@ import { CalendarDays, LoaderCircle, WalletCards } from "lucide-react";
 import CustomModal from "@/components/ui/CustomModal";
 import type { CourseProfileDetailDTO } from "@/lib/dto/course-profile.dto";
 import type { CourseVoucherPreviewDTO } from "@/lib/dto/course-voucher.dto";
-import type {
-  PlanPaymentStatus,
-  VoucherPaymentMethod,
-} from "@/models/StudentProfile";
 
 interface CreateCourseVouchersModalProps {
   isOpen: boolean;
@@ -20,8 +16,6 @@ interface CreateCourseVouchersModalProps {
 }
 
 type TextValuesByStudent = Record<string, string>;
-type PaymentStatusByStudent = Record<string, PlanPaymentStatus>;
-type PaymentMethodByStudent = Record<string, VoucherPaymentMethod>;
 
 const WEEKDAY_LABELS = [
   "domingo",
@@ -62,10 +56,6 @@ const WARNING_LABELS: Record<string, string> = {
   renewing_existing_cycle: "Renovación del ciclo",
 };
 
-function todayDateOnly() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 function toNumberRecord(values: TextValuesByStudent) {
   return Object.fromEntries(
     Object.entries(values).flatMap(([studentId, value]) => {
@@ -104,19 +94,9 @@ export default function CreateCourseVouchersModal({
   );
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [selectedStartDate, setSelectedStartDate] = useState("");
-  const [manualCredits, setManualCredits] =
-    useState<TextValuesByStudent>({});
+  const [manualCredits, setManualCredits] = useState<TextValuesByStudent>({});
   const [prices, setPrices] = useState<TextValuesByStudent>({});
-  const [paymentStatuses, setPaymentStatuses] =
-    useState<PaymentStatusByStudent>({});
-  const [paymentNotes, setPaymentNotes] =
-    useState<TextValuesByStudent>({});
-  const [amountsPaid, setAmountsPaid] = useState<TextValuesByStudent>({});
-  const [paymentMethods, setPaymentMethods] =
-    useState<PaymentMethodByStudent>({});
-  const [internalNotes, setInternalNotes] =
-    useState<TextValuesByStudent>({});
-  const [paidDates, setPaidDates] = useState<TextValuesByStudent>({});
+  const [internalNotes, setInternalNotes] = useState<TextValuesByStudent>({});
   const [applyPrice, setApplyPrice] = useState("");
   const [preview, setPreview] = useState<CourseVoucherPreviewDTO | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
@@ -131,20 +111,12 @@ export default function CreateCourseVouchersModal({
           .filter((member) => initialStudentIds.includes(member.studentId))
           .map((member) => member.studentId)
       : activeMembers.map((member) => member.studentId);
-    const defaultStatuses = Object.fromEntries(
-      activeMembers.map((member) => [member.studentId, "pending" as const]),
-    );
 
     setSelectedStudentIds(initialSelection);
     setSelectedStartDate("");
     setManualCredits({});
     setPrices({});
-    setPaymentStatuses(defaultStatuses);
-    setPaymentNotes({});
-    setAmountsPaid({});
-    setPaymentMethods({});
     setInternalNotes({});
-    setPaidDates({});
     setApplyPrice("");
     setPreview(null);
     setError(null);
@@ -173,11 +145,6 @@ export default function CreateCourseVouchersModal({
               selectedStartDate: selectedStartDate || undefined,
               manualCreditsByStudent: toNumberRecord(manualCredits),
               priceByStudent: toNumberRecord(prices),
-              paymentStatusByStudent: paymentStatuses,
-              amountPaidByStudent: toNumberRecord(amountsPaid),
-              paidAtByStudent: paidDates,
-              paymentMethodByStudent: paymentMethods,
-              paymentNotesByStudent: paymentNotes,
               internalNotesByStudent: internalNotes,
             }),
           },
@@ -192,7 +159,10 @@ export default function CreateCourseVouchersModal({
 
         setPreview(data);
       } catch (previewError) {
-        if (previewError instanceof DOMException && previewError.name === "AbortError") {
+        if (
+          previewError instanceof DOMException &&
+          previewError.name === "AbortError"
+        ) {
           return;
         }
         setPreview(null);
@@ -214,29 +184,11 @@ export default function CreateCourseVouchersModal({
     course.id,
     isOpen,
     manualCredits,
-    amountsPaid,
     internalNotes,
-    paidDates,
-    paymentNotes,
-    paymentMethods,
-    paymentStatuses,
     prices,
     selectedStartDate,
     selectedStudentIds,
   ]);
-
-  const updatePaymentStatus = (
-    studentId: string,
-    status: PlanPaymentStatus,
-  ) => {
-    setPaymentStatuses((current) => ({ ...current, [studentId]: status }));
-    if (status === "paid" && !paidDates[studentId]) {
-      setPaidDates((current) => ({
-        ...current,
-        [studentId]: todayDateOnly(),
-      }));
-    }
-  };
 
   const applyPriceToSelected = () => {
     if (!applyPrice.trim()) return;
@@ -262,11 +214,6 @@ export default function CreateCourseVouchersModal({
             selectedStartDate: selectedStartDate || undefined,
             manualCreditsByStudent: toNumberRecord(manualCredits),
             priceByStudent: toNumberRecord(prices),
-            paymentStatusByStudent: paymentStatuses,
-            amountPaidByStudent: toNumberRecord(amountsPaid),
-            paidAtByStudent: paidDates,
-            paymentMethodByStudent: paymentMethods,
-            paymentNotesByStudent: paymentNotes,
             internalNotesByStudent: internalNotes,
             allowDuplicatePeriod: false,
           }),
@@ -321,7 +268,8 @@ export default function CreateCourseVouchersModal({
               </p>
             </div>
             <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
-              {formatNumber(course.policies.creditPolicy.creditsPerLesson)} cr. por clase
+              {formatNumber(course.policies.creditPolicy.creditsPerLesson)} cr.
+              por clase
             </span>
           </div>
           <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
@@ -442,7 +390,8 @@ export default function CreateCourseVouchersModal({
                     <p className="font-semibold">{item.studentName}</p>
                     <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
                       <CalendarDays className="h-3.5 w-3.5" />
-                      {formatDate(item.periodStart)} – {formatDate(item.periodEnd)}
+                      {formatDate(item.periodStart)} –{" "}
+                      {formatDate(item.periodEnd)}
                       {` · Renueva ${formatDate(item.nextBillingDate)}`}
                     </p>
                   </div>
@@ -495,96 +444,8 @@ export default function CreateCourseVouchersModal({
                         : `${formatNumber(item.unitCreditPrice)} €/crédito`}
                     </span>
                   </label>
-                  <label className="text-xs font-medium text-slate-600">
-                    Estado de pago
-                    <select
-                      value={paymentStatuses[item.studentId] ?? "pending"}
-                      onChange={(event) =>
-                        updatePaymentStatus(
-                          item.studentId,
-                          event.target.value as PlanPaymentStatus,
-                        )
-                      }
-                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm"
-                    >
-                      <option value="pending">Pendiente</option>
-                      <option value="paid">Pagado</option>
-                      <option value="partial">Parcial</option>
-                      <option value="waived">Exento</option>
-                    </select>
-                  </label>
-                  <label className="text-xs font-medium text-slate-600">
-                    Fecha de pago
-                    <input
-                      type="date"
-                      disabled={
-                        !["paid", "partial"].includes(
-                          paymentStatuses[item.studentId] ?? "pending",
-                        )
-                      }
-                      value={paidDates[item.studentId] ?? ""}
-                      onChange={(event) =>
-                        setPaidDates((current) => ({
-                          ...current,
-                          [item.studentId]: event.target.value,
-                        }))
-                      }
-                      className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm disabled:bg-slate-100"
-                    />
-                  </label>
                 </div>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <label className="text-xs font-medium text-slate-600">
-                    Importe pagado
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={amountsPaid[item.studentId] ?? ""}
-                      onChange={(event) =>
-                        setAmountsPaid((current) => ({
-                          ...current,
-                          [item.studentId]: event.target.value,
-                        }))
-                      }
-                      placeholder={formatNumber(item.amountPaid)}
-                      className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm"
-                    />
-                  </label>
-                  <label className="text-xs font-medium text-slate-600">
-                    Método de pago
-                    <select
-                      value={paymentMethods[item.studentId] ?? ""}
-                      onChange={(event) =>
-                        setPaymentMethods((current) => ({
-                          ...current,
-                          [item.studentId]: event.target.value as VoucherPaymentMethod,
-                        }))
-                      }
-                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm"
-                    >
-                      <option value="">Sin especificar</option>
-                      <option value="cash">Efectivo</option>
-                      <option value="bank_transfer">Transferencia</option>
-                      <option value="bizum">Bizum</option>
-                      <option value="card">Tarjeta</option>
-                      <option value="other">Otro</option>
-                    </select>
-                  </label>
-                  <label className="text-xs font-medium text-slate-600">
-                    Notas de pago
-                    <input
-                      value={paymentNotes[item.studentId] ?? ""}
-                      onChange={(event) =>
-                        setPaymentNotes((current) => ({
-                          ...current,
-                          [item.studentId]: event.target.value,
-                        }))
-                      }
-                      maxLength={1000}
-                      className="mt-1 w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm"
-                    />
-                  </label>
                   <label className="text-xs font-medium text-slate-600">
                     Notas internas
                     <input
@@ -606,7 +467,8 @@ export default function CreateCourseVouchersModal({
                       key={warning}
                       className={`rounded-full px-2 py-1 text-[11px] font-medium ${
                         warning === "existing_voucher_for_period" ||
-                        warning === "no_preferred_weekdays_manual_credits_required"
+                        warning ===
+                          "no_preferred_weekdays_manual_credits_required"
                           ? "bg-red-50 text-red-700"
                           : "bg-amber-50 text-amber-700"
                       }`}

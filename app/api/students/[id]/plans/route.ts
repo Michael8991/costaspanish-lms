@@ -3,10 +3,8 @@ import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireAuth, requireRole } from "@/lib/auth/apiAuth";
-import { getCurrentUserObjectId } from "@/lib/auth/getCurrentUserObjectId";
 import { getStudentOwnershipFilter } from "@/lib/auth/studentOwnership";
 import dbConnect from "@/lib/mongo";
-import { ensurePaymentLedgerForVoucher } from "@/lib/services/payment-ledger.service";
 import {
   assertNoOverlappingVoucherPeriod,
   validateVoucherEnrollment,
@@ -33,6 +31,17 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   }
 
   const body: unknown = await req.json().catch(() => null);
+  const financialFields = ["paymentStatus", "amountPaid", "paidAt", "paymentMethod", "paymentNotes"];
+  if (
+    body &&
+    typeof body === "object" &&
+    financialFields.some((field) => Object.prototype.hasOwnProperty.call(body, field))
+  ) {
+    return NextResponse.json(
+      { error: "Los datos de cobro deben registrarse mediante POST /payments." },
+      { status: 400 },
+    );
+  }
   const parsed = createStudentVoucherSchema.safeParse(body);
 
   if (!parsed.success) {
@@ -73,10 +82,6 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   }
 
   const priceTotal = payload.priceTotal ?? payload.price ?? 0;
-  const amountPaid =
-    payload.paymentStatus === "paid" && payload.amountPaid === 0
-      ? priceTotal
-      : payload.amountPaid;
   const unitCreditPriceSnapshot =
     creditsTotal !== undefined && creditsTotal > 0
       ? priceTotal / creditsTotal
@@ -125,14 +130,11 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     billingPeriodStart: payload.billingPeriodStart ?? undefined,
     billingPeriodEnd: payload.billingPeriodEnd ?? undefined,
     billingAnchorDay: payload.billingAnchorDay ?? undefined,
-    paymentStatus: payload.paymentStatus,
-    amountPaid,
-    paidAt:
-      payload.paymentStatus === "paid"
-        ? payload.paidAt ?? new Date()
-        : payload.paidAt,
-    paymentMethod: payload.paymentMethod,
-    paymentNotes: payload.paymentNotes,
+    paymentStatus: "pending",
+    amountPaid: 0,
+    paidAt: null,
+    paymentMethod: "",
+    paymentNotes: "",
     internalNotes: payload.internalNotes,
     priceTotal,
     currency: payload.currency,
@@ -203,37 +205,14 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     );
   }
 
-  const changedBy = getCurrentUserObjectId(user);
   const updatedVoucher = updated.activePlans.find(
     (voucher) => voucher._id.toString() === voucherObjectId.toString(),
   );
-  const ledgerTeacherId = updated.teacherId ?? changedBy;
-
-  if (!changedBy || !ledgerTeacherId || !updatedVoucher) {
+  if (!updatedVoucher) {
     await StudentProfile.updateOne(
       { _id: updated._id },
       { $pull: { activePlans: { _id: voucherObjectId } } },
     );
-    return NextResponse.json(
-      { error: "No se pudo registrar el pago del bono." },
-      { status: 500 },
-    );
-  }
-
-  try {
-    await ensurePaymentLedgerForVoucher({
-      teacherId: ledgerTeacherId,
-      student: updated,
-      voucher: updatedVoucher,
-      changedBy,
-      source: "voucher_created_paid",
-    });
-  } catch (ledgerError) {
-    await StudentProfile.updateOne(
-      { _id: updated._id },
-      { $pull: { activePlans: { _id: voucherObjectId } } },
-    );
-    console.error("Error creating payment ledger for voucher:", ledgerError);
     return NextResponse.json(
       { error: "No se pudo registrar el pago del bono." },
       { status: 500 },

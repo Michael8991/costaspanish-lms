@@ -217,11 +217,8 @@ export async function buildCourseVoucherContext({
       });
       const hasPrice = hasOwnValue(input.priceByStudent, studentId);
       const priceTotal = input.priceByStudent[studentId] ?? 0;
-      const paymentStatus =
-        input.paymentStatusByStudent[studentId] ?? "pending";
-      const amountPaid =
-        input.amountPaidByStudent[studentId] ??
-        (paymentStatus === "paid" ? priceTotal : 0);
+      const paymentStatus = "pending" as const;
+      const amountPaid = 0;
       const warnings = new Set<CourseVoucherWarning>();
 
       if (member.status === "paused") warnings.add("member_paused");
@@ -264,10 +261,8 @@ export async function buildCourseVoucherContext({
             : null,
         paymentStatus,
         amountPaid,
-        paymentMethod:
-          input.paymentMethodByStudent[studentId] ?? "",
-        paymentNotes:
-          input.paymentNotesByStudent[studentId] ?? "",
+        paymentMethod: "",
+        paymentNotes: "",
         internalNotes:
           input.internalNotesByStudent[studentId] ??
           input.notesByStudent[studentId] ??

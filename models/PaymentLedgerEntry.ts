@@ -11,6 +11,7 @@ export const PAYMENT_LEDGER_SOURCES = [
   "voucher_created_paid",
   "voucher_marked_paid",
   "voucher_payment_updated",
+  "voucher_payment_registered",
   "manual_adjustment",
 ] as const;
 
@@ -37,6 +38,7 @@ export interface IPaymentLedgerEntry {
   billingPeriodStart?: Date | null;
   billingPeriodEnd?: Date | null;
   amount: number;
+  amountCents?: number | null;
   currency: "EUR";
   paymentStatusSnapshot: PaymentLedgerPaymentStatus;
   paymentMethod: PaymentLedgerPaymentMethod;
@@ -47,6 +49,8 @@ export interface IPaymentLedgerEntry {
   reversedBy?: Types.ObjectId | null;
   reversalReason: string;
   notes: string;
+  createdBy?: Types.ObjectId | null;
+  idempotencyKey?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -89,6 +93,15 @@ const PaymentLedgerEntrySchema = new Schema<IPaymentLedgerEntry>(
     billingPeriodStart: { type: Date, default: null },
     billingPeriodEnd: { type: Date, default: null },
     amount: { type: Number, required: true, min: 0 },
+    amountCents: {
+      type: Number,
+      min: 1,
+      default: null,
+      validate: {
+        validator: (value: number | null) => value === null || Number.isSafeInteger(value),
+        message: "amountCents must be a safe integer",
+      },
+    },
     currency: {
       type: String,
       enum: ["EUR"],
@@ -123,6 +136,8 @@ const PaymentLedgerEntrySchema = new Schema<IPaymentLedgerEntry>(
     reversedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
     reversalReason: { type: String, trim: true, default: "" },
     notes: { type: String, trim: true, maxlength: 2000, default: "" },
+    createdBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    idempotencyKey: { type: String, trim: true, default: null },
   },
   { timestamps: true },
 );
@@ -132,11 +147,11 @@ PaymentLedgerEntrySchema.index({ teacherId: 1, studentId: 1, paidAt: -1 });
 PaymentLedgerEntrySchema.index({ teacherId: 1, courseId: 1, paidAt: -1 });
 PaymentLedgerEntrySchema.index({ teacherId: 1, voucherId: 1, status: 1 });
 PaymentLedgerEntrySchema.index(
-  { teacherId: 1, voucherId: 1 },
+  { teacherId: 1, idempotencyKey: 1 },
   {
     unique: true,
-    partialFilterExpression: { status: "active" },
-    name: "unique_active_payment_per_voucher",
+    partialFilterExpression: { idempotencyKey: { $type: "string" } },
+    name: "unique_payment_idempotency_key_per_teacher",
   },
 );
 

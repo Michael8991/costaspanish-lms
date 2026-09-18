@@ -4,15 +4,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireAuth, requireRole } from "@/lib/auth/apiAuth";
-import { getCurrentUserObjectId } from "@/lib/auth/getCurrentUserObjectId";
 import { getStudentOwnershipFilter } from "@/lib/auth/studentOwnership";
 import type { GeneratedCourseVoucherDTO } from "@/lib/dto/course-voucher.dto";
 import { CourseEnrollment } from "@/models/CourseEnrollment";
 import dbConnect from "@/lib/mongo";
-import {
-  ensurePaymentLedgerForVoucher,
-  reverseActivePaymentLedgersForVouchers,
-} from "@/lib/services/payment-ledger.service";
 import {
   buildCourseVoucherContext,
   CourseVoucherRequestError,
@@ -36,14 +31,8 @@ function formatZodError(error: z.ZodError) {
   }));
 }
 
-function parseDateOnly(value?: string) {
-  return value ? new Date(`${value}T00:00:00.000Z`) : null;
-}
-
 async function rollbackVouchers(args: {
   appliedVouchers: AppliedVoucher[];
-  teacherId: Types.ObjectId;
-  changedBy: Types.ObjectId;
 }) {
   await Promise.allSettled(
     args.appliedVouchers.map(({ studentId, voucherId }) =>
@@ -53,13 +42,6 @@ async function rollbackVouchers(args: {
       ),
     ),
   );
-
-  await reverseActivePaymentLedgersForVouchers({
-    teacherId: args.teacherId,
-    voucherIds: args.appliedVouchers.map(({ voucherId }) => voucherId),
-    changedBy: args.changedBy,
-    reason: "voucher_generation_rolled_back",
-  });
 }
 
 export async function POST(
@@ -95,10 +77,6 @@ export async function POST(
     }
 
     await dbConnect();
-    const changedBy = getCurrentUserObjectId(user);
-    if (!changedBy) {
-      return NextResponse.json({ error: "Invalid user id" }, { status: 500 });
-    }
     const courseId = new Types.ObjectId(id);
     const context = await buildCourseVoucherContext({
       courseId,
@@ -120,15 +98,6 @@ export async function POST(
       ) {
         return [
           `${item.studentName} ya tiene un bono generado para este periodo.`,
-        ];
-      }
-      if (
-        item.paymentStatus === "partial" &&
-        item.priceTotal > 0 &&
-        item.amountPaid > item.priceTotal
-      ) {
-        return [
-          `El importe pagado de ${item.studentName} no puede superar el precio total.`,
         ];
       }
       return [];
@@ -160,12 +129,7 @@ export async function POST(
       const voucherId = new Types.ObjectId();
       const periodStart = new Date(item.periodStart);
       const periodEnd = new Date(item.periodEnd);
-      const requestedPaidAt = parseDateOnly(
-        parsed.data.paidAtByStudent[item.studentId],
-      );
-      const paidAt =
-        requestedPaidAt ??
-        (item.paymentStatus === "paid" ? new Date() : null);
+      const paidAt = null;
       const plan: PlanDoc = {
         _id: voucherId,
         name: `${courseName} · ${periodStart.toLocaleDateString("es-ES", {
@@ -190,11 +154,11 @@ export async function POST(
         billingAnchorDay: item.billingAnchorDay,
         generatedFromCourse: true,
         generatedFromCourseMember: true,
-        paymentStatus: item.paymentStatus,
-        amountPaid: item.amountPaid,
+        paymentStatus: "pending",
+        amountPaid: 0,
         paidAt,
-        paymentMethod: item.paymentMethod,
-        paymentNotes: item.paymentNotes,
+        paymentMethod: "",
+        paymentNotes: "",
         internalNotes: item.internalNotes,
         priceTotal: item.priceTotal,
         currency: "EUR",
@@ -211,7 +175,7 @@ export async function POST(
         ...item,
         voucherId: voucherId.toString(),
         status: "active",
-        paidAt: paidAt?.toISOString() ?? null,
+        paidAt: null,
       });
     }
 
@@ -258,19 +222,6 @@ export async function POST(
           voucherId: plan._id,
         });
 
-        const generatedItem = generatedItems.find(
-          (item) => item.studentId === studentId,
-        );
-        await ensurePaymentLedgerForVoucher({
-          teacherId: context.course.ownerTeacherId,
-          student: {
-            _id: studentId,
-            fullName: generatedItem?.studentName,
-          },
-          voucher: plan,
-          changedBy,
-          source: "voucher_created_paid",
-        });
       }
 
       const normalizedMembers = normalizeCourseMembers({
@@ -333,8 +284,6 @@ export async function POST(
     } catch (generationError) {
       await rollbackVouchers({
         appliedVouchers,
-        teacherId: context.course.ownerTeacherId,
-        changedBy,
       });
       throw generationError;
     }
