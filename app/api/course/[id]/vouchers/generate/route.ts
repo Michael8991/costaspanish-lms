@@ -16,6 +16,7 @@ import { normalizeCourseMembers } from "@/lib/utils/course-members";
 import { toCourseProfileDetailDTO } from "@/lib/utils/course-profile.mapper";
 import { generateCourseVouchersSchema } from "@/lib/validators/course-voucher";
 import { StudentProfile, type PlanDoc } from "@/models/StudentProfile";
+import { toCents } from "@/lib/utils/money";
 
 export const runtime = "nodejs";
 
@@ -145,6 +146,8 @@ export async function POST(
         validUntil: periodEnd,
         status: "active",
         price: item.priceTotal,
+        priceTotalCents: toCents(item.priceTotal),
+        amountPaidCents: 0,
         enrollmentId: enrollmentByStudent.get(item.studentId),
         courseId,
         courseNameSnapshot: courseName,

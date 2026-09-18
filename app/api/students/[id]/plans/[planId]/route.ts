@@ -11,6 +11,7 @@ import {
   type PlanStatus,
   type StudentProfileDoc,
 } from "@/models/StudentProfile";
+import { toCents } from "@/lib/utils/money";
 
 type Ctx = {
   params:
@@ -171,6 +172,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     if (priceWasUpdated) {
       set["activePlans.$.price"] = finalPriceTotal;
       set["activePlans.$.priceTotal"] = finalPriceTotal;
+      set["activePlans.$.priceTotalCents"] = toCents(finalPriceTotal)
     }
     if (priceWasUpdated || payload.creditsTotal !== undefined) {
       set["activePlans.$.unitCreditPriceSnapshot"] =

@@ -13,6 +13,7 @@ import {
 import { createStudentVoucherSchema } from "@/lib/validators/voucher";
 import { StudentProfile, type PlanDoc } from "@/models/StudentProfile";
 import { CourseProfile } from "@/models/CourseProfile";
+import { toCents } from "@/lib/utils/money";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   }
 
   const body: unknown = await req.json().catch(() => null);
-  const financialFields = ["paymentStatus", "amountPaid", "paidAt", "paymentMethod", "paymentNotes"];
+  const financialFields = ["paymentStatus", "amountPaid","amountPaidCents", "paidAt", "paymentMethod", "paymentNotes"];
   if (
     body &&
     typeof body === "object" &&
@@ -82,6 +83,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   }
 
   const priceTotal = payload.priceTotal ?? payload.price ?? 0;
+  const priceTotalCents = toCents(priceTotal);
   const unitCreditPriceSnapshot =
     creditsTotal !== undefined && creditsTotal > 0
       ? priceTotal / creditsTotal
@@ -117,12 +119,11 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     creditsTotal,
     creditsRemaining,
     status: payload.status,
-    price: priceTotal,
     enrollmentId: enrollment?._id,
     courseId: enrollment?.courseId ?? (payload.courseId
       ? new mongoose.Types.ObjectId(payload.courseId)
       : undefined),
-    courseNameSnapshot: payload.courseNameSnapshot ??
+      courseNameSnapshot: payload.courseNameSnapshot ??
       (enrollmentCourse?.name?.trim() || enrollmentCourse?.internalName?.trim() || undefined),
     generatedFromCourse: payload.generatedFromCourse,
     generatedFromCourseMember: payload.generatedFromCourseMember,
@@ -132,11 +133,14 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     billingAnchorDay: payload.billingAnchorDay ?? undefined,
     paymentStatus: "pending",
     amountPaid: 0,
+    amountPaidCents: 0,
     paidAt: null,
     paymentMethod: "",
     paymentNotes: "",
     internalNotes: payload.internalNotes,
     priceTotal,
+    price: priceTotal,
+    priceTotalCents,
     currency: payload.currency,
     unitCreditPriceSnapshot,
     createdFrom: payload.createdFrom,
@@ -214,7 +218,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       { $pull: { activePlans: { _id: voucherObjectId } } },
     );
     return NextResponse.json(
-      { error: "No se pudo registrar el pago del bono." },
+      { error: "No se encontró el bono después de su creación." },
       { status: 500 },
     );
   }

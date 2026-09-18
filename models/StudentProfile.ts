@@ -47,10 +47,13 @@ export interface PlanDoc {
     paymentNotes?: string;
     internalNotes?: string;
     priceTotal?: number;
-    currency?: "EUR";
     unitCreditPriceSnapshot?: number | null;
     createdFrom?: VoucherCreatedFrom;
     notes?: string;
+    //CANONICAL MONEY
+    currency?: "EUR";
+    priceTotalCents?: number | null;
+    amountPaidCents?: number | null;
 }
 
 export interface StudentProfileDoc{
@@ -120,6 +123,26 @@ const PlanSchema = new Schema<PlanDoc>({
         default: "manual",
     },
     notes: { type: String, trim: true, maxlength: 1000 },
+    priceTotalCents: {
+        type: Number,
+        min: 0,
+        default: null,
+        validate: {
+            validator: (value: number | null | undefined) =>
+                value === null || Number.isSafeInteger(value),
+            message: "priceTotalCents must be a safe integer",
+        }
+    },
+    amountPaidCents: {
+        type: Number,
+        min: 0,
+        default: null,
+        validate: {
+            validator: (value: number | null | undefined) => 
+                value === null || Number.isSafeInteger(value),
+            message: "amountPaidCents must be a safe integer",
+        }
+    }
 })
 
 const StudentProfileSchema = new Schema<StudentProfileDoc>({

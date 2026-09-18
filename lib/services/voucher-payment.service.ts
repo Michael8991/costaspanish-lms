@@ -213,6 +213,9 @@ class MongooseVoucherPaymentTransaction implements VoucherPaymentTransaction {
     const teacherId = student?.teacherId ?? new Types.ObjectId(command.actor.id);
     if (!student || !voucher || !teacherId) return null;
     const price = voucher.priceTotal ?? voucher.price;
+    const priceCents = typeof voucher.priceTotalCents === "number" && Number.isSafeInteger(voucher.priceTotalCents) ? voucher.priceTotalCents : typeof voucher.priceTotal === "number" ? toCents(voucher.priceTotal) : typeof voucher.price === "number" ? toCents(voucher.price)
+      : Number.NaN;
+    
     return {
       studentId: student._id.toString(),
       studentName: getStudentNameSnapshot(student),
@@ -223,7 +226,7 @@ class MongooseVoucherPaymentTransaction implements VoucherPaymentTransaction {
       courseNameSnapshot: voucher.courseNameSnapshot,
       billingPeriodStart: voucher.billingPeriodStart ?? null,
       billingPeriodEnd: voucher.billingPeriodEnd ?? null,
-      priceCents: typeof price === "number" ? toCents(price) : Number.NaN,
+      priceCents,
       currency: voucher.currency ?? "EUR",
     };
   }
@@ -286,6 +289,7 @@ class MongooseVoucherPaymentTransaction implements VoucherPaymentTransaction {
       },
       {
         $set: {
+          "activePlans.$.amountPaidCents":input.amountPaidCents,
           "activePlans.$.amountPaid": fromCents(input.amountPaidCents),
           "activePlans.$.paymentStatus": input.paymentStatus,
           "activePlans.$.paidAt": input.paidAt,

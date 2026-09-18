@@ -12,6 +12,7 @@ import {
   type ICourseProfile,
 } from "@/models/CourseProfile";
 import { StudentProfile } from "@/models/StudentProfile";
+import { toCents } from "@/lib/utils/money";
 
 type RouteContext = {
   params: Promise<{ id: string; studentId: string; voucherId: string }>;
@@ -226,6 +227,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (payload.priceTotal !== undefined) {
       set["activePlans.$.price"] = payload.priceTotal;
       set["activePlans.$.priceTotal"] = payload.priceTotal;
+      set["activePlans.$.priceTotalCents"] = toCents(payload.priceTotal);
       set["activePlans.$.unitCreditPriceSnapshot"] =
         result.voucher.creditsTotal && result.voucher.creditsTotal > 0
           ? payload.priceTotal / result.voucher.creditsTotal
