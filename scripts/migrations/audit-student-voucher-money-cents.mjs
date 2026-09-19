@@ -1,6 +1,14 @@
 import mongoose from "mongoose";
 
-const EXPECTED_DATABASE = "costaspanish-lms-demo";
+const ALLOWED_DATABASES = Object.freeze({
+  staging: "costaspanish-lms-demo",
+  production: "costaspanish_lms",
+});
+
+const appEnv = process.env.APP_ENV;
+const expectedDatabase = Object.hasOwn(ALLOWED_DATABASES, appEnv)
+  ? ALLOWED_DATABASES[appEnv]
+  : null;
 
 const uri =
   process.env.MONGODB_URI ??
@@ -12,18 +20,18 @@ if (!uri) {
   );
 }
 
-if (process.env.APP_ENV !== "staging") {
+if (!expectedDatabase) {
   throw new Error(
-    'APP_ENV must be "staging".',
+    'APP_ENV must be "staging" or "production".',
   );
 }
 
 if (
   process.env.MONGODB_DB_NAME !==
-  EXPECTED_DATABASE
+  expectedDatabase
 ) {
   throw new Error(
-    `Expected database "${EXPECTED_DATABASE}", ` +
+    `Expected database "${expectedDatabase}" for APP_ENV "${appEnv}", ` +
       `got "${process.env.MONGODB_DB_NAME}".`,
   );
 }
@@ -56,14 +64,17 @@ try {
   const actualDatabase =
     mongoose.connection.db?.databaseName;
 
-  if (actualDatabase !== EXPECTED_DATABASE) {
+  if (actualDatabase !== process.env.MONGODB_DB_NAME) {
     throw new Error(
-      `Connected to unsafe database "${actualDatabase}".`,
+      `Connected database "${actualDatabase}" does not match ` +
+        `MONGODB_DB_NAME "${process.env.MONGODB_DB_NAME}".`,
     );
   }
 
-  console.log(`Database: ${actualDatabase}`);
-  console.log("READ ONLY AUDIT — no documents will be modified.");
+  console.log("mode: AUDIT_READ_ONLY");
+  console.log(`appEnv: ${appEnv}`);
+  console.log(`expectedDatabase: ${expectedDatabase}`);
+  console.log(`connectedDatabase: ${actualDatabase}`);
 
   const studentsCollection =
     mongoose.connection.collection("studentprofiles");
