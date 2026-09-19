@@ -1,4 +1,5 @@
 import type { Types } from "mongoose";
+import { isDateOnlyExpired } from "@/lib/utils/date-only";
 
 import type {
   AcademicLevel,
@@ -159,22 +160,22 @@ export function toStudentPlanListDTO(
       ? Math.max(0, creditsTotal - creditsRemaining)
       : null;
   const validUntil = toISOStringOrNull(plan.validUntil);
+  const now = new Date();
   const fallbackStatus: PlanStatus =
     creditsRemaining !== null && creditsRemaining <= 0
       ? "exhausted"
-      : validUntil && new Date(validUntil) < new Date()
+      : validUntil && isDateOnlyExpired(validUntil, now)
         ? "expired"
         : "active";
-  const now = Date.now();
   const validFrom = toISOStringOrNull(plan.validFrom);
   const temporalStatus =
     (plan.status ?? fallbackStatus) === "canceled"
       ? "canceled" as const
       : creditsRemaining !== null && creditsRemaining <= 0
         ? "exhausted" as const
-        : validFrom && new Date(validFrom).getTime() > now
+        : validFrom && new Date(validFrom).getTime() > now.getTime()
           ? "upcoming" as const
-          : validUntil && new Date(validUntil).getTime() < now
+          : validUntil && isDateOnlyExpired(validUntil, now)
             ? "expired" as const
             : "active" as const;
 

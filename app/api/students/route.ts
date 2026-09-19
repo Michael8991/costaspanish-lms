@@ -17,6 +17,7 @@ import {
     toStudentListDTO,
 } from "@/lib/dto/student.dto";
 import { createStudentProfileSchema } from "@/lib/validators/student";
+import { isDateOnlyExpired } from "@/lib/utils/date-only";
 import type {
     StudentListResponse,
     StudentListSource,
@@ -66,7 +67,7 @@ export async function POST(req: NextRequest){
     const planStatus: PlanStatus =
         creditsRemaining <= 0
             ? "exhausted"
-            : validUntilDate < new Date()
+            : isDateOnlyExpired(validUntilDate)
               ? "expired"
               : "active";
 

@@ -2,6 +2,7 @@
 
 import CustomModal from "@/components/ui/CustomModal";
 import { DBPlanDoc } from "@/lib/types/student";
+import { isDateOnlyExpired } from "@/lib/utils/date-only";
 import { formatCurrencyEUR, formatFinanceDate } from "@/lib/utils/finance-format";
 import {
   getPaymentMethodLabel,
@@ -32,8 +33,7 @@ function resolveVoucherStatus(plan: DBPlanDoc): string {
   }
   if ((plan.creditsRemaining ?? 0) <= 0) return "exhausted";
   if (plan.validUntil) {
-    const validUntil = new Date(plan.validUntil);
-    if (!Number.isNaN(validUntil.getTime()) && validUntil < new Date()) {
+    if (isDateOnlyExpired(plan.validUntil)) {
       return "expired";
     }
   }

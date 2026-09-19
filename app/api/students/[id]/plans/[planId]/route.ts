@@ -12,6 +12,7 @@ import {
   type StudentProfileDoc,
 } from "@/models/StudentProfile";
 import { toCents } from "@/lib/utils/money";
+import { isDateOnlyExpired } from "@/lib/utils/date-only";
 
 type Ctx = {
   params:
@@ -183,7 +184,9 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 
     let finalStatus: PlanStatus = payload.status ?? currentPlan.status;
     if (finalStatus !== "canceled") {
-      if (new Date(finalValidUntil) < new Date()) finalStatus = "expired";
+      if (isDateOnlyExpired(finalValidUntil)) {
+        finalStatus = "expired";
+      }
       else if (finalCreditsRemaining === 0) finalStatus = "exhausted";
       else finalStatus = "active";
       set["activePlans.$.status"] = finalStatus;

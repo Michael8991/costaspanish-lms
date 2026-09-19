@@ -34,7 +34,7 @@ export function isPlanCompatible(
     plan.status === "active" &&
     plan.classType === classType &&
     (plan.creditsRemaining ?? 0) > 0 &&
-    getExpirationTime(plan.validUntil) >= now.getTime()
+    (!plan.validUntil || !isDateOnlyExpired(plan.validUntil, now))
   );
 }
 
@@ -102,3 +102,4 @@ export function formatAssignedVoucherLabel(plan: LessonPlanProgressInput) {
 
   return progressLabel.includes("/") ? `Clase ${progressLabel}` : progressLabel;
 }
+import { isDateOnlyExpired } from "@/lib/utils/date-only";

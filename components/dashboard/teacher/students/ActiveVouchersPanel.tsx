@@ -17,6 +17,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { isDateOnlyExpired } from "@/lib/utils/date-only";
 import type { VoucherEnrollmentOption } from "../forms/NewVoucherForm";
 import { NewVoucherFormData } from "../forms";
 import { toast } from "sonner";
@@ -208,7 +209,7 @@ export default function ActiveVouchersPanel({
                   ? "exhausted"
                   : new Date(plan.validFrom).getTime() > Date.now()
                     ? "upcoming"
-                    : new Date(plan.validUntil).getTime() < Date.now()
+                    : isDateOnlyExpired(plan.validUntil)
                       ? "expired"
                       : plan.status;
               const percentage =
