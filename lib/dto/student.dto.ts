@@ -1,5 +1,6 @@
 import type { Types } from "mongoose";
 import { isDateOnlyExpired } from "@/lib/utils/date-only";
+import { fromCents } from "@/lib/utils/money";
 
 import type {
   AcademicLevel,
@@ -143,7 +144,9 @@ export function toStudentPlanListDTO(
       ? plan.creditsRemaining
       : null;
   const priceTotal =
-    typeof plan.priceTotal === "number" && Number.isFinite(plan.priceTotal)
+    typeof plan.priceTotalCents === "number" && Number.isSafeInteger(plan.priceTotalCents)
+      ? fromCents(plan.priceTotalCents)
+      : typeof plan.priceTotal === "number" && Number.isFinite(plan.priceTotal)
       ? plan.priceTotal
       : typeof plan.price === "number" && Number.isFinite(plan.price)
         ? plan.price
@@ -203,7 +206,9 @@ export function toStudentPlanListDTO(
     billingPeriodEnd: toISOStringOrNull(plan.billingPeriodEnd),
     billingAnchorDay: plan.billingAnchorDay ?? null,
     paymentStatus: plan.paymentStatus ?? "pending",
-    amountPaid: toFiniteNumberOrZero(plan.amountPaid),
+    amountPaid: typeof plan.amountPaidCents === "number" && Number.isSafeInteger(plan.amountPaidCents)
+      ? fromCents(plan.amountPaidCents)
+      : toFiniteNumberOrZero(plan.amountPaid),
     paidAt: toISOStringOrNull(plan.paidAt),
     paymentMethod: plan.paymentMethod ?? "",
     paymentNotes: plan.paymentNotes ?? "",

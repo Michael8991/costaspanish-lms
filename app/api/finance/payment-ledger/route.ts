@@ -9,6 +9,8 @@ import {
   parseFinanceStatus,
 } from "@/lib/server/finance-ledger.query";
 import { toPaymentLedgerEntryDTO } from "@/lib/utils/payment-ledger.mapper";
+import { fromCents } from "@/lib/utils/money";
+import { paymentLedgerAmountCentsExpression } from "@/lib/utils/payment-ledger-money";
 import { PaymentLedgerEntry } from "@/models/PaymentLedgerEntry";
 
 export async function GET(request: NextRequest) {
@@ -41,9 +43,9 @@ export async function GET(request: NextRequest) {
         .limit(limit)
         .lean(),
       PaymentLedgerEntry.countDocuments(itemFilter),
-      PaymentLedgerEntry.aggregate<{ totalAmount: number }>([
+      PaymentLedgerEntry.aggregate<{ totalAmountCents: number }>([
         { $match: summaryFilter },
-        { $group: { _id: null, totalAmount: { $sum: "$amount" } } },
+        { $group: { _id: null, totalAmountCents: { $sum: paymentLedgerAmountCentsExpression } } },
       ]),
     ]);
 
@@ -56,7 +58,7 @@ export async function GET(request: NextRequest) {
         totalPages: Math.ceil(total / limit),
       },
       summary: {
-        totalAmount: summaryRows[0]?.totalAmount ?? 0,
+        totalAmount: fromCents(summaryRows[0]?.totalAmountCents ?? 0),
       },
     });
   } catch (error) {

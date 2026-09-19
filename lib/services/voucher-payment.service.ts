@@ -5,6 +5,7 @@ import { getStudentNameSnapshot, getVoucherNameSnapshot } from "@/lib/utils/ledg
 import { PaymentLedgerEntry, type PaymentLedgerPaymentMethod } from "@/models/PaymentLedgerEntry";
 import { StudentProfile, type StudentProfileDoc } from "@/models/StudentProfile";
 import { fromCents, toCents } from "@/lib/utils/money";
+import { paymentLedgerAmountCentsExpression } from "@/lib/utils/payment-ledger-money";
 
 export type VoucherPaymentActor = {
   id: string;
@@ -244,7 +245,7 @@ class MongooseVoucherPaymentTransaction implements VoucherPaymentTransaction {
         $group: {
           _id: null,
           total: {
-            $sum: { $ifNull: ["$amountCents", { $round: [{ $multiply: ["$amount", 100] }, 0] }] },
+            $sum: paymentLedgerAmountCentsExpression,
           },
         },
       },

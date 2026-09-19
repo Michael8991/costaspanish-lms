@@ -39,7 +39,18 @@ export const createStudentProfileSchema = z
     validUntil: z.coerce.date(),
     creditsTotal: z.coerce.number().min(0).optional(),
     creditsRemaining: z.coerce.number().min(0).optional(),
-    price: z.coerce.number().min(0),
+    price: z.preprocess(
+      (value) =>
+        typeof value === "number" || (typeof value === "string" && value.trim() !== "")
+          ? value
+          : undefined,
+      z.coerce.number().finite().min(0).refine(
+        (value) =>
+          Number.isSafeInteger(Math.round(value * 100)) &&
+          Math.round(value * 100) / 100 === value,
+        "Price must be representable in safe integer cents",
+      ),
+    ),
     status: z
       .enum(["active", "exhausted", "expired", "canceled"])
       .optional(),

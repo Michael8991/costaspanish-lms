@@ -10,6 +10,8 @@ import {
 } from "@/lib/server/finance-ledger.query";
 import { CreditLedgerEntry } from "@/models/CreditLedgerEntry";
 import { PaymentLedgerEntry } from "@/models/PaymentLedgerEntry";
+import { fromCents } from "@/lib/utils/money";
+import { paymentLedgerAmountCentsExpression } from "@/lib/utils/payment-ledger-money";
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,7 +39,7 @@ export async function GET(request: NextRequest) {
     await dbConnect();
     const [paymentRows, creditRows] = await Promise.all([
       PaymentLedgerEntry.aggregate<{
-        collectedAmount: number;
+        collectedAmountCents: number;
         activePaymentEntries: number;
       }>([
         {
@@ -50,7 +52,7 @@ export async function GET(request: NextRequest) {
         {
           $group: {
             _id: null,
-            collectedAmount: { $sum: "$amount" },
+            collectedAmountCents: { $sum: paymentLedgerAmountCentsExpression },
             activePaymentEntries: { $sum: 1 },
           },
         },
@@ -80,7 +82,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       month: month.month,
-      collectedAmount: paymentRows[0]?.collectedAmount ?? 0,
+      collectedAmount: fromCents(paymentRows[0]?.collectedAmountCents ?? 0),
       earnedEstimatedAmount: creditRows[0]?.earnedEstimatedAmount ?? 0,
       consumedCredits: creditRows[0]?.consumedCredits ?? 0,
       activePaymentEntries: paymentRows[0]?.activePaymentEntries ?? 0,

@@ -1,4 +1,6 @@
 import type { PaymentLedgerEntryDTO } from "@/lib/dto/payment-ledger.dto";
+import { fromCents } from "@/lib/utils/money";
+import { paymentLedgerAmountCents } from "@/lib/utils/payment-ledger-money";
 import type {
   PaymentLedgerPaymentMethod,
   PaymentLedgerPaymentStatus,
@@ -63,10 +65,6 @@ function toIso(value: unknown): string | null {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-function toNumber(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
 function toString(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
@@ -85,6 +83,7 @@ export function toPaymentLedgerEntryDTO(
   source: PaymentLedgerMapperSource,
 ): PaymentLedgerEntryDTO {
   const courseId = toId(source.courseId);
+  const amountCents = paymentLedgerAmountCents(source);
 
   return {
     id: toId(source._id ?? source.id),
@@ -97,12 +96,8 @@ export function toPaymentLedgerEntryDTO(
     voucherNameSnapshot: toString(source.voucherNameSnapshot),
     billingPeriodStart: toIso(source.billingPeriodStart),
     billingPeriodEnd: toIso(source.billingPeriodEnd),
-    amount: typeof source.amountCents === "number"
-      ? source.amountCents / 100
-      : toNumber(source.amount),
-    amountCents: typeof source.amountCents === "number"
-      ? source.amountCents
-      : Math.round(toNumber(source.amount) * 100),
+    amount: fromCents(amountCents),
+    amountCents,
     currency: source.currency === "EUR" ? "EUR" : "EUR",
     paymentStatusSnapshot: oneOf(
       source.paymentStatusSnapshot,

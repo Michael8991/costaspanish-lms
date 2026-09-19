@@ -17,7 +17,7 @@ import {
     toStudentListDTO,
 } from "@/lib/dto/student.dto";
 import { createStudentProfileSchema } from "@/lib/validators/student";
-import { isDateOnlyExpired } from "@/lib/utils/date-only";
+import { buildInitialStudentPlan } from "@/lib/utils/student-initial-plan";
 import type {
     StudentListResponse,
     StudentListSource,
@@ -43,6 +43,13 @@ export async function POST(req: NextRequest){
     }
 
     const body: unknown = await req.json().catch(() => null);
+    const financialFields = ["paymentStatus", "amountPaid", "amountPaidCents", "paidAt", "paymentMethod", "paymentNotes"];
+    if (body && typeof body === "object" && financialFields.some((field) => Object.prototype.hasOwnProperty.call(body, field))) {
+        return NextResponse.json(
+            { error: "Los datos de cobro deben registrarse mediante POST /payments." },
+            { status: 400 },
+        );
+    }
     const parsed = createStudentProfileSchema.safeParse(body);
     if (!parsed.success) {
         return NextResponse.json(
@@ -61,15 +68,7 @@ export async function POST(req: NextRequest){
     const rawEmail = (payload.contactEmail ?? payload.email ?? "").trim();
     const contactEmailLower = rawEmail.toLowerCase();
 
-    const creditsTotal = payload.creditsTotal ?? 0;
-    const creditsRemaining = payload.creditsRemaining ?? creditsTotal;
-    const validUntilDate = payload.validUntil;
-    const planStatus: PlanStatus =
-        creditsRemaining <= 0
-            ? "exhausted"
-            : isDateOnlyExpired(validUntilDate)
-              ? "expired"
-              : "active";
+    const initialPlan = buildInitialStudentPlan(payload);
 
     await dbConnect();
 
@@ -87,18 +86,7 @@ export async function POST(req: NextRequest){
             goals: payload.goals,
             internalNotes: payload.internalNotes,
 
-            activePlans: [
-                {
-                    name: payload.name,
-                    billingType: payload.billingType,
-                    classType: payload.classType,
-                    validUntil: validUntilDate,
-                    creditsTotal,
-                    creditsRemaining,
-                    status: planStatus,
-                    price: payload.price,
-                }
-            ]
+            activePlans: [initialPlan]
         });
 
         return NextResponse.json(
