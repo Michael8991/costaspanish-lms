@@ -13,6 +13,7 @@ export const PAYMENT_LEDGER_SOURCES = [
   "voucher_payment_updated",
   "voucher_payment_registered",
   "manual_adjustment",
+  "legacy_snapshot_migration",
 ] as const;
 
 export type PaymentLedgerSource =

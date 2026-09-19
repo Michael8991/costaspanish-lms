@@ -91,7 +91,7 @@ export async function ensurePaymentLedgerForVoucher(args: {
   student: PaymentLedgerStudentInput;
   voucher: PaymentLedgerVoucherInput;
   changedBy: Types.ObjectId;
-  source: Exclude<PaymentLedgerSource, "manual_adjustment">;
+  source: Exclude<PaymentLedgerSource, "manual_adjustment" | "legacy_snapshot_migration">;
 }): Promise<PaymentLedgerResult> {
   const studentId = toObjectId(args.student._id);
   const voucherId = toObjectId(args.voucher._id);
