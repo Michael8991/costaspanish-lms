@@ -1,13 +1,24 @@
 import mongoose from "mongoose";
 
-const EXPECTED_DATABASE = "costaspanish-lms-demo";
+const ALLOWED_DATABASES = Object.freeze({
+  staging: "costaspanish-lms-demo",
+  production: "costaspanish_lms",
+});
+
+const appEnv = process.env.APP_ENV;
+const expectedDatabase = Object.hasOwn(ALLOWED_DATABASES, appEnv)
+  ? ALLOWED_DATABASES[appEnv]
+  : null;
 
 const uri =
   process.env.MONGODB_URI ??
   process.env.MONGO_URI;
 
-const APPLY =
-  process.env.APPLY_MIGRATION === "true";
+const APPLY = process.argv.includes("--apply");
+
+if (process.argv.slice(2).some((arg) => arg !== "--apply")) {
+  throw new Error('Only the "--apply" argument is supported.');
+}
 
 if (!uri) {
   throw new Error(
@@ -15,19 +26,29 @@ if (!uri) {
   );
 }
 
-if (process.env.APP_ENV !== "staging") {
+if (!expectedDatabase) {
   throw new Error(
-    'APP_ENV must be "staging".',
+    'APP_ENV must be "staging" or "production".',
   );
 }
 
 if (
   process.env.MONGODB_DB_NAME !==
-  EXPECTED_DATABASE
+  expectedDatabase
 ) {
   throw new Error(
-    `Expected database "${EXPECTED_DATABASE}", ` +
+    `Expected database "${expectedDatabase}" for APP_ENV "${appEnv}", ` +
       `got "${process.env.MONGODB_DB_NAME}".`,
+  );
+}
+
+if (
+  APPLY &&
+  appEnv === "production" &&
+  process.env.ALLOW_PRODUCTION_MIGRATION !== "true"
+) {
+  throw new Error(
+    "Production --apply requires ALLOW_PRODUCTION_MIGRATION=true.",
   );
 }
 
@@ -73,18 +94,15 @@ try {
   const actualDatabase =
     mongoose.connection.db?.databaseName;
 
-  if (actualDatabase !== EXPECTED_DATABASE) {
+  if (actualDatabase !== process.env.MONGODB_DB_NAME) {
     throw new Error(
-      `Connected to unsafe database "${actualDatabase}".`,
+      `Connected database "${actualDatabase}" does not match ` +
+        `MONGODB_DB_NAME "${process.env.MONGODB_DB_NAME}".`,
     );
   }
 
-  console.log(`Database: ${actualDatabase}`);
-  console.log(
-    APPLY
-      ? "MODE: APPLY"
-      : "MODE: DRY RUN — no documents will be modified.",
-  );
+  console.log(`database: ${actualDatabase}`);
+  console.log(`mode: ${APPLY ? "APPLY" : "DRY_RUN"}`);
 
   const studentsCollection =
     mongoose.connection.collection(
@@ -152,9 +170,11 @@ try {
 
   const candidates = [];
   const anomalies = [];
+  let vouchersExamined = 0;
 
   for (const student of students) {
     for (const plan of student.activePlans ?? []) {
+      vouchersExamined += 1;
       /*
        * Solo reconstruimos dinero que el sistema
        * legacy ya consideraba pagado.
@@ -167,6 +187,13 @@ try {
       }
 
       if (!isFinitePositiveNumber(plan.amountPaid)) {
+        anomalies.push({
+          studentId: student._id.toString(),
+          studentName: student.fullName,
+          voucherId: plan._id?.toString(),
+          reason: "paid legacy voucher has invalid amountPaid",
+          amountPaid: plan.amountPaid,
+        });
         continue;
       }
 
@@ -231,6 +258,18 @@ try {
             reversed.map(
               (entry) => entry._id.toString(),
             ),
+        });
+        continue;
+      }
+
+      if (existing.length > 0) {
+        anomalies.push({
+          studentId: student._id.toString(),
+          studentName: student.fullName,
+          voucherId,
+          voucherName: plan.name,
+          reason: "paid legacy voucher has ledger with unknown status",
+          ledgerIds: existing.map((entry) => entry._id.toString()),
         });
         continue;
       }
@@ -342,6 +381,11 @@ try {
     }
   }
 
+  console.log(`\nStudents examined: ${students.length}`);
+  console.log(`Vouchers examined: ${vouchersExamined}`);
+  console.log(`Ledger entries examined: ${ledgerEntries.length}`);
+  console.log(`Movements to create: ${candidates.length}`);
+
   console.log(
     `\nMigration candidates: ${candidates.length}`,
   );
@@ -385,14 +429,16 @@ try {
       { depth: null },
     );
 
-    throw new Error(
-      "Migration aborted because anomalies were found.",
-    );
+    if (APPLY) {
+      throw new Error(
+        "Migration aborted because anomalies were found.",
+      );
+    }
   }
 
   if (!APPLY) {
     console.log(
-      "\nDry run finished. No documents were modified.",
+      "\nDRY_RUN finished. No documents were modified.",
     );
   } else {
     let inserted = 0;
