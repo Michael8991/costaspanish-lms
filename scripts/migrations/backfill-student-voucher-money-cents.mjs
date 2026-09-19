@@ -1,14 +1,24 @@
 import mongoose from "mongoose";
+import { isDeepStrictEqual } from "node:util";
 
-const EXPECTED_DATABASE =
-  "costaspanish-lms-demo";
+const ALLOWED_DATABASES = Object.freeze({
+  staging: "costaspanish-lms-demo",
+  production: "costaspanish_lms",
+});
+const appEnv = process.env.APP_ENV;
+const expectedDatabase = Object.hasOwn(ALLOWED_DATABASES, appEnv)
+  ? ALLOWED_DATABASES[appEnv]
+  : null;
 
 const uri =
   process.env.MONGODB_URI ??
   process.env.MONGO_URI;
 
-const APPLY =
-  process.env.APPLY_MIGRATION === "true";
+const APPLY = process.argv.includes("--apply");
+
+if (process.argv.slice(2).some((arg) => arg !== "--apply")) {
+  throw new Error('Only the "--apply" argument is supported.');
+}
 
 if (!uri) {
   throw new Error(
@@ -16,19 +26,26 @@ if (!uri) {
   );
 }
 
-if (process.env.APP_ENV !== "staging") {
+if (!expectedDatabase) {
   throw new Error(
-    'APP_ENV must be "staging".',
+    'APP_ENV must be "staging" or "production".',
   );
 }
 
 if (
   process.env.MONGODB_DB_NAME !==
-  EXPECTED_DATABASE
+  expectedDatabase
 ) {
   throw new Error(
-    `Expected database "${EXPECTED_DATABASE}", ` +
+    `Expected database "${expectedDatabase}" for APP_ENV "${appEnv}", ` +
       `got "${process.env.MONGODB_DB_NAME}".`,
+  );
+}
+
+if (APPLY && appEnv === "production" &&
+    process.env.ALLOW_PRODUCTION_MIGRATION !== "true") {
+  throw new Error(
+    "Production --apply requires ALLOW_PRODUCTION_MIGRATION=true.",
   );
 }
 
@@ -60,6 +77,67 @@ function toCents(value) {
   return Math.round(value * 100);
 }
 
+const LEGACY_FIELDS = [
+  "price", "priceTotal", "unitCreditPriceSnapshot", "currency",
+  "paymentStatus", "amountPaid", "paidAt", "paymentMethod",
+  "paymentNotes",
+];
+
+function snapshotFields(plan) {
+  return Object.fromEntries(
+    LEGACY_FIELDS.filter((field) => Object.hasOwn(plan, field))
+      .map((field) => [field, plan[field]]),
+  );
+}
+
+function legacyUnchanged(plan, snapshot) {
+  return LEGACY_FIELDS.every((field) =>
+    Object.hasOwn(plan, field) === Object.hasOwn(snapshot, field) &&
+    isDeepStrictEqual(plan[field], snapshot[field]),
+  );
+}
+
+function legacyGuard(snapshot) {
+  return Object.fromEntries(LEGACY_FIELDS.map((field) => [
+    field,
+    Object.hasOwn(snapshot, field)
+      ? (snapshot[field] === null ? { $type: 10 } : snapshot[field])
+      : { $exists: false },
+  ]));
+}
+
+async function readVoucher(collection, candidate) {
+  const student = await collection.findOne(
+    { _id: candidate.studentId },
+    { projection: { activePlans: {
+      $elemMatch: { _id: candidate.voucherId },
+    } } },
+  );
+  return student?.activePlans?.[0];
+}
+
+function candidateVerified(plan, candidate) {
+  return Boolean(plan) &&
+    plan.priceTotalCents === candidate.expectedPriceTotalCents &&
+    plan.amountPaidCents === candidate.expectedAmountPaidCents &&
+    legacyUnchanged(plan, candidate.legacySnapshot);
+}
+
+async function activeLedgerTotal(collection, candidate) {
+  const entries = await collection.find({
+    voucherId: candidate.voucherId,
+    status: "active",
+  }).toArray();
+  if (entries.some((entry) => !isLedgerCents(entry.amountCents))) {
+    throw new Error(`Active ledger for ${candidate.voucherId} is invalid.`);
+  }
+  const total = entries.reduce((sum, entry) => sum + entry.amountCents, 0);
+  if (!isVoucherCents(total)) {
+    throw new Error(`Active ledger total for ${candidate.voucherId} is unsafe.`);
+  }
+  return entries.length ? total : 0;
+}
+
 await mongoose.connect(uri, {
   dbName: process.env.MONGODB_DB_NAME,
 });
@@ -68,19 +146,15 @@ try {
   const actualDatabase =
     mongoose.connection.db?.databaseName;
 
-  if (actualDatabase !== EXPECTED_DATABASE) {
+  if (actualDatabase !== process.env.MONGODB_DB_NAME) {
     throw new Error(
-      `Connected to unsafe database "${actualDatabase}".`,
+      `Connected database "${actualDatabase}" does not match ` +
+        `MONGODB_DB_NAME "${process.env.MONGODB_DB_NAME}".`,
     );
   }
 
-  console.log(`Database: ${actualDatabase}`);
-
-  console.log(
-    APPLY
-      ? "MODE: APPLY"
-      : "MODE: DRY RUN — no documents will be modified.",
-  );
+  console.log(`database: ${actualDatabase}`);
+  console.log(`mode: ${APPLY ? "APPLY" : "DRY_RUN"}`);
 
   const studentsCollection =
     mongoose.connection.collection(
@@ -158,21 +232,6 @@ try {
    * Si el ledger todavía no está limpio,
    * no tocamos StudentProfile.
    */
-  if (anomalies.length > 0) {
-    console.log(
-      `\nLedger anomalies: ${anomalies.length}`,
-    );
-
-    console.dir(
-      anomalies,
-      { depth: null },
-    );
-
-    throw new Error(
-      "Voucher migration aborted because ledger is not fully canonical.",
-    );
-  }
-
   const students =
     await studentsCollection
       .find(
@@ -187,9 +246,15 @@ try {
       .toArray();
 
   const candidates = [];
+  let vouchersExamined = 0;
+  let canonicalValid = 0;
+  const priceSources = { priceTotal: 0, price: 0, missing: 0 };
+  const amountPaidSources = { activeLedger: 0, zeroWithoutLedger: 0, ambiguous: 0 };
 
   for (const student of students) {
     for (const plan of student.activePlans ?? []) {
+      vouchersExamined += 1;
+      const anomaliesBeforeVoucher = anomalies.length;
       const voucherId =
         plan._id?.toString();
 
@@ -233,6 +298,8 @@ try {
           "price";
       }
 
+      priceSources[priceSource ?? "missing"] += 1;
+
       if (sourcePrice === null) {
         anomalies.push({
           studentId:
@@ -260,6 +327,15 @@ try {
 
       const expectedPriceTotalCents =
         toCents(sourcePrice);
+
+      if (!isVoucherCents(expectedPriceTotalCents)) {
+        anomalies.push({
+          studentId: student._id.toString(), voucherId,
+          reason: "price cannot be represented safely in cents",
+          sourcePrice, expectedPriceTotalCents,
+        });
+        continue;
+      }
 
       /*
        * Ambos legacy deberían representar
@@ -307,17 +383,28 @@ try {
       if (
         ledgerPaidCents !== undefined
       ) {
+        amountPaidSources.activeLedger += 1;
         expectedAmountPaidCents =
           ledgerPaidCents;
+
+        if (!isVoucherCents(ledgerPaidCents)) {
+          anomalies.push({
+            studentId: student._id.toString(), voucherId,
+            reason: "active ledger total cannot be represented safely",
+            ledgerPaidCents,
+          });
+          continue;
+        }
 
         /*
          * El snapshot legacy debe coincidir
          * con la fuente de verdad.
          */
         if (
-          isEuroAmount(plan.amountPaid) &&
-          toCents(plan.amountPaid) !==
-            ledgerPaidCents
+          typeof plan.amountPaid === "number" &&
+          (!isEuroAmount(plan.amountPaid) ||
+            !isVoucherCents(toCents(plan.amountPaid)) ||
+            toCents(plan.amountPaid) !== ledgerPaidCents)
         ) {
           anomalies.push({
             studentId:
@@ -347,7 +434,8 @@ try {
          * Sin ledger solo aceptamos
          * ausencia real de dinero.
          */
-        if (!isEuroAmount(plan.amountPaid)) {
+        if (plan.amountPaid != null && !isEuroAmount(plan.amountPaid)) {
+          amountPaidSources.ambiguous += 1;
           anomalies.push({
             studentId:
               student._id.toString(),
@@ -370,9 +458,10 @@ try {
         }
 
         const legacyAmountPaidCents =
-          toCents(plan.amountPaid);
+          plan.amountPaid == null ? 0 : toCents(plan.amountPaid);
 
-        if (legacyAmountPaidCents > 0) {
+        if (plan.amountPaid > 0) {
+          amountPaidSources.ambiguous += 1;
           anomalies.push({
             studentId:
               student._id.toString(),
@@ -398,6 +487,7 @@ try {
         }
 
         expectedAmountPaidCents = 0;
+        amountPaidSources.zeroWithoutLedger += 1;
       }
 
       /*
@@ -511,15 +601,25 @@ try {
         });
       }
 
+      for (const field of ["priceTotalCents", "amountPaidCents"]) {
+        if (plan[field] != null && !isVoucherCents(plan[field])) {
+          anomalies.push({
+            studentId: student._id.toString(), voucherId,
+            reason: `invalid existing ${field}`,
+            current: plan[field],
+          });
+        }
+      }
+
+      if (anomalies.length !== anomaliesBeforeVoucher) {
+        continue;
+      }
+
       const missingPriceTotalCents =
-        !isVoucherCents(
-          plan.priceTotalCents,
-        );
+        plan.priceTotalCents == null;
 
       const missingAmountPaidCents =
-        !isVoucherCents(
-          plan.amountPaidCents,
-        );
+        plan.amountPaidCents == null;
 
       if (
         missingPriceTotalCents ||
@@ -553,14 +653,22 @@ try {
 
           missingPriceTotalCents,
           missingAmountPaidCents,
+          legacySnapshot: snapshotFields(plan),
+          currentPriceTotalCents: plan.priceTotalCents,
+          currentAmountPaidCents: plan.amountPaidCents,
         });
+      } else {
+        canonicalValid += 1;
       }
     }
   }
 
-  console.log(
-    `\nStudents scanned: ${students.length}`,
-  );
+  console.log(`\nstudentsExamined: ${students.length}`);
+  console.log(`vouchersExamined: ${vouchersExamined}`);
+  console.log(`ledgerEntriesExamined: ${ledgerEntries.length}`);
+  console.log(`canonicalValid: ${canonicalValid}`);
+  console.log("priceSources:", priceSources);
+  console.log("amountPaidSources:", amountPaidSources);
 
   console.log(
     `Migration candidates: ${candidates.length}`,
@@ -571,6 +679,8 @@ try {
       studentName:
         candidate.studentName,
 
+      studentId: candidate.studentId.toString(),
+
       voucherName:
         candidate.voucherName,
 
@@ -579,6 +689,12 @@ try {
 
       paymentStatus:
         candidate.paymentStatus,
+
+      current: candidate.legacySnapshot,
+
+      currentPriceTotalCents: candidate.currentPriceTotalCents,
+
+      currentAmountPaidCents: candidate.currentAmountPaidCents,
 
       priceTotalCents:
         candidate.expectedPriceTotalCents,
@@ -605,23 +721,36 @@ try {
       { depth: null },
     );
 
-    throw new Error(
-      "Migration aborted because anomalies were found.",
-    );
+    if (APPLY) {
+      throw new Error(
+        "Migration aborted because anomalies were found.",
+      );
+    }
   }
 
   if (!APPLY) {
     console.log(
-      "\nDry run finished. No documents were modified.",
+      "\nDRY_RUN finished. No documents were modified.",
     );
   } else {
     let modified = 0;
     let unchanged = 0;
 
     for (const candidate of candidates) {
+      const currentLedgerTotal = await activeLedgerTotal(
+        ledgerCollection, candidate,
+      );
+      if (currentLedgerTotal !== candidate.expectedAmountPaidCents) {
+        throw new Error(
+          `Active ledger changed for voucher ${candidate.voucherId}; ` +
+            "manual review required.",
+        );
+      }
+
       const set = {};
       const voucherMatch = {
         _id: candidate.voucherId,
+        ...legacyGuard(candidate.legacySnapshot),
       };
 
       if (
@@ -638,6 +767,8 @@ try {
          */
         voucherMatch.priceTotalCents =
           null;
+      } else {
+        voucherMatch.priceTotalCents = candidate.expectedPriceTotalCents;
       }
 
       if (
@@ -650,6 +781,8 @@ try {
 
         voucherMatch.amountPaidCents =
           null;
+      } else {
+        voucherMatch.amountPaidCents = candidate.expectedAmountPaidCents;
       }
 
       const result =
@@ -671,6 +804,13 @@ try {
       if (result.modifiedCount === 1) {
         modified += 1;
       } else {
+        const plan = await readVoucher(studentsCollection, candidate);
+        if (!candidateVerified(plan, candidate)) {
+          throw new Error(
+            `Voucher ${candidate.voucherId} changed before update; ` +
+              "manual review required.",
+          );
+        }
         unchanged += 1;
       }
     }
@@ -689,34 +829,9 @@ try {
     const verificationFailures = [];
 
     for (const candidate of candidates) {
-      const student =
-        await studentsCollection.findOne(
-          {
-            _id:
-              candidate.studentId,
-          },
-          {
-            projection: {
-              activePlans: {
-                $elemMatch: {
-                  _id:
-                    candidate.voucherId,
-                },
-              },
-            },
-          },
-        );
+      const plan = await readVoucher(studentsCollection, candidate);
 
-      const plan =
-        student?.activePlans?.[0];
-
-      if (
-        !plan ||
-        plan.priceTotalCents !==
-          candidate.expectedPriceTotalCents ||
-        plan.amountPaidCents !==
-          candidate.expectedAmountPaidCents
-      ) {
+      if (!candidateVerified(plan, candidate)) {
         verificationFailures.push({
           voucherId:
             candidate.voucherId.toString(),
@@ -732,6 +847,8 @@ try {
 
           actualAmountPaidCents:
             plan?.amountPaidCents,
+
+          legacyUnchanged: plan && legacyUnchanged(plan, candidate.legacySnapshot),
         });
       }
     }
