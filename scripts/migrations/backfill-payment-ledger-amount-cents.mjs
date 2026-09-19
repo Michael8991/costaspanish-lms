@@ -1,13 +1,24 @@
 import mongoose from "mongoose";
 
-const EXPECTED_DATABASE = "costaspanish-lms-demo";
+const ALLOWED_DATABASES = Object.freeze({
+  staging: "costaspanish-lms-demo",
+  production: "costaspanish_lms",
+});
+
+const appEnv = process.env.APP_ENV;
+const expectedDatabase = Object.hasOwn(ALLOWED_DATABASES, appEnv)
+  ? ALLOWED_DATABASES[appEnv]
+  : null;
 
 const uri =
   process.env.MONGODB_URI ??
   process.env.MONGO_URI;
 
-const APPLY =
-  process.env.APPLY_MIGRATION === "true";
+const APPLY = process.argv.includes("--apply");
+
+if (process.argv.slice(2).some((arg) => arg !== "--apply")) {
+  throw new Error('Only the "--apply" argument is supported.');
+}
 
 if (!uri) {
   throw new Error(
@@ -15,19 +26,29 @@ if (!uri) {
   );
 }
 
-if (process.env.APP_ENV !== "staging") {
+if (!expectedDatabase) {
   throw new Error(
-    'APP_ENV must be "staging".',
+    'APP_ENV must be "staging" or "production".',
   );
 }
 
 if (
   process.env.MONGODB_DB_NAME !==
-  EXPECTED_DATABASE
+  expectedDatabase
 ) {
   throw new Error(
-    `Expected database "${EXPECTED_DATABASE}", ` +
+    `Expected database "${expectedDatabase}" for APP_ENV "${appEnv}", ` +
       `got "${process.env.MONGODB_DB_NAME}".`,
+  );
+}
+
+if (
+  APPLY &&
+  appEnv === "production" &&
+  process.env.ALLOW_PRODUCTION_MIGRATION !== "true"
+) {
+  throw new Error(
+    "Production --apply requires ALLOW_PRODUCTION_MIGRATION=true.",
   );
 }
 
@@ -59,18 +80,15 @@ try {
   const actualDatabase =
     mongoose.connection.db?.databaseName;
 
-  if (actualDatabase !== EXPECTED_DATABASE) {
+  if (actualDatabase !== process.env.MONGODB_DB_NAME) {
     throw new Error(
-      `Connected to unsafe database "${actualDatabase}".`,
+      `Connected database "${actualDatabase}" does not match ` +
+        `MONGODB_DB_NAME "${process.env.MONGODB_DB_NAME}".`,
     );
   }
 
-  console.log(`Database: ${actualDatabase}`);
-  console.log(
-    APPLY
-      ? "MODE: APPLY"
-      : "MODE: DRY RUN — no documents will be modified.",
-  );
+  console.log(`database: ${actualDatabase}`);
+  console.log(`mode: ${APPLY ? "APPLY" : "DRY_RUN"}`);
 
   const collection =
     mongoose.connection.collection(
@@ -82,18 +100,28 @@ try {
 
   const candidates = [];
   const anomalies = [];
+  let canonicalValid = 0;
+  const byStatus = Object.create(null);
 
   for (const entry of entries) {
+    const status = entry.status ?? "<missing>";
+    byStatus[status] ??= {
+      examined: 0,
+      canonicalValid: 0,
+      candidates: 0,
+      anomalies: 0,
+    };
+    byStatus[status].examined += 1;
+
     /*
      * Ya existe canonical cents.
      * Comprobamos también que coincida con legacy amount.
      */
     if (isValidCents(entry.amountCents)) {
-      if (
-        isValidEuroAmount(entry.amount) &&
-        entry.amountCents !==
-          toCents(entry.amount)
-      ) {
+      if (entry.amount != null &&
+          (!isValidEuroAmount(entry.amount) ||
+            !isValidCents(toCents(entry.amount)) ||
+            entry.amountCents !== toCents(entry.amount))) {
         anomalies.push({
           ledgerId: entry._id.toString(),
           reason:
@@ -103,6 +131,10 @@ try {
           expectedAmountCents:
             toCents(entry.amount),
         });
+        byStatus[status].anomalies += 1;
+      } else {
+        canonicalValid += 1;
+        byStatus[status].canonicalValid += 1;
       }
 
       continue;
@@ -121,6 +153,7 @@ try {
         amount: entry.amount,
         amountCents: entry.amountCents,
       });
+      byStatus[status].anomalies += 1;
 
       continue;
     }
@@ -136,6 +169,7 @@ try {
           "missing amountCents and invalid legacy amount",
         amount: entry.amount,
       });
+      byStatus[status].anomalies += 1;
 
       continue;
     }
@@ -151,6 +185,7 @@ try {
         amount: entry.amount,
         amountCents,
       });
+      byStatus[status].anomalies += 1;
 
       continue;
     }
@@ -164,11 +199,13 @@ try {
       amount: entry.amount,
       amountCents,
     });
+    byStatus[status].candidates += 1;
   }
 
-  console.log(
-    `\nLedger entries scanned: ${entries.length}`,
-  );
+  console.log(`\nledgerEntriesExamined: ${entries.length}`);
+  console.log(`canonicalValid: ${canonicalValid}`);
+  console.log("By status:");
+  console.table(byStatus);
 
   console.log(
     `Migration candidates: ${candidates.length}`,
@@ -204,14 +241,16 @@ try {
       { depth: null },
     );
 
-    throw new Error(
-      "Migration aborted because anomalies were found.",
-    );
+    if (APPLY) {
+      throw new Error(
+        "Migration aborted because anomalies were found.",
+      );
+    }
   }
 
   if (!APPLY) {
     console.log(
-      "\nDry run finished. No documents were modified.",
+      "\nDRY_RUN finished. No documents were modified.",
     );
   } else {
     let modified = 0;
@@ -222,6 +261,7 @@ try {
         await collection.updateOne(
           {
             _id: candidate.ledgerId,
+            amount: candidate.amount,
             $or: [
               {
                 amountCents: {
@@ -244,6 +284,21 @@ try {
       if (result.modifiedCount === 1) {
         modified += 1;
       } else {
+        const current = await collection.findOne({
+          _id: candidate.ledgerId,
+        });
+
+        if (
+          !current ||
+          current.amount !== candidate.amount ||
+          current.amountCents !== candidate.amountCents
+        ) {
+          throw new Error(
+            `Candidate ${candidate.ledgerId} changed before update; ` +
+              "aborting for manual review.",
+          );
+        }
+
         unchanged += 1;
       }
     }
@@ -266,8 +321,8 @@ try {
 
       if (
         !entry ||
-        entry.amountCents !==
-          candidate.amountCents
+        entry.amountCents !== candidate.amountCents ||
+        entry.amount !== candidate.amount
       ) {
         verificationFailures.push({
           ledgerId:
@@ -276,6 +331,8 @@ try {
             candidate.amountCents,
           actual:
             entry?.amountCents,
+          expectedAmount: candidate.amount,
+          actualAmount: entry?.amount,
         });
       }
     }
