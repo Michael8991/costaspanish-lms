@@ -20,28 +20,131 @@ export const authOptions: NextAuthOptions = {
         const email = credentials?.email;
         const password = credentials?.password;
 
-        if (typeof email !== "string" || typeof password !== "string")
+        const stagingDiagnosticEnabled = process.env.APP_ENV === "staging";
+        const credentialsPresent =
+          typeof email === "string" && typeof password === "string";
+        let credentialsNonBlank = false;
+        let emailMatchesDemo = false;
+        let passwordMatchesConfiguredDemoPassword = false;
+        let connectedDb: string | null = null;
+        let userFound = false;
+        let isActive: boolean | null = null;
+        let role: string | null = null;
+        let hasPasswordHash = false;
+        let passwordMatches: boolean | null = null;
+
+        const logStagingDiagnostic = (
+          result:
+            | "missing_credentials"
+            | "blank_credentials"
+            | "user_not_found"
+            | "inactive_user"
+            | "password_hash_missing"
+            | "password_mismatch"
+            | "authorize_success"
+            | "authorize_exception",
+          exceptionAt: "db_connect" | "user_lookup" | "password_compare" | null = null,
+        ) => {
+          if (stagingDiagnosticEnabled) {
+            console.info("[staging-auth-diagnostic]", {
+              appEnv: process.env.APP_ENV,
+              configuredDb: process.env.MONGODB_DB_NAME ?? null,
+              connectedDb,
+              mongoUriSource:
+                process.env.MONGODB_URI !== undefined
+                  ? "MONGODB_URI"
+                  : process.env.MONGO_URI !== undefined
+                    ? "MONGO_URI"
+                    : null,
+              firebaseProjectLooksStaging: Boolean(
+                process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.includes("staging"),
+              ),
+              demoModeEnabled: process.env.DEMO_MODE === "true",
+              credentialsPresent,
+              credentialsNonBlank,
+              emailMatchesDemo,
+              passwordMatchesConfiguredDemoPassword,
+              userFound,
+              isActive,
+              role,
+              hasPasswordHash,
+              passwordMatches,
+              authorizeSucceeded: result === "authorize_success",
+              result,
+              exceptionAt,
+            });
+          }
+        };
+
+        if (!credentialsPresent) {
+          logStagingDiagnostic("missing_credentials");
           return null;
-        if (email.trim().length === 0 || password.trim().length === 0)
+        }
+
+        credentialsNonBlank =
+          email.trim().length > 0 && password.trim().length > 0;
+        if (!credentialsNonBlank) {
+          logStagingDiagnostic("blank_credentials");
           return null;
+        }
 
         const normalizedEmail = email.trim().toLowerCase();
+        const configuredDemoEmail = process.env.DEMO_TEACHER_EMAIL;
+        emailMatchesDemo = Boolean(
+          configuredDemoEmail &&
+            normalizedEmail === configuredDemoEmail.trim().toLowerCase(),
+        );
+        passwordMatchesConfiguredDemoPassword = Boolean(
+          process.env.DEMO_TEACHER_PASSWORD &&
+            password === process.env.DEMO_TEACHER_PASSWORD,
+        );
 
-        await dbConnect();
+        let currentStep: "db_connect" | "user_lookup" | "password_compare" =
+          "db_connect";
 
-        const user = await User.findOne({ email: normalizedEmail });
-        if (!user || !user.isActive || !user.passwordHash) return null;
+        try {
+          const mongoose = await dbConnect();
+          connectedDb = mongoose.connection.db?.databaseName ?? null;
 
-        const ok = await bcrypt.compare(password, user.passwordHash);
-        if (!ok) return null;
+          currentStep = "user_lookup";
+          const user = await User.findOne({ email: normalizedEmail });
+          userFound = Boolean(user);
+          isActive = user?.isActive ?? null;
+          role = user?.role ?? null;
+          hasPasswordHash = Boolean(user?.passwordHash);
 
-        return {
-          id: user._id.toString(),
-          name: user.name ?? "",
-          email: user.email,
-          role: user.role,
-          preferredLanguage: user.preferredLanguage ?? "es",
-        };
+          if (!user) {
+            logStagingDiagnostic("user_not_found");
+            return null;
+          }
+          if (!user.isActive) {
+            logStagingDiagnostic("inactive_user");
+            return null;
+          }
+          if (!user.passwordHash) {
+            logStagingDiagnostic("password_hash_missing");
+            return null;
+          }
+
+          currentStep = "password_compare";
+          passwordMatches = await bcrypt.compare(password, user.passwordHash);
+          if (!passwordMatches) {
+            logStagingDiagnostic("password_mismatch");
+            return null;
+          }
+
+          logStagingDiagnostic("authorize_success");
+          return {
+            id: user._id.toString(),
+            name: user.name ?? "",
+            email: user.email,
+            role: user.role,
+            preferredLanguage: user.preferredLanguage ?? "es",
+          };
+        } catch (error) {
+          logStagingDiagnostic("authorize_exception", currentStep);
+          throw error;
+        }
       },
     }),
     // GoogleProvider({
