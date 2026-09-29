@@ -25,7 +25,6 @@ export const authOptions: NextAuthOptions = {
           typeof email === "string" && typeof password === "string";
         let credentialsNonBlank = false;
         let emailMatchesDemo = false;
-        let passwordMatchesConfiguredDemoPassword = false;
         let connectedDb: string | null = null;
         let userFound = false;
         let isActive: boolean | null = null;
@@ -63,7 +62,6 @@ export const authOptions: NextAuthOptions = {
               credentialsPresent,
               credentialsNonBlank,
               emailMatchesDemo,
-              passwordMatchesConfiguredDemoPassword,
               userFound,
               isActive,
               role,
@@ -93,10 +91,6 @@ export const authOptions: NextAuthOptions = {
         emailMatchesDemo = Boolean(
           configuredDemoEmail &&
             normalizedEmail === configuredDemoEmail.trim().toLowerCase(),
-        );
-        passwordMatchesConfiguredDemoPassword = Boolean(
-          process.env.DEMO_TEACHER_PASSWORD &&
-            password === process.env.DEMO_TEACHER_PASSWORD,
         );
 
         let currentStep: "db_connect" | "user_lookup" | "password_compare" =
