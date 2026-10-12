@@ -17,6 +17,10 @@ import { toCourseProfileDetailDTO } from "@/lib/utils/course-profile.mapper";
 import { generateCourseVouchersSchema } from "@/lib/validators/course-voucher";
 import { StudentProfile, type PlanDoc } from "@/models/StudentProfile";
 import { toCents } from "@/lib/utils/money";
+import {
+  getCourseVoucherPlanDates,
+  resolveNextBillingDateAfterVoucherGeneration,
+} from "@/lib/utils/course-voucher-billing";
 
 export const runtime = "nodejs";
 
@@ -128,8 +132,9 @@ export async function POST(
 
     for (const item of context.preview.items) {
       const voucherId = new Types.ObjectId();
-      const periodStart = new Date(item.periodStart);
-      const periodEnd = new Date(item.periodEnd);
+      const planDates = getCourseVoucherPlanDates(item);
+      const periodStart = planDates.billingPeriodStart;
+      const periodEnd = planDates.billingPeriodEnd;
       const paidAt = null;
       const plan: PlanDoc = {
         _id: voucherId,
@@ -142,8 +147,8 @@ export async function POST(
         classType: context.preview.courseSummary.classType,
         creditsTotal: item.creditsTotal,
         creditsRemaining: item.creditsTotal,
-        validFrom: periodStart,
-        validUntil: periodEnd,
+        validFrom: planDates.validFrom,
+        validUntil: planDates.validUntil,
         status: "active",
         price: item.priceTotal,
         priceTotalCents: toCents(item.priceTotal),
@@ -247,6 +252,18 @@ export async function POST(
         const generated = generatedByStudentId.get(member.studentId);
         const storedMember = storedMembersByStudentId.get(member.studentId);
         const currentFirstVoucherId = member.billing.firstVoucherId;
+        const currentNextBillingDate = member.billing.nextBillingDate
+          ? new Date(member.billing.nextBillingDate)
+          : null;
+        const resolvedNextBillingDate = generated
+          ? resolveNextBillingDateAfterVoucherGeneration({
+              currentNextBillingDate,
+              generatedNextBillingDate: generated.nextBillingDate
+                ? new Date(generated.nextBillingDate)
+                : null,
+              advancesNextBillingDate: generated.advancesNextBillingDate,
+            })
+          : currentNextBillingDate;
 
         return {
           studentId: new Types.ObjectId(member.studentId),
@@ -263,11 +280,7 @@ export async function POST(
               : generated
                 ? new Date(generated.periodStart)
                 : null,
-            nextBillingDate: generated
-              ? new Date(generated.nextBillingDate)
-              : member.billing.nextBillingDate
-                ? new Date(member.billing.nextBillingDate)
-                : null,
+            nextBillingDate: resolvedNextBillingDate,
             firstVoucherId: currentFirstVoucherId
               ? new Types.ObjectId(currentFirstVoucherId)
               : generated

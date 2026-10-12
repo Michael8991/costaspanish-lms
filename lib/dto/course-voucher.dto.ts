@@ -22,7 +22,8 @@ export interface CourseVoucherPreviewItemDTO {
   memberStatus: "active" | "paused" | "left";
   periodStart: string;
   periodEnd: string;
-  nextBillingDate: string;
+  nextBillingDate: string | null;
+  advancesNextBillingDate: boolean;
   billingAnchorDay: number;
   classOccurrencesCount: number;
   creditsPerLesson: number;

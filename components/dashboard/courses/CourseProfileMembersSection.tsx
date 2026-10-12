@@ -9,6 +9,7 @@ import {
 
 interface CourseProfileMembersSectionProps {
   members: CourseMemberDTO[];
+  isPrivateManual: boolean;
   onCreateVouchers?: () => void;
   onCreateVoucher?: (studentId: string) => void;
   onEditVoucher?: (member: CourseMemberDTO) => void;
@@ -53,7 +54,12 @@ function MemberStatusBadge({
   );
 }
 
-function getBillingCycleLabel(member: CourseMemberDTO) {
+function getBillingCycleLabel(
+  member: CourseMemberDTO,
+  isPrivateManual: boolean,
+) {
+  if (isPrivateManual) return "Bono con vigencia manual";
+
   const anchor = member.billing.billingAnchorDay;
   return anchor
     ? `Ciclo individual · día ${anchor}`
@@ -69,6 +75,7 @@ function isFirstVoucherPending(member: CourseMemberDTO) {
 
 export default function CourseProfileMembersSection({
   members,
+  isPrivateManual,
   onCreateVouchers,
   onCreateVoucher,
   onEditVoucher,
@@ -86,8 +93,9 @@ export default function CourseProfileMembersSection({
           <div>
             <h2 className="font-semibold text-slate-900">Bonos por alumno</h2>
             <p className="mt-1 text-sm text-slate-500">
-              La facturación se calculará individualmente por alumno cuando se
-              creen bonos desde el curso.
+              {isPrivateManual
+                ? "Los bonos tienen vigencia manual y no se renuevan automáticamente."
+                : "La facturación se calculará individualmente por alumno cuando se creen bonos desde el curso."}
             </p>
           </div>
           </div>
@@ -136,16 +144,18 @@ export default function CourseProfileMembersSection({
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-xs text-slate-400">Ciclo</dt>
+                    <dt className="text-xs text-slate-400">
+                      {isPrivateManual ? "Modalidad" : "Ciclo"}
+                    </dt>
                     <dd className="mt-1 text-slate-700">
-                      {getBillingCycleLabel(member)}
+                      {getBillingCycleLabel(member, isPrivateManual)}
                     </dd>
                     {isFirstVoucherPending(member) && (
                       <dd className="mt-1 text-xs text-amber-700">
                         Primer bono pendiente
                       </dd>
                     )}
-                    {member.billing.billingStartedAt && (
+                    {!isPrivateManual && member.billing.billingStartedAt && (
                       <dd className="mt-1 text-xs text-slate-500">
                         Desde {formatMemberDate(member.billing.billingStartedAt)}
                       </dd>
@@ -158,11 +168,13 @@ export default function CourseProfileMembersSection({
                   </div>
                   <div>
                     <dt className="text-xs text-slate-400">
-                      Próxima facturación
+                      {isPrivateManual ? "Renovación" : "Próxima facturación"}
                     </dt>
                     <dd className="mt-1 text-slate-700">
-                      {formatMemberDate(member.billing.nextBillingDate) ??
-                        "Sin próxima fecha todavía"}
+                      {isPrivateManual
+                        ? "Sin renovación automática"
+                        : formatMemberDate(member.billing.nextBillingDate) ??
+                          "Sin próxima fecha todavía"}
                     </dd>
                     {member.billing.lastVoucherId && (
                       <dd className="mt-1 text-xs text-slate-400">
@@ -212,8 +224,12 @@ export default function CourseProfileMembersSection({
                   <th className="px-5 py-3">Alumno</th>
                   <th className="px-4 py-3">Estado</th>
                   <th className="px-4 py-3">Entrada</th>
-                  <th className="px-4 py-3">Ciclo</th>
-                  <th className="px-4 py-3">Próxima facturación</th>
+                  <th className="px-4 py-3">
+                    {isPrivateManual ? "Modalidad" : "Ciclo"}
+                  </th>
+                  <th className="px-4 py-3">
+                    {isPrivateManual ? "Renovación" : "Próxima facturación"}
+                  </th>
                   <th className="px-5 py-3">Notas</th>
                   {onCreateVoucher && <th className="px-5 py-3">Acción</th>}
                 </tr>
@@ -239,7 +255,7 @@ export default function CourseProfileMembersSection({
                     </td>
                     <td className="px-4 py-4">
                       <p className="text-slate-700">
-                        {getBillingCycleLabel(member)}
+                        {getBillingCycleLabel(member, isPrivateManual)}
                       </p>
                       {isFirstVoucherPending(member) && (
                         <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-amber-700">
@@ -247,7 +263,7 @@ export default function CourseProfileMembersSection({
                           Primer bono pendiente
                         </p>
                       )}
-                      {member.billing.billingStartedAt && (
+                      {!isPrivateManual && member.billing.billingStartedAt && (
                         <p className="mt-1 text-xs text-slate-500">
                           Desde {formatMemberDate(member.billing.billingStartedAt)}
                         </p>
@@ -259,8 +275,10 @@ export default function CourseProfileMembersSection({
                       )}
                     </td>
                     <td className="px-4 py-4 text-slate-700">
-                      {formatMemberDate(member.billing.nextBillingDate) ??
-                        "Sin próxima fecha todavía"}
+                      {isPrivateManual
+                        ? "Sin renovación automática"
+                        : formatMemberDate(member.billing.nextBillingDate) ??
+                          "Sin próxima fecha todavía"}
                       {member.billing.lastVoucherId && (
                         <p className="mt-1 text-xs text-slate-400">
                           Último bono …{member.billing.lastVoucherId.slice(-6)}

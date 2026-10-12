@@ -230,6 +230,10 @@ export default function CourseProfileDetailView({
 
       <CourseProfileMembersSection
         members={course.members}
+        isPrivateManual={
+          course.classType === "private" ||
+          course.courseType === "private_flexible"
+        }
         onCreateVouchers={
           course.status === "archived"
             ? undefined

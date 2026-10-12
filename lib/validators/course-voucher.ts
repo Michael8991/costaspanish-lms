@@ -22,12 +22,13 @@ const optionalDateOnlySchema = z.preprocess(
   dateOnlySchema.optional(),
 );
 
-const courseVoucherRequestBaseSchema = z.object({
+const courseVoucherRequestBaseShape = {
   memberStudentIds: z
     .array(objectIdSchema)
     .min(1)
     .transform((values) => Array.from(new Set(values))),
   selectedStartDate: optionalDateOnlySchema,
+  selectedEndDate: optionalDateOnlySchema,
   manualCreditsByStudent: z
     .record(z.string(), z.coerce.number().min(0))
     .default({}),
@@ -48,14 +49,37 @@ const courseVoucherRequestBaseSchema = z.object({
   internalNotesByStudent: z
     .record(z.string(), z.string().trim().max(2000))
     .default({}),
-}).strict();
+};
 
-export const previewCourseVouchersSchema = courseVoucherRequestBaseSchema;
+function validateSelectedDateRange(
+  value: { selectedStartDate?: string; selectedEndDate?: string },
+  context: z.RefinementCtx,
+) {
+  if (
+    value.selectedStartDate &&
+    value.selectedEndDate &&
+    value.selectedEndDate < value.selectedStartDate
+  ) {
+    context.addIssue({
+      code: "custom",
+      path: ["selectedEndDate"],
+      message: "selectedEndDate must be on or after selectedStartDate",
+    });
+  }
+}
 
-export const generateCourseVouchersSchema =
-  courseVoucherRequestBaseSchema.extend({
+export const previewCourseVouchersSchema = z
+  .object(courseVoucherRequestBaseShape)
+  .strict()
+  .superRefine(validateSelectedDateRange);
+
+export const generateCourseVouchersSchema = z
+  .object({
+    ...courseVoucherRequestBaseShape,
     allowDuplicatePeriod: z.boolean().default(false),
-  });
+  })
+  .strict()
+  .superRefine(validateSelectedDateRange);
 
 export type CourseVoucherRequestInput = z.infer<
   typeof previewCourseVouchersSchema

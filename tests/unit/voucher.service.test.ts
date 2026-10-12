@@ -7,7 +7,13 @@ import {
   resolveVoucherForLessonResult,
   VoucherDomainError,
 } from "../../lib/services/voucher.service";
-import { calculateIndividualBillingPeriod } from "../../lib/utils/course-voucher-billing";
+import {
+  calculateCourseVoucherPeriod,
+  calculateIndividualBillingPeriod,
+  getCourseVoucherPlanDates,
+  resolveNextBillingDateAfterVoucherGeneration,
+} from "../../lib/utils/course-voucher-billing";
+import { previewCourseVouchersSchema } from "../../lib/validators/course-voucher";
 
 const studentEnrollment = new Types.ObjectId();
 const courseId = new Types.ObjectId();
@@ -239,4 +245,103 @@ test("month-end anchors clamp deterministically and return to day 31", () => {
   assert.equal(february.periodEnd.toISOString(), "2027-03-30T00:00:00.000Z");
   assert.equal(february.nextBillingDate.toISOString(), "2027-03-31T00:00:00.000Z");
   assert.equal(leapJanuary.nextBillingDate.toISOString(), "2028-02-29T00:00:00.000Z");
+});
+
+test("private legacy voucher uses the selected inclusive validity instead of a stale next billing date", () => {
+  const period = calculateCourseVoucherPeriod({
+    classType: "private",
+    courseType: "private_flexible",
+    memberJoinedAt: new Date("2026-08-10T00:00:00.000Z"),
+    billingStartedAt: new Date("2026-08-09T00:00:00.000Z"),
+    existingBillingAnchorDay: 10,
+    nextBillingDate: new Date("2027-04-10T00:00:00.000Z"),
+    selectedStartDate: new Date("2026-10-12T00:00:00.000Z"),
+    selectedEndDate: new Date("2026-10-19T00:00:00.000Z"),
+  });
+
+  assert.equal(period.periodStart.toISOString(), "2026-10-12T00:00:00.000Z");
+  assert.equal(period.periodEnd.toISOString(), "2026-10-19T00:00:00.000Z");
+  assert.equal(period.nextBillingDate, null);
+  assert.equal(period.advancesNextBillingDate, false);
+});
+
+test("private manual voucher clears a legacy member next billing date", () => {
+  const currentNextBillingDate = new Date("2027-04-10T00:00:00.000Z");
+  const period = calculateCourseVoucherPeriod({
+    classType: "private",
+    courseType: "private_flexible",
+    memberJoinedAt: new Date("2026-08-10T00:00:00.000Z"),
+    nextBillingDate: currentNextBillingDate,
+    selectedStartDate: new Date("2026-10-12T00:00:00.000Z"),
+    selectedEndDate: new Date("2026-10-19T00:00:00.000Z"),
+  });
+  const resolved = resolveNextBillingDateAfterVoucherGeneration({
+    currentNextBillingDate,
+    generatedNextBillingDate: period.nextBillingDate,
+    advancesNextBillingDate: period.advancesNextBillingDate,
+  });
+
+  assert.equal(period.periodStart.toISOString(), "2026-10-12T00:00:00.000Z");
+  assert.equal(period.periodEnd.toISOString(), "2026-10-19T00:00:00.000Z");
+  assert.equal(period.nextBillingDate, null);
+  assert.equal(resolved, null);
+});
+
+test("private manual preview dates are the exact dates persisted by generate", () => {
+  const previewPeriod = calculateCourseVoucherPeriod({
+    classType: "private",
+    courseType: "private_flexible",
+    memberJoinedAt: new Date("2026-08-10T00:00:00.000Z"),
+    nextBillingDate: new Date("2027-04-10T00:00:00.000Z"),
+    selectedStartDate: new Date("2026-10-12T00:00:00.000Z"),
+    selectedEndDate: new Date("2026-10-19T00:00:00.000Z"),
+  });
+  const persisted = getCourseVoucherPlanDates({
+    periodStart: previewPeriod.periodStart.toISOString(),
+    periodEnd: previewPeriod.periodEnd.toISOString(),
+  });
+
+  assert.equal(persisted.validFrom.toISOString(), previewPeriod.periodStart.toISOString());
+  assert.equal(persisted.validUntil.toISOString(), previewPeriod.periodEnd.toISOString());
+  assert.equal(persisted.billingPeriodStart.toISOString(), previewPeriod.periodStart.toISOString());
+  assert.equal(persisted.billingPeriodEnd.toISOString(), previewPeriod.periodEnd.toISOString());
+});
+
+test("recurring course keeps the existing monthly next-billing precedence", () => {
+  const period = calculateCourseVoucherPeriod({
+    classType: "group_regular",
+    courseType: "regular_group",
+    memberJoinedAt: new Date("2026-08-10T00:00:00.000Z"),
+    billingStartedAt: new Date("2026-08-10T00:00:00.000Z"),
+    existingBillingAnchorDay: 10,
+    nextBillingDate: new Date("2027-04-10T00:00:00.000Z"),
+    selectedStartDate: new Date("2026-10-12T00:00:00.000Z"),
+    selectedEndDate: new Date("2026-10-19T00:00:00.000Z"),
+  });
+
+  assert.equal(period.periodStart.toISOString(), "2027-04-10T00:00:00.000Z");
+  assert.equal(period.periodEnd.toISOString(), "2027-05-09T00:00:00.000Z");
+  assert.equal(period.nextBillingDate?.toISOString(), "2027-05-10T00:00:00.000Z");
+  assert.equal(period.advancesNextBillingDate, true);
+  assert.equal(
+    resolveNextBillingDateAfterVoucherGeneration({
+      currentNextBillingDate: new Date("2027-04-10T00:00:00.000Z"),
+      generatedNextBillingDate: period.nextBillingDate,
+      advancesNextBillingDate: period.advancesNextBillingDate,
+    })?.toISOString(),
+    "2027-05-10T00:00:00.000Z",
+  );
+});
+
+test("voucher request rejects an end date before the start date", () => {
+  const parsed = previewCourseVouchersSchema.safeParse({
+    memberStudentIds: [new Types.ObjectId().toString()],
+    selectedStartDate: "2026-10-12",
+    selectedEndDate: "2026-10-11",
+  });
+
+  assert.equal(parsed.success, false);
+  if (!parsed.success) {
+    assert.deepEqual(parsed.error.issues[0]?.path, ["selectedEndDate"]);
+  }
 });
