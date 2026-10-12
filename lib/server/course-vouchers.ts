@@ -12,7 +12,8 @@ import { normalizeCourseMembers } from "@/lib/utils/course-members";
 import { normalizeCourseOperationalPolicies } from "@/lib/utils/course-policies";
 import {
   calculateCourseVoucherCredits,
-  calculateIndividualBillingPeriod,
+  calculateCourseVoucherPeriod,
+  isPrivateManualVoucherCourse,
 } from "@/lib/utils/course-voucher-billing";
 import type { CourseVoucherRequestInput } from "@/lib/validators/course-voucher";
 import {
@@ -126,6 +127,36 @@ export async function buildCourseVoucherContext({
     );
   }
 
+  const isPrivateManual = isPrivateManualVoucherCourse({
+    classType: course.classType,
+    courseType: course.courseType,
+  });
+  const selectedStartDate = parseDateOnly(input.selectedStartDate);
+  const selectedEndDate = parseDateOnly(input.selectedEndDate);
+
+  if (isPrivateManual && !selectedStartDate) {
+    throw new CourseVoucherRequestError(
+      "La fecha de inicio es obligatoria para un bono privado manual.",
+      400,
+    );
+  }
+  if (isPrivateManual && !selectedEndDate) {
+    throw new CourseVoucherRequestError(
+      "La fecha de fin es obligatoria para un bono privado manual.",
+      400,
+    );
+  }
+  if (
+    selectedStartDate &&
+    selectedEndDate &&
+    selectedEndDate.getTime() < selectedStartDate.getTime()
+  ) {
+    throw new CourseVoucherRequestError(
+      "La fecha de fin no puede ser anterior a la fecha de inicio.",
+      400,
+    );
+  }
+
   const members = normalizeCourseMembers({
     members: course.members,
     legacyStudentIds: course.studentIds,
@@ -175,7 +206,6 @@ export async function buildCourseVoucherContext({
   }
 
   const policies = normalizeCourseOperationalPolicies(course.policies);
-  const selectedStartDate = parseDateOnly(input.selectedStartDate);
   const courseIdString = courseId.toString();
   const courseName = course.name?.trim() || course.internalName;
   const items: CourseVoucherPreviewItemDTO[] = input.memberStudentIds.map(
@@ -190,7 +220,9 @@ export async function buildCourseVoucherContext({
         );
       }
 
-      const period = calculateIndividualBillingPeriod({
+      const period = calculateCourseVoucherPeriod({
+        classType: course.classType,
+        courseType: course.courseType,
         memberJoinedAt: new Date(member.joinedAt),
         billingStartedAt: member.billing.billingStartedAt
           ? new Date(member.billing.billingStartedAt)
@@ -202,6 +234,7 @@ export async function buildCourseVoucherContext({
           ? new Date(member.billing.nextBillingDate)
           : null,
         selectedStartDate,
+        selectedEndDate,
       });
       const hasManualCredits = hasOwnValue(
         input.manualCreditsByStudent,
@@ -224,7 +257,7 @@ export async function buildCourseVoucherContext({
       if (member.status === "paused") warnings.add("member_paused");
       if (member.status === "left") warnings.add("member_left");
       if (!member.billing.firstVoucherId) warnings.add("first_voucher");
-      else warnings.add("renewing_existing_cycle");
+      else if (!isPrivateManual) warnings.add("renewing_existing_cycle");
       if (!hasPrice) warnings.add("missing_price");
       if (
         policies.schedulingDefaults.preferredWeekdays.length === 0 &&
@@ -249,7 +282,8 @@ export async function buildCourseVoucherContext({
         memberStatus: member.status,
         periodStart: period.periodStart.toISOString(),
         periodEnd: period.periodEnd.toISOString(),
-        nextBillingDate: period.nextBillingDate.toISOString(),
+        nextBillingDate: period.nextBillingDate?.toISOString() ?? null,
+        advancesNextBillingDate: period.advancesNextBillingDate,
         billingAnchorDay: period.billingAnchorDay,
         classOccurrencesCount: creditCalculation.classOccurrencesCount,
         creditsPerLesson: creditCalculation.creditsPerLesson,

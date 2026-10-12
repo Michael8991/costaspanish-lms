@@ -92,8 +92,11 @@ export default function CreateCourseVouchersModal({
     () => course.members.filter((member) => member.status === "active"),
     [course.members],
   );
+  const isPrivateManual =
+    course.classType === "private" || course.courseType === "private_flexible";
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [selectedStartDate, setSelectedStartDate] = useState("");
+  const [selectedEndDate, setSelectedEndDate] = useState("");
   const [manualCredits, setManualCredits] = useState<TextValuesByStudent>({});
   const [prices, setPrices] = useState<TextValuesByStudent>({});
   const [internalNotes, setInternalNotes] = useState<TextValuesByStudent>({});
@@ -114,6 +117,7 @@ export default function CreateCourseVouchersModal({
 
     setSelectedStudentIds(initialSelection);
     setSelectedStartDate("");
+    setSelectedEndDate("");
     setManualCredits({});
     setPrices({});
     setInternalNotes({});
@@ -123,7 +127,11 @@ export default function CreateCourseVouchersModal({
   }, [activeMembers, isOpen, course.id, initialStudentIds]);
 
   useEffect(() => {
-    if (!isOpen || selectedStudentIds.length === 0) {
+    if (
+      !isOpen ||
+      selectedStudentIds.length === 0 ||
+      (isPrivateManual && (!selectedStartDate || !selectedEndDate))
+    ) {
       setPreview(null);
       setIsLoadingPreview(false);
       return;
@@ -143,6 +151,7 @@ export default function CreateCourseVouchersModal({
             body: JSON.stringify({
               memberStudentIds: selectedStudentIds,
               selectedStartDate: selectedStartDate || undefined,
+              selectedEndDate: selectedEndDate || undefined,
               manualCreditsByStudent: toNumberRecord(manualCredits),
               priceByStudent: toNumberRecord(prices),
               internalNotesByStudent: internalNotes,
@@ -186,6 +195,8 @@ export default function CreateCourseVouchersModal({
     manualCredits,
     internalNotes,
     prices,
+    isPrivateManual,
+    selectedEndDate,
     selectedStartDate,
     selectedStudentIds,
   ]);
@@ -212,6 +223,7 @@ export default function CreateCourseVouchersModal({
           body: JSON.stringify({
             memberStudentIds: selectedStudentIds,
             selectedStartDate: selectedStartDate || undefined,
+            selectedEndDate: selectedEndDate || undefined,
             manualCreditsByStudent: toNumberRecord(manualCredits),
             priceByStudent: toNumberRecord(prices),
             internalNotesByStudent: internalNotes,
@@ -264,7 +276,9 @@ export default function CreateCourseVouchersModal({
             <div>
               <p className="font-semibold">{course.name}</p>
               <p className="mt-1 text-sm text-slate-500">
-                Cada alumno tendrá su propio ciclo individual de facturación.
+                {isPrivateManual
+                  ? "Bono privado con vigencia manual. No modifica el próximo ciclo."
+                  : "Cada alumno tendrá su propio ciclo individual de facturación."}
               </p>
             </div>
             <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
@@ -331,7 +345,9 @@ export default function CreateCourseVouchersModal({
                     {member.studentName}
                   </span>
                   <span className="mt-0.5 block text-xs text-slate-500">
-                    {member.billing.nextBillingDate
+                    {isPrivateManual
+                      ? "Vigencia manual"
+                      : member.billing.nextBillingDate
                       ? `Próximo ciclo: ${formatDate(member.billing.nextBillingDate)}`
                       : "Primer bono pendiente"}
                   </span>
@@ -341,16 +357,30 @@ export default function CreateCourseVouchersModal({
           </div>
         </section>
 
-        <section className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2">
+        <section className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-3">
           <label className="text-sm font-medium text-slate-700">
-            Fecha global para primeros bonos (opcional)
+            Vigencia desde{isPrivateManual ? " (requerida)" : " (opcional)"}
             <input
               type="date"
               value={selectedStartDate}
               onChange={(event) => setSelectedStartDate(event.target.value)}
+              required={isPrivateManual}
               className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2"
             />
           </label>
+          {isPrivateManual && (
+            <label className="text-sm font-medium text-slate-700">
+              Vigencia hasta (inclusive, requerida)
+              <input
+                type="date"
+                value={selectedEndDate}
+                min={selectedStartDate || undefined}
+                onChange={(event) => setSelectedEndDate(event.target.value)}
+                required
+                className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2"
+              />
+            </label>
+          )}
           <div className="text-sm font-medium text-slate-700">
             Aplicar precio a seleccionados
             <div className="mt-1.5 flex gap-2">
@@ -392,7 +422,9 @@ export default function CreateCourseVouchersModal({
                       <CalendarDays className="h-3.5 w-3.5" />
                       {formatDate(item.periodStart)} –{" "}
                       {formatDate(item.periodEnd)}
-                      {` · Renueva ${formatDate(item.nextBillingDate)}`}
+                      {item.advancesNextBillingDate && item.nextBillingDate
+                        ? ` · Renueva ${formatDate(item.nextBillingDate)}`
+                        : " · Vigencia manual"}
                     </p>
                   </div>
                   <div className="text-right">

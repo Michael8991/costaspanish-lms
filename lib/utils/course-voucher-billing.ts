@@ -57,6 +57,24 @@ function resolveBillingAnchorDay(
     : startDay;
 }
 
+export function isPrivateManualVoucherCourse({
+  classType,
+  courseType,
+}: {
+  classType?: string | null;
+  courseType?: string | null;
+}) {
+  return classType === "private" || courseType === "private_flexible";
+}
+
+export type CourseVoucherPeriod = {
+  periodStart: Date;
+  periodEnd: Date;
+  billingAnchorDay: number;
+  nextBillingDate: Date | null;
+  advancesNextBillingDate: boolean;
+};
+
 export function calculateIndividualBillingPeriod({
   memberJoinedAt,
   billingStartedAt,
@@ -89,6 +107,94 @@ export function calculateIndividualBillingPeriod({
     periodEnd,
     billingAnchorDay,
     nextBillingDate: followingBillingDate,
+  };
+}
+
+export function calculateCourseVoucherPeriod({
+  classType,
+  courseType,
+  memberJoinedAt,
+  billingStartedAt,
+  existingBillingAnchorDay,
+  nextBillingDate,
+  selectedStartDate,
+  selectedEndDate,
+}: {
+  classType?: string | null;
+  courseType?: string | null;
+  memberJoinedAt: Date;
+  billingStartedAt?: Date | null;
+  existingBillingAnchorDay?: number | null;
+  nextBillingDate?: Date | null;
+  selectedStartDate?: Date | null;
+  selectedEndDate?: Date | null;
+}): CourseVoucherPeriod {
+  if (isPrivateManualVoucherCourse({ classType, courseType })) {
+    if (!selectedStartDate || !selectedEndDate) {
+      throw new Error(
+        "Private manual vouchers require selectedStartDate and selectedEndDate",
+      );
+    }
+
+    const periodStart = startOfUtcDay(selectedStartDate);
+    const periodEnd = startOfUtcDay(selectedEndDate);
+
+    if (periodEnd.getTime() < periodStart.getTime()) {
+      throw new Error("selectedEndDate cannot be before selectedStartDate");
+    }
+
+    return {
+      periodStart,
+      periodEnd,
+      billingAnchorDay: periodStart.getUTCDate(),
+      nextBillingDate: null,
+      advancesNextBillingDate: false,
+    };
+  }
+
+  return {
+    ...calculateIndividualBillingPeriod({
+      memberJoinedAt,
+      billingStartedAt,
+      existingBillingAnchorDay,
+      nextBillingDate,
+      selectedStartDate,
+    }),
+    advancesNextBillingDate: true,
+  };
+}
+
+export function resolveNextBillingDateAfterVoucherGeneration({
+  currentNextBillingDate,
+  generatedNextBillingDate,
+  advancesNextBillingDate,
+}: {
+  currentNextBillingDate?: Date | null;
+  generatedNextBillingDate?: Date | null;
+  advancesNextBillingDate: boolean;
+}) {
+  if (!advancesNextBillingDate) return null;
+  if (generatedNextBillingDate) {
+    return startOfUtcDay(generatedNextBillingDate);
+  }
+  return currentNextBillingDate ? startOfUtcDay(currentNextBillingDate) : null;
+}
+
+export function getCourseVoucherPlanDates({
+  periodStart,
+  periodEnd,
+}: {
+  periodStart: string;
+  periodEnd: string;
+}) {
+  const validFrom = startOfUtcDay(new Date(periodStart));
+  const validUntil = startOfUtcDay(new Date(periodEnd));
+
+  return {
+    validFrom,
+    validUntil,
+    billingPeriodStart: validFrom,
+    billingPeriodEnd: validUntil,
   };
 }
 
