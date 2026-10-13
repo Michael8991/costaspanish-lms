@@ -204,6 +204,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
           billingPeriodEnd: result.voucher.billingPeriodEnd,
         },
         patch: {
+          validFrom: payload.validFrom,
+          validUntil: payload.validUntil,
           billingPeriodStart: payload.billingPeriodStart,
           billingPeriodEnd: payload.billingPeriodEnd,
         },

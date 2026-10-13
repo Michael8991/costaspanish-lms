@@ -31,6 +31,8 @@ export default function EditCourseVoucherModal({
   onSaved,
 }: EditCourseVoucherModalProps) {
   const [voucher, setVoucher] = useState<StudentPlanListDTO | null>(null);
+  const [validFrom, setValidFrom] = useState("");
+  const [validUntil, setValidUntil] = useState("");
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
   const [priceTotal, setPriceTotal] = useState("");
@@ -62,6 +64,8 @@ export default function EditCourseVoucherModal({
 
         const item = data.item;
         setVoucher(item);
+        setValidFrom(dateOnly(item.validFrom));
+        setValidUntil(dateOnly(item.validUntil));
         setPeriodStart(dateOnly(item.billingPeriodStart));
         setPeriodEnd(dateOnly(item.billingPeriodEnd));
         setPriceTotal(item.priceTotal?.toString() ?? "");
@@ -91,13 +95,20 @@ export default function EditCourseVoucherModal({
       setIsSaving(true);
       setError(null);
       const payload: Record<string, string | number | null> = {};
+      const originalValidFrom = dateOnly(voucher.validFrom);
+      const originalValidUntil = dateOnly(voucher.validUntil);
       const originalPeriodStart = dateOnly(voucher.billingPeriodStart);
       const originalPeriodEnd = dateOnly(voucher.billingPeriodEnd);
-      if (
-        periodStart !== originalPeriodStart ||
-        periodEnd !== originalPeriodEnd
-      ) {
+      if (validFrom !== originalValidFrom) {
+        payload.validFrom = validFrom;
+      }
+      if (validUntil !== originalValidUntil) {
+        payload.validUntil = validUntil;
+      }
+      if (periodStart !== originalPeriodStart) {
         payload.billingPeriodStart = periodStart || null;
+      }
+      if (periodEnd !== originalPeriodEnd) {
         payload.billingPeriodEnd = periodEnd || null;
       }
       if (priceTotal !== "") {
@@ -164,18 +175,43 @@ export default function EditCourseVoucherModal({
 
         {voucher && !isLoading && (
           <div className="max-h-[68vh] space-y-4 overflow-y-auto rounded-2xl bg-white p-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="text-sm font-medium text-slate-700">
-                Inicio del periodo de facturación
-                <input type="date" value={periodStart} onChange={(event) => setPeriodStart(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" />
-              </label>
-              <label className="text-sm font-medium text-slate-700">
-                Fin del periodo de facturación
-                <input type="date" value={periodEnd} onChange={(event) => setPeriodEnd(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" />
-              </label>
-              <p className="text-xs text-slate-500 sm:col-span-2">
-                Estas fechas corresponden al ciclo de facturación y no modifican la vigencia operativa del bono.
+            <section className="space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Vigencia del bono
+              </h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="text-sm font-medium text-slate-700">
+                  Inicio de vigencia
+                  <input required type="date" value={validFrom} onChange={(event) => setValidFrom(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" />
+                </label>
+                <label className="text-sm font-medium text-slate-700">
+                  Fecha de caducidad
+                  <input required type="date" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" />
+                </label>
+              </div>
+              <p className="text-xs text-slate-500">
+                Define cuándo puede utilizarse el bono para clases.
               </p>
+            </section>
+            <section className="space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Facturación
+              </h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="text-sm font-medium text-slate-700">
+                  Inicio del periodo de facturación
+                  <input type="date" value={periodStart} onChange={(event) => setPeriodStart(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" />
+                </label>
+                <label className="text-sm font-medium text-slate-700">
+                  Fin del periodo de facturación
+                  <input type="date" value={periodEnd} onChange={(event) => setPeriodEnd(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" />
+                </label>
+              </div>
+              <p className="text-xs text-slate-500">
+                Define el ciclo financiero y no modifica la vigencia operativa del bono.
+              </p>
+            </section>
+            <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm font-medium text-slate-700">
                 Créditos totales
                 <input readOnly value={voucher.creditsTotal} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 py-2" />

@@ -183,57 +183,27 @@ export function resolveVoucherDatePatch(args: {
 export function resolveCourseVoucherDatePatch(args: {
   current: VoucherDateState;
   patch: Partial<{
+    validFrom: VoucherDateValue;
+    validUntil: VoucherDateValue;
     billingPeriodStart: VoucherDateValue | null;
     billingPeriodEnd: VoucherDateValue | null;
   }>;
 }): VoucherDatePatchResolution {
   const hasStart = args.patch.billingPeriodStart !== undefined;
   const hasEnd = args.patch.billingPeriodEnd !== undefined;
-  if (!hasStart && !hasEnd) {
-    return {
-      state: args.current,
-      patch: {},
-      changed: false,
-      validityChanged: false,
-      billingPeriodChanged: false,
-    };
+  if (hasStart || hasEnd) {
+    const startValue = hasStart
+      ? args.patch.billingPeriodStart
+      : args.current.billingPeriodStart;
+    const endValue = hasEnd
+      ? args.patch.billingPeriodEnd
+      : args.current.billingPeriodEnd;
+    if (startValue == null || endValue == null) {
+      throw new VoucherDatePolicyError(
+        "Course voucher period requires both start and end dates",
+      );
+    }
   }
 
-  const startValue = hasStart
-    ? args.patch.billingPeriodStart
-    : args.current.billingPeriodStart;
-  const endValue = hasEnd
-    ? args.patch.billingPeriodEnd
-    : args.current.billingPeriodEnd;
-  if (startValue == null || endValue == null) {
-    throw new VoucherDatePolicyError(
-      "Course voucher period requires both start and end dates",
-    );
-  }
-
-  const billingPeriodStart = hasStart
-    ? normalizeRequiredDate(startValue, "billingPeriodStart")
-    : args.current.billingPeriodStart!;
-  const billingPeriodEnd = hasEnd
-    ? normalizeRequiredDate(endValue, "billingPeriodEnd")
-    : args.current.billingPeriodEnd!;
-  const state: VoucherDateState = {
-    validFrom: args.current.validFrom,
-    validUntil: args.current.validUntil,
-    billingPeriodStart,
-    billingPeriodEnd,
-  };
-  validateVoucherDateState(state, { requireCompleteBillingPeriod: true });
-
-  const patch: VoucherDatePatch = {};
-  if (hasStart) patch.billingPeriodStart = billingPeriodStart;
-  if (hasEnd) patch.billingPeriodEnd = billingPeriodEnd;
-
-  return {
-    state,
-    changed: true,
-    validityChanged: false,
-    billingPeriodChanged: true,
-    patch,
-  };
+  return resolveVoucherDatePatch(args);
 }

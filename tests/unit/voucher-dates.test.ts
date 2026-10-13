@@ -175,9 +175,9 @@ describe("voucher date-only UTC policy", () => {
     assert.deepEqual(resolved.state, current);
   });
 
-  it("normalizes and applies an explicit validity PATCH only to supplied fields", () => {
-    const resolved = resolveVoucherDatePatch({
-      current: { ...current, billingPeriodStart: null, billingPeriodEnd: null },
+  it("course validity-only PATCH writes only the dirty field and preserves billing byte-equivalent", () => {
+    const resolved = resolveCourseVoucherDatePatch({
+      current,
       patch: { validUntil: "2026-10-21T18:00:00.000Z" },
     });
     assert.equal(resolved.validityChanged, true);
@@ -185,6 +185,20 @@ describe("voucher date-only UTC policy", () => {
     assert.deepEqual(Object.keys(resolved.patch), ["validUntil"]);
     assert.equal(resolved.patch.validUntil?.toISOString(), "2026-10-21T00:00:00.000Z");
     assert.strictEqual(resolved.state.validFrom, current.validFrom);
+    assert.strictEqual(resolved.state.billingPeriodStart, current.billingPeriodStart);
+    assert.strictEqual(resolved.state.billingPeriodEnd, current.billingPeriodEnd);
+    assert.equal(Object.hasOwn(resolved.patch, "billingPeriodStart"), false);
+    assert.equal(Object.hasOwn(resolved.patch, "billingPeriodEnd"), false);
+  });
+
+  it("rejects a course validity PATCH ending before validFrom", () => {
+    assert.throws(
+      () => resolveCourseVoucherDatePatch({
+        current,
+        patch: { validUntil: "2026-10-11" },
+      }),
+      /validUntil cannot be before validFrom/,
+    );
   });
 
   it("rejects an invalid billing period", () => {
@@ -214,7 +228,7 @@ describe("voucher date-only UTC policy", () => {
     ));
   });
 
-  it("edits only the financial billing cycle and preserves validity byte-equivalent", () => {
+  it("course billing-only PATCH writes only the dirty field and preserves validity byte-equivalent", () => {
     const legacyDistinctState = {
       validFrom: new Date("2026-09-30T00:00:00.000Z"),
       validUntil: new Date("2026-10-29T00:00:00.000Z"),
@@ -224,7 +238,6 @@ describe("voucher date-only UTC policy", () => {
     const resolved = resolveCourseVoucherDatePatch({
       current: legacyDistinctState,
       patch: {
-        billingPeriodStart: "2026-10-04T18:30:00.000Z",
         billingPeriodEnd: "2026-11-03T23:59:59.999Z",
       },
     });
@@ -232,20 +245,17 @@ describe("voucher date-only UTC policy", () => {
     assert.equal(resolved.changed, true);
     assert.equal(resolved.validityChanged, false);
     assert.equal(resolved.billingPeriodChanged, true);
-    assert.deepEqual(Object.keys(resolved.patch), [
-      "billingPeriodStart",
-      "billingPeriodEnd",
-    ]);
-    assert.equal(
-      resolved.patch.billingPeriodStart?.toISOString(),
-      "2026-10-04T00:00:00.000Z",
-    );
+    assert.deepEqual(Object.keys(resolved.patch), ["billingPeriodEnd"]);
     assert.equal(
       resolved.patch.billingPeriodEnd?.toISOString(),
       "2026-11-03T00:00:00.000Z",
     );
     assert.strictEqual(resolved.state.validFrom, legacyDistinctState.validFrom);
     assert.strictEqual(resolved.state.validUntil, legacyDistinctState.validUntil);
+    assert.strictEqual(
+      resolved.state.billingPeriodStart,
+      legacyDistinctState.billingPeriodStart,
+    );
     assert.equal(Object.hasOwn(resolved.patch, "validFrom"), false);
     assert.equal(Object.hasOwn(resolved.patch, "validUntil"), false);
   });

@@ -177,6 +177,8 @@ export const updateStudentVoucherSchema =
 
 export const editCourseVoucherSchema = z
   .object({
+    validFrom: dateSchema,
+    validUntil: dateSchema,
     billingPeriodStart: nullableDateSchema,
     billingPeriodEnd: nullableDateSchema,
     internalNotes: z.string().trim().max(2000).optional(),
