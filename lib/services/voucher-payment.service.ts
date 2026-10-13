@@ -45,6 +45,16 @@ type VoucherRecord = {
   currency: "EUR";
 };
 
+export type VoucherPaymentSummaryInput = {
+  studentId: string;
+  voucherId: string;
+  amountPaidCents: number;
+  paymentStatus: "partial" | "paid";
+  paidAt: Date;
+  paymentMethod: PaymentLedgerPaymentMethod;
+  notes: string;
+};
+
 export interface VoucherPaymentTransaction {
   findVoucher(command: RegisterVoucherPaymentCommand): Promise<VoucherRecord | null>;
   sumActivePaymentCents(teacherId: string, voucherId: string): Promise<number>;
@@ -59,15 +69,7 @@ export interface VoucherPaymentTransaction {
     createdBy: string;
     idempotencyKey?: string;
   }): Promise<string>;
-  updateVoucherSummary(input: {
-    studentId: string;
-    voucherId: string;
-    amountPaidCents: number;
-    paymentStatus: "partial" | "paid";
-    paidAt: Date;
-    paymentMethod: PaymentLedgerPaymentMethod;
-    notes: string;
-  }): Promise<boolean>;
+  updateVoucherSummary(input: VoucherPaymentSummaryInput): Promise<boolean>;
 }
 
 export interface VoucherPaymentRepository {
@@ -94,6 +96,19 @@ export class VoucherPaymentError extends Error {
 
 export function deriveVoucherPaymentStatus(totalPaidCents: number, priceCents: number) {
   return totalPaidCents >= priceCents ? "paid" as const : "partial" as const;
+}
+
+export function buildVoucherPaymentSummarySet(
+  input: VoucherPaymentSummaryInput,
+): Record<string, unknown> {
+  return {
+    "activePlans.$.amountPaidCents": input.amountPaidCents,
+    "activePlans.$.amountPaid": fromCents(input.amountPaidCents),
+    "activePlans.$.paymentStatus": input.paymentStatus,
+    "activePlans.$.paidAt": input.paidAt,
+    "activePlans.$.paymentMethod": input.paymentMethod,
+    "activePlans.$.paymentNotes": input.notes,
+  };
 }
 
 function isDuplicateKeyError(error: unknown): boolean {
@@ -289,14 +304,7 @@ class MongooseVoucherPaymentTransaction implements VoucherPaymentTransaction {
         "activePlans._id": new Types.ObjectId(input.voucherId),
       },
       {
-        $set: {
-          "activePlans.$.amountPaidCents":input.amountPaidCents,
-          "activePlans.$.amountPaid": fromCents(input.amountPaidCents),
-          "activePlans.$.paymentStatus": input.paymentStatus,
-          "activePlans.$.paidAt": input.paidAt,
-          "activePlans.$.paymentMethod": input.paymentMethod,
-          "activePlans.$.paymentNotes": input.notes,
-        },
+        $set: buildVoucherPaymentSummarySet(input),
       },
       { session: this.session, runValidators: true },
     );

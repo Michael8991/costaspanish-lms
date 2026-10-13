@@ -4,7 +4,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, requireRole } from "@/lib/auth/apiAuth";
 import { getStudentOwnershipFilter } from "@/lib/auth/studentOwnership";
 import dbConnect from "@/lib/mongo";
-import { validateVoucherEnrollment, VoucherDomainError } from "@/lib/services/voucher.service";
+import {
+  assertNoOverlappingVoucherPeriod,
+  validateVoucherEnrollment,
+  VoucherDomainError,
+} from "@/lib/services/voucher.service";
 import { updateStudentVoucherSchema } from "@/lib/validators/voucher";
 import {
   StudentProfile,
@@ -12,7 +16,11 @@ import {
   type StudentProfileDoc,
 } from "@/models/StudentProfile";
 import { toCents } from "@/lib/utils/money";
-import { isDateOnlyExpired } from "@/lib/utils/date-only";
+import { getVoucherEffectiveStatus } from "@/lib/utils/date-only";
+import {
+  resolveVoucherDatePatch,
+  VoucherDatePolicyError,
+} from "@/lib/utils/voucher-date-policy";
 
 type Ctx = {
   params:
@@ -60,12 +68,14 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     if (!currentFilter) {
       return NextResponse.json({ error: "Invalid user id" }, { status: 500 });
     }
-    const current = await StudentProfile.findOne(
-      currentFilter,
-      { activePlans: { $elemMatch: { _id: planObjectId } } },
-    ).lean();
+    const current = await StudentProfile.findOne(currentFilter)
+      .select("activePlans")
+      .lean();
 
-    if (!current?.activePlans?.length) {
+    const currentPlan = current?.activePlans?.find(
+      (plan) => plan._id.toString() === planId,
+    );
+    if (!current || !currentPlan) {
       return NextResponse.json(
         { error: "Student or specific plan not found" },
         { status: 404 },
@@ -89,20 +99,31 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         throw error;
       }
     }
-    const currentPlan = current.activePlans[0];
     const finalCreditsTotal = payload.creditsTotal ?? currentPlan.creditsTotal;
     const finalCreditsRemaining =
       payload.creditsRemaining ?? currentPlan.creditsRemaining;
-    const finalValidFrom = payload.validFrom ?? currentPlan.validFrom;
-    const finalValidUntil = payload.validUntil ?? currentPlan.validUntil;
-    const finalBillingPeriodStart =
-      payload.billingPeriodStart === undefined
-        ? currentPlan.billingPeriodStart
-        : payload.billingPeriodStart;
-    const finalBillingPeriodEnd =
-      payload.billingPeriodEnd === undefined
-        ? currentPlan.billingPeriodEnd
-        : payload.billingPeriodEnd;
+    let dateResolution;
+    try {
+      dateResolution = resolveVoucherDatePatch({
+        current: {
+          validFrom: currentPlan.validFrom,
+          validUntil: currentPlan.validUntil,
+          billingPeriodStart: currentPlan.billingPeriodStart,
+          billingPeriodEnd: currentPlan.billingPeriodEnd,
+        },
+        patch: {
+          validFrom: payload.validFrom,
+          validUntil: payload.validUntil,
+          billingPeriodStart: payload.billingPeriodStart,
+          billingPeriodEnd: payload.billingPeriodEnd,
+        },
+      });
+    } catch (error) {
+      if (error instanceof VoucherDatePolicyError) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+      throw error;
+    }
 
     if (
       finalCreditsTotal !== undefined &&
@@ -114,30 +135,11 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
         { status: 400 },
       );
     }
-    if (new Date(finalValidUntil) < new Date(finalValidFrom)) {
-      return NextResponse.json(
-        { error: "validUntil cannot be before validFrom" },
-        { status: 400 },
-      );
-    }
-    if (
-      finalBillingPeriodStart &&
-      finalBillingPeriodEnd &&
-      finalBillingPeriodEnd < finalBillingPeriodStart
-    ) {
-      return NextResponse.json(
-        { error: "billingPeriodEnd cannot be before billingPeriodStart" },
-        { status: 400 },
-      );
-    }
-
     const set: Record<string, unknown> = {};
     const directFields = [
       "name",
       "billingType",
       "classType",
-      "validFrom",
-      "validUntil",
       "creditsTotal",
       "creditsRemaining",
       "status",
@@ -145,8 +147,6 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       "generatedFromCourse",
       "generatedFromCourseMember",
       "billingMode",
-      "billingPeriodStart",
-      "billingPeriodEnd",
       "billingAnchorDay",
     ] as const;
 
@@ -154,6 +154,9 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       if (payload[field] !== undefined) {
         set[`activePlans.$.${field}`] = payload[field];
       }
+    }
+    for (const [field, value] of Object.entries(dateResolution.patch)) {
+      set[`activePlans.$.${field}`] = value;
     }
     if (payload.courseId !== undefined) {
       set["activePlans.$.courseId"] = new mongoose.Types.ObjectId(
@@ -182,13 +185,23 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
           : null;
     }
 
+    const shouldRecalculateStatus =
+      dateResolution.validityChanged ||
+      payload.creditsRemaining !== undefined ||
+      payload.status !== undefined;
     let finalStatus: PlanStatus = payload.status ?? currentPlan.status;
-    if (finalStatus !== "canceled") {
-      if (isDateOnlyExpired(finalValidUntil)) {
-        finalStatus = "expired";
-      }
-      else if (finalCreditsRemaining === 0) finalStatus = "exhausted";
-      else finalStatus = "active";
+    if (shouldRecalculateStatus) {
+      const statusForDerivation =
+        payload.status ??
+        (payload.creditsRemaining !== undefined ? "active" : currentPlan.status);
+      const effectiveStatus = getVoucherEffectiveStatus({
+        status: statusForDerivation,
+        creditsRemaining: finalCreditsRemaining,
+        validFrom: dateResolution.state.validFrom,
+        validUntil: dateResolution.state.validUntil,
+      });
+      finalStatus =
+        effectiveStatus === "upcoming" ? "active" : effectiveStatus;
       set["activePlans.$.status"] = finalStatus;
     }
 
@@ -199,18 +212,47 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
       );
     }
 
+    const finalEnrollmentId = selectedEnrollment?._id ?? currentPlan.enrollmentId;
+    const finalClassType = payload.classType ?? currentPlan.classType;
+    const overlapRelevantChange =
+      dateResolution.validityChanged ||
+      payload.classType !== undefined ||
+      payload.enrollmentId !== undefined;
+    if (overlapRelevantChange && finalEnrollmentId && finalStatus !== "canceled") {
+      try {
+        assertNoOverlappingVoucherPeriod({
+          vouchers: current.activePlans,
+          enrollmentId: finalEnrollmentId.toString(),
+          classType: finalClassType,
+          validFrom: dateResolution.state.validFrom,
+          validUntil: dateResolution.state.validUntil,
+          excludeVoucherId: planId,
+        });
+      } catch (error) {
+        if (error instanceof VoucherDomainError) {
+          return NextResponse.json(
+            { error: error.message },
+            { status: error.status },
+          );
+        }
+        throw error;
+      }
+    }
+
     const queryBase: mongoose.QueryFilter<StudentProfileDoc> = {
       _id: studentObjectId,
       "activePlans._id": planObjectId,
     };
-    const finalClassType = payload.classType ?? currentPlan.classType;
-    if (finalStatus === "active") {
+    if (overlapRelevantChange && finalEnrollmentId && finalStatus !== "canceled") {
       queryBase.activePlans = {
         $not: {
           $elemMatch: {
             _id: { $ne: planObjectId },
+            enrollmentId: finalEnrollmentId,
             classType: finalClassType,
-            status: "active",
+            status: { $ne: "canceled" },
+            validFrom: { $lte: dateResolution.state.validUntil },
+            validUntil: { $gte: dateResolution.state.validFrom },
           },
         },
       };
@@ -228,7 +270,10 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
 
     if (!updated) {
       return NextResponse.json(
-        { error: "Conflict: already an active plan with same classType" },
+        {
+          error:
+            "Ya existe un bono del mismo tipo para esta matrícula con un periodo solapado.",
+        },
         { status: 409 },
       );
     }

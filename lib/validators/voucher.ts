@@ -1,5 +1,6 @@
 import { Types } from "mongoose";
 import { z } from "zod";
+import { getUtcCalendarDay } from "@/lib/utils/voucher-period";
 
 const objectIdSchema = z
   .string()
@@ -11,7 +12,10 @@ const optionalObjectIdSchema = z.preprocess(
   objectIdSchema.optional(),
 );
 
-const dateSchema = z.coerce.date();
+const dateSchema = z.preprocess(
+  (value) => (value === "" || value === null ? undefined : value),
+  z.coerce.date(),
+);
 const nullableDateSchema = z.preprocess(
   (value) => (value === "" || value === null ? null : value),
   dateSchema.nullable().optional(),
@@ -61,14 +65,21 @@ function validateVoucherRanges(
 ) {
   if (
     value.billingPeriodStart &&
-    value.billingPeriodEnd &&
-    value.billingPeriodEnd < value.billingPeriodStart
+    value.billingPeriodEnd
   ) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["billingPeriodEnd"],
-      message: "billingPeriodEnd must be on or after billingPeriodStart",
-    });
+    const billingStart = getUtcCalendarDay(value.billingPeriodStart);
+    const billingEnd = getUtcCalendarDay(value.billingPeriodEnd);
+    if (
+      billingStart !== null &&
+      billingEnd !== null &&
+      billingEnd < billingStart
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["billingPeriodEnd"],
+        message: "billingPeriodEnd must be on or after billingPeriodStart",
+      });
+    }
   }
   if (
     value.creditsTotal !== undefined &&
@@ -108,7 +119,10 @@ export const createStudentVoucherSchema = z
   .strict()
   .superRefine((value, context) => {
     validateVoucherRanges(value, context);
-    if (value.validUntil < (value.validFrom ?? new Date(0))) {
+    if (
+      value.validFrom &&
+      getUtcCalendarDay(value.validUntil)! < getUtcCalendarDay(value.validFrom)!
+    ) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["validUntil"],

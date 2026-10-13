@@ -1,5 +1,5 @@
 import type { Types } from "mongoose";
-import { isDateOnlyExpired } from "@/lib/utils/date-only";
+import { getVoucherEffectiveStatus } from "@/lib/utils/date-only";
 import { fromCents } from "@/lib/utils/money";
 
 import type {
@@ -69,7 +69,12 @@ export interface StudentPlanListDTO {
   currency: "EUR";
   unitCreditPriceSnapshot: number | null;
   createdFrom: VoucherCreatedFrom;
-  temporalStatus: "upcoming" | "active" | "expired" | "exhausted" | "canceled";
+  temporalStatus:
+    | "upcoming"
+    | "active"
+    | "expired"
+    | "exhausted"
+    | "canceled";
   consumedCredits: number | null;
   remainingValue: number | null;
   consumedValue: number | null;
@@ -163,24 +168,15 @@ export function toStudentPlanListDTO(
       ? Math.max(0, creditsTotal - creditsRemaining)
       : null;
   const validUntil = toISOStringOrNull(plan.validUntil);
-  const now = new Date();
-  const fallbackStatus: PlanStatus =
-    creditsRemaining !== null && creditsRemaining <= 0
-      ? "exhausted"
-      : validUntil && isDateOnlyExpired(validUntil, now)
-        ? "expired"
-        : "active";
   const validFrom = toISOStringOrNull(plan.validFrom);
-  const temporalStatus =
-    (plan.status ?? fallbackStatus) === "canceled"
-      ? "canceled" as const
-      : creditsRemaining !== null && creditsRemaining <= 0
-        ? "exhausted" as const
-        : validFrom && new Date(validFrom).getTime() > now.getTime()
-          ? "upcoming" as const
-          : validUntil && isDateOnlyExpired(validUntil, now)
-            ? "expired" as const
-            : "active" as const;
+  const temporalStatus = getVoucherEffectiveStatus({
+    status: plan.status,
+    creditsRemaining,
+    validFrom,
+    validUntil,
+  });
+  const fallbackStatus: PlanStatus =
+    temporalStatus === "upcoming" ? "active" : temporalStatus;
 
   return {
     id,

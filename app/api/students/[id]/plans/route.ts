@@ -14,6 +14,11 @@ import { createStudentVoucherSchema } from "@/lib/validators/voucher";
 import { StudentProfile, type PlanDoc } from "@/models/StudentProfile";
 import { CourseProfile } from "@/models/CourseProfile";
 import { toCents } from "@/lib/utils/money";
+import { startOfUtcDay } from "@/lib/utils/date-only";
+import {
+  resolveManualVoucherDates,
+  VoucherDatePolicyError,
+} from "@/lib/utils/voucher-date-policy";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -43,7 +48,17 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       { status: 400 },
     );
   }
-  const parsed = createStudentVoucherSchema.safeParse(body);
+  const bodyWithValidityDefault =
+    body && typeof body === "object" && !Array.isArray(body)
+      ? {
+          ...(body as Record<string, unknown>),
+          validFrom:
+            Object.prototype.hasOwnProperty.call(body, "validFrom")
+              ? Reflect.get(body, "validFrom")
+              : startOfUtcDay(new Date()),
+        }
+      : body;
+  const parsed = createStudentVoucherSchema.safeParse(bodyWithValidityDefault);
 
   if (!parsed.success) {
     return NextResponse.json(
@@ -59,6 +74,20 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   }
 
   const payload = parsed.data;
+  let voucherDates;
+  try {
+    voucherDates = resolveManualVoucherDates({
+      validFrom: payload.validFrom,
+      validUntil: payload.validUntil,
+      billingPeriodStart: payload.billingPeriodStart,
+      billingPeriodEnd: payload.billingPeriodEnd,
+    });
+  } catch (error) {
+    if (error instanceof VoucherDatePolicyError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    throw error;
+  }
   const creditsTotal = payload.creditsTotal;
   const creditsRemaining = payload.creditsRemaining ?? creditsTotal;
 
@@ -114,8 +143,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     name: payload.name,
     billingType: payload.billingType,
     classType: payload.classType,
-    validFrom: payload.validFrom ?? new Date(),
-    validUntil: payload.validUntil,
+    validFrom: voucherDates.validFrom,
+    validUntil: voucherDates.validUntil,
     creditsTotal,
     creditsRemaining,
     status: payload.status,
@@ -128,8 +157,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     generatedFromCourse: payload.generatedFromCourse,
     generatedFromCourseMember: payload.generatedFromCourseMember,
     billingMode: payload.billingMode ?? undefined,
-    billingPeriodStart: payload.billingPeriodStart ?? undefined,
-    billingPeriodEnd: payload.billingPeriodEnd ?? undefined,
+    billingPeriodStart: voucherDates.billingPeriodStart ?? undefined,
+    billingPeriodEnd: voucherDates.billingPeriodEnd ?? undefined,
     billingAnchorDay: payload.billingAnchorDay ?? undefined,
     paymentStatus: "pending",
     amountPaid: 0,

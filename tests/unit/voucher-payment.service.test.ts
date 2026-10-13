@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildVoucherPaymentSummarySet,
   createVoucherPaymentService,
   type RegisterVoucherPaymentCommand,
   VoucherPaymentError,
@@ -95,6 +96,35 @@ test("a complete payment creates one movement and marks the voucher paid", async
   assert.deepEqual(repository.payments.map(({ amountCents }) => amountCents), [16000]);
   assert.deepEqual(repository.summary, { amountPaidCents: 16000, paymentStatus: "paid" });
   assert.equal(result.outstandingAmountCents, 0);
+});
+
+test("payment summary updates preserve all four voucher date fields", () => {
+  const set = buildVoucherPaymentSummarySet({
+    studentId: baseCommand.studentId,
+    voucherId: baseCommand.voucherId,
+    amountPaidCents: 8000,
+    paymentStatus: "partial",
+    paidAt: baseCommand.paidAt!,
+    paymentMethod: baseCommand.paymentMethod,
+    notes: baseCommand.notes!,
+  });
+
+  for (const field of [
+    "validFrom",
+    "validUntil",
+    "billingPeriodStart",
+    "billingPeriodEnd",
+  ]) {
+    assert.equal(Object.keys(set).some((key) => key.endsWith(`.${field}`)), false);
+  }
+  assert.deepEqual(Object.keys(set).sort(), [
+    "activePlans.$.amountPaid",
+    "activePlans.$.amountPaidCents",
+    "activePlans.$.paidAt",
+    "activePlans.$.paymentMethod",
+    "activePlans.$.paymentNotes",
+    "activePlans.$.paymentStatus",
+  ]);
 });
 
 test("a partial payment creates an individual movement and marks the voucher partial", async () => {

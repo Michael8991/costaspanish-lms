@@ -2,7 +2,10 @@
 
 import CustomModal from "@/components/ui/CustomModal";
 import { DBPlanDoc } from "@/lib/types/student";
-import { isDateOnlyExpired } from "@/lib/utils/date-only";
+import {
+  formatDateOnlyUtc,
+  getVoucherEffectiveStatus,
+} from "@/lib/utils/date-only";
 import { formatCurrencyEUR, formatFinanceDate } from "@/lib/utils/finance-format";
 import {
   getPaymentMethodLabel,
@@ -22,22 +25,18 @@ import { useRouter } from "next/navigation";
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import EditVoucherForm, { EditVoucherFormData } from "../forms/EditVoucherForm";
+import EditVoucherForm, { EditVoucherPatch } from "../forms/EditVoucherForm";
 import RemoveVoucherForm from "../forms/RemoveVoucherForm";
 import { FormattedPlan } from "./ActiveVouchersPanel";
 import VoucherPaymentEditor from "./VoucherPaymentEditor";
 
 function resolveVoucherStatus(plan: DBPlanDoc): string {
-  if (typeof plan.status === "string" && plan.status.trim()) {
-    return plan.status;
-  }
-  if ((plan.creditsRemaining ?? 0) <= 0) return "exhausted";
-  if (plan.validUntil) {
-    if (isDateOnlyExpired(plan.validUntil)) {
-      return "expired";
-    }
-  }
-  return "active";
+  return getVoucherEffectiveStatus({
+    status: plan.status,
+    creditsRemaining: plan.creditsRemaining,
+    validFrom: plan.validFrom,
+    validUntil: plan.validUntil,
+  });
 }
 
 function toDateOnly(value?: Date | null): string | null {
@@ -186,7 +185,7 @@ export default function VouchersTable({
 
   const handleEditVoucher = async (
     planId: string,
-    formData: EditVoucherFormData,
+    formData: EditVoucherPatch,
   ) => {
     setIsSubmittingEditVoucher(true);
     try {
@@ -324,10 +323,10 @@ export default function VouchersTable({
                         {voucher.remainingCredits} / {voucher.totalCredits}
                       </td>
                       <td className="px-5 py-4 text-gray-600">
-                        {formatFinanceDate(voucher.validFrom)}
+                        {formatDateOnlyUtc(voucher.validFrom)}
                       </td>
                       <td className="px-5 py-4 text-gray-600">
-                        {formatFinanceDate(voucher.validUntil)}
+                        {formatDateOnlyUtc(voucher.validUntil)}
                       </td>
                       <td className="px-5 py-4 text-gray-600">
                         <dl className="space-y-1 text-xs">

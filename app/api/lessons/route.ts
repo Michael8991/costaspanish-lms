@@ -452,6 +452,7 @@ export async function POST(req: NextRequest) {
           creditsRemaining: plan.creditsRemaining,
           creditsTotal: plan.creditsTotal,
           status: plan.status,
+           validFrom: plan.validFrom,
           validUntil: plan.validUntil,
         })),
       }),

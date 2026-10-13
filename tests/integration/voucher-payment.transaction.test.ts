@@ -74,6 +74,8 @@ test(
         creditsRemaining: 10,
         validFrom: new Date("2026-09-01T00:00:00.000Z"),
         validUntil: new Date("2026-12-31T00:00:00.000Z"),
+        billingPeriodStart: new Date("2026-09-01T00:00:00.000Z"),
+        billingPeriodEnd: new Date("2026-12-31T00:00:00.000Z"),
         status: "active",
         price: 160,
         priceTotal: 160,
@@ -100,6 +102,10 @@ test(
     let voucher = persisted?.activePlans.find((item) => item._id.equals(voucherId));
     assert.equal(voucher?.amountPaid, 80);
     assert.equal(voucher?.paymentStatus, "partial");
+    assert.equal(voucher?.validFrom.toISOString(), "2026-09-01T00:00:00.000Z");
+    assert.equal(voucher?.validUntil.toISOString(), "2026-12-31T00:00:00.000Z");
+    assert.equal(voucher?.billingPeriodStart?.toISOString(), "2026-09-01T00:00:00.000Z");
+    assert.equal(voucher?.billingPeriodEnd?.toISOString(), "2026-12-31T00:00:00.000Z");
 
     const failingService = createVoucherPaymentService(
       createMongooseVoucherPaymentRepository({
@@ -122,6 +128,10 @@ test(
     voucher = persisted?.activePlans.find((item) => item._id.equals(voucherId));
     assert.equal(voucher?.amountPaid, 80);
     assert.equal(voucher?.paymentStatus, "partial");
+    assert.equal(voucher?.validFrom.toISOString(), "2026-09-01T00:00:00.000Z");
+    assert.equal(voucher?.validUntil.toISOString(), "2026-12-31T00:00:00.000Z");
+    assert.equal(voucher?.billingPeriodStart?.toISOString(), "2026-09-01T00:00:00.000Z");
+    assert.equal(voucher?.billingPeriodEnd?.toISOString(), "2026-12-31T00:00:00.000Z");
   } finally {
 
     await PaymentLedgerEntry.deleteMany({

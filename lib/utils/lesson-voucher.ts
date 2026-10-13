@@ -1,9 +1,12 @@
+import { getVoucherEffectiveStatus } from "@/lib/utils/date-only";
+
 export type LessonVoucherPlanInput = {
   _id: string;
   classType?: string;
   status?: string;
   creditsRemaining?: number;
   creditsTotal?: number;
+  validFrom?: string | Date | null;
   validUntil?: string | Date | null;
 };
 
@@ -31,10 +34,9 @@ export function isPlanCompatible(
   now = new Date(),
 ) {
   return (
-    plan.status === "active" &&
+    getVoucherEffectiveStatus(plan, now) === "active" &&
     plan.classType === classType &&
-    (plan.creditsRemaining ?? 0) > 0 &&
-    (!plan.validUntil || !isDateOnlyExpired(plan.validUntil, now))
+    (plan.creditsRemaining ?? 0) > 0
   );
 }
 
@@ -102,4 +104,3 @@ export function formatAssignedVoucherLabel(plan: LessonPlanProgressInput) {
 
   return progressLabel.includes("/") ? `Clase ${progressLabel}` : progressLabel;
 }
-import { isDateOnlyExpired } from "@/lib/utils/date-only";

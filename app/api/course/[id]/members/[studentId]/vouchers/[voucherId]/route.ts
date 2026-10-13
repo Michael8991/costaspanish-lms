@@ -5,14 +5,23 @@ import { requireAuth, requireRole, type Role } from "@/lib/auth/apiAuth";
 import { getStudentOwnershipFilter } from "@/lib/auth/studentOwnership";
 import { toStudentPlanListDTO } from "@/lib/dto/student.dto";
 import dbConnect from "@/lib/mongo";
+import { buildCourseVoucherUpdateSet } from "@/lib/server/course-vouchers";
 import { normalizeCourseMembers } from "@/lib/utils/course-members";
+import { getVoucherEffectiveStatus } from "@/lib/utils/date-only";
+import {
+  resolveCourseVoucherDatePatch,
+  VoucherDatePolicyError,
+} from "@/lib/utils/voucher-date-policy";
 import { editCourseVoucherSchema } from "@/lib/validators/voucher";
+import {
+  assertNoOverlappingVoucherPeriod,
+  VoucherDomainError,
+} from "@/lib/services/voucher.service";
 import {
   CourseProfile,
   type ICourseProfile,
 } from "@/models/CourseProfile";
-import { StudentProfile } from "@/models/StudentProfile";
-import { toCents } from "@/lib/utils/money";
+import { StudentProfile, type PlanStatus } from "@/models/StudentProfile";
 
 type RouteContext = {
   params: Promise<{ id: string; studentId: string; voucherId: string }>;
@@ -61,11 +70,12 @@ async function getVoucherContext(
   if (!studentFilter) {
     return { error: "Invalid user id", status: 500 } as const;
   }
-  const student = await StudentProfile.findOne(
-    studentFilter,
-    { activePlans: { $elemMatch: { _id: voucherId } } },
-  ).lean();
-  const voucher = student?.activePlans?.[0];
+  const student = await StudentProfile.findOne(studentFilter)
+    .select("activePlans")
+    .lean();
+  const voucher = student?.activePlans?.find(
+    (candidate) => candidate._id.toString() === voucherId.toString(),
+  );
   if (!voucher) {
     return { error: "Voucher not found", status: 404 } as const;
   }
@@ -88,7 +98,7 @@ async function getVoucherContext(
     } as const;
   }
 
-  return { course, member, voucher } as const;
+  return { course, member, student, voucher } as const;
 }
 
 async function authorize(request: NextRequest) {
@@ -184,54 +194,67 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     const payload = parsed.data;
-    const finalPeriodStart =
-      payload.billingPeriodStart === undefined
-        ? result.voucher.billingPeriodStart
-        : payload.billingPeriodStart;
-    const finalPeriodEnd =
-      payload.billingPeriodEnd === undefined
-        ? result.voucher.billingPeriodEnd
-        : payload.billingPeriodEnd;
-    if (
-      finalPeriodStart &&
-      finalPeriodEnd &&
-      finalPeriodEnd < finalPeriodStart
-    ) {
-      return NextResponse.json(
-        { error: "La fecha final no puede ser anterior a la inicial." },
-        { status: 400 },
-      );
-    }
-
-    const set: Record<string, unknown> = {};
-    const allowedFields = [
-      "billingPeriodStart",
-      "billingPeriodEnd",
-      "internalNotes",
-    ] as const;
-    for (const field of allowedFields) {
-      if (payload[field] !== undefined) {
-        set[`activePlans.$.${field}`] = payload[field];
+    let dateResolution;
+    try {
+      dateResolution = resolveCourseVoucherDatePatch({
+        current: {
+          validFrom: result.voucher.validFrom,
+          validUntil: result.voucher.validUntil,
+          billingPeriodStart: result.voucher.billingPeriodStart,
+          billingPeriodEnd: result.voucher.billingPeriodEnd,
+        },
+        patch: {
+          billingPeriodStart: payload.billingPeriodStart,
+          billingPeriodEnd: payload.billingPeriodEnd,
+        },
+      });
+    } catch (error) {
+      if (error instanceof VoucherDatePolicyError) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
       }
-    }
-    // For course vouchers these pairs describe the same calendar interval.
-    // Keeping only billingPeriod* in sync made the UI show an edited period
-    // while lesson settlement continued to evaluate the stale validFrom/Until.
-    if (payload.billingPeriodStart !== undefined) {
-      set["activePlans.$.validFrom"] = payload.billingPeriodStart;
-    }
-    if (payload.billingPeriodEnd !== undefined) {
-      set["activePlans.$.validUntil"] = payload.billingPeriodEnd;
+      throw error;
     }
 
-    if (payload.priceTotal !== undefined) {
-      set["activePlans.$.price"] = payload.priceTotal;
-      set["activePlans.$.priceTotal"] = payload.priceTotal;
-      set["activePlans.$.priceTotalCents"] = toCents(payload.priceTotal);
-      set["activePlans.$.unitCreditPriceSnapshot"] =
-        result.voucher.creditsTotal && result.voucher.creditsTotal > 0
-          ? payload.priceTotal / result.voucher.creditsTotal
-          : null;
+    const set = buildCourseVoucherUpdateSet({
+      internalNotes: payload.internalNotes,
+      priceTotal: payload.priceTotal,
+      creditsTotal: result.voucher.creditsTotal,
+      datePatch: dateResolution.patch,
+    });
+    if (dateResolution.validityChanged) {
+      const effectiveStatus = getVoucherEffectiveStatus({
+        status: result.voucher.status,
+        creditsRemaining: result.voucher.creditsRemaining,
+        validFrom: dateResolution.state.validFrom,
+        validUntil: dateResolution.state.validUntil,
+      });
+      const persistedStatus: PlanStatus =
+        effectiveStatus === "upcoming" ? "active" : effectiveStatus;
+      set["activePlans.$.status"] = persistedStatus;
+
+      if (
+        result.voucher.enrollmentId &&
+        persistedStatus !== "canceled"
+      ) {
+        try {
+          assertNoOverlappingVoucherPeriod({
+            vouchers: result.student?.activePlans ?? [],
+            enrollmentId: result.voucher.enrollmentId.toString(),
+            classType: result.voucher.classType,
+            validFrom: dateResolution.state.validFrom,
+            validUntil: dateResolution.state.validUntil,
+            excludeVoucherId: voucherId,
+          });
+        } catch (error) {
+          if (error instanceof VoucherDomainError) {
+            return NextResponse.json(
+              { error: error.message },
+              { status: error.status },
+            );
+          }
+          throw error;
+        }
+      }
     }
 
     if (Object.keys(set).length === 0) {
@@ -241,9 +264,29 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       );
     }
 
+    const overlapGuard =
+      dateResolution.validityChanged &&
+      result.voucher.enrollmentId &&
+      result.voucher.status !== "canceled"
+        ? {
+            activePlans: {
+              $not: {
+                $elemMatch: {
+                  _id: { $ne: voucherObjectId },
+                  enrollmentId: result.voucher.enrollmentId,
+                  classType: result.voucher.classType,
+                  status: { $ne: "canceled" },
+                  validFrom: { $lte: dateResolution.state.validUntil },
+                  validUntil: { $gte: dateResolution.state.validFrom },
+                },
+              },
+            },
+          }
+        : {};
     const updateFilter = getStudentOwnershipFilter(user, {
       _id: studentObjectId,
       "activePlans._id": voucherObjectId,
+      ...overlapGuard,
     });
     if (!updateFilter) {
       return NextResponse.json({ error: "Invalid user id" }, { status: 500 });
@@ -258,8 +301,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     );
     if (!updated || !updatedVoucher) {
       return NextResponse.json(
-        { error: "Voucher not found after update" },
-        { status: 404 },
+        {
+          error: dateResolution.validityChanged
+            ? "Ya existe un bono del mismo tipo con un periodo solapado."
+            : "Voucher not found after update",
+        },
+        { status: dateResolution.validityChanged ? 409 : 404 },
       );
     }
 

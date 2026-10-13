@@ -23,7 +23,7 @@ const ClassTypes = [
 interface EditVoucherFormProps {
   student: string;
   plan: FormattedPlan;
-  onSubmitForm: (planId: string, data: EditVoucherFormData) => void;
+  onSubmitForm: (planId: string, data: EditVoucherPatch) => void;
   isSubmitting: boolean;
   onClose: () => void;
   enrollments?: VoucherEnrollmentOption[];
@@ -42,15 +42,10 @@ export interface EditVoucherFormData {
   enrollmentId?: string;
 }
 
-export default function EditVoucherForm({
-  student,
-  plan,
-  onSubmitForm,
-  isSubmitting,
-  onClose,
-  enrollments = [],
-}: EditVoucherFormProps) {
-  const [formData, setFormData] = useState<EditVoucherFormData>({
+export type EditVoucherPatch = Partial<EditVoucherFormData>;
+
+function initialFormData(plan: FormattedPlan): EditVoucherFormData {
+  return {
     name: plan.name,
     billingType: plan.billingType as DBPlanBillingType,
     classType: plan.classType as DBClassType,
@@ -61,7 +56,20 @@ export default function EditVoucherForm({
     price: plan.price,
     status: plan.status as DBPlanStatus,
     enrollmentId: plan.enrollmentId ?? "",
-  });
+  };
+}
+
+export default function EditVoucherForm({
+  student,
+  plan,
+  onSubmitForm,
+  isSubmitting,
+  onClose,
+  enrollments = [],
+}: EditVoucherFormProps) {
+  const [formData, setFormData] = useState<EditVoucherFormData>(() =>
+    initialFormData(plan),
+  );
 
   const [formError, setFormError] = useState<string>("");
 
@@ -82,12 +90,28 @@ export default function EditVoucherForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (new Date(formData.validUntil) < new Date(formData.validFrom)) {
+    const original = initialFormData(plan);
+    const patch: EditVoucherPatch = {};
+    for (const key of Object.keys(formData) as Array<keyof EditVoucherFormData>) {
+      if (formData[key] !== original[key]) {
+        Object.assign(patch, { [key]: formData[key] });
+      }
+    }
+
+    const changesValidity =
+      patch.validFrom !== undefined || patch.validUntil !== undefined;
+    if (
+      changesValidity &&
+      new Date(formData.validUntil) < new Date(formData.validFrom)
+    ) {
       return setFormError(
         "La fecha de caducidad no puede ser anterior a la fecha de creación.",
       );
     }
-    onSubmitForm(plan.id, formData);
+    if (Object.keys(patch).length === 0) {
+      return setFormError("No hay cambios para guardar.");
+    }
+    onSubmitForm(plan.id, patch);
   };
 
   const inputClass =
