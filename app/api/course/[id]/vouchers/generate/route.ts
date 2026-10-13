@@ -198,8 +198,8 @@ export async function POST(
                 $not: {
                   $elemMatch: {
                     courseId,
-                    billingPeriodStart: plan.billingPeriodStart,
-                    billingPeriodEnd: plan.billingPeriodEnd,
+                    validFrom: { $lte: plan.validUntil },
+                    validUntil: { $gte: plan.validFrom },
                     status: { $ne: "canceled" },
                   },
                 },

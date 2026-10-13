@@ -17,13 +17,16 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { isDateOnlyExpired } from "@/lib/utils/date-only";
+import {
+  formatDateOnlyUtc,
+  getVoucherEffectiveStatus,
+} from "@/lib/utils/date-only";
 import type { VoucherEnrollmentOption } from "../forms/NewVoucherForm";
 import { NewVoucherFormData } from "../forms";
 import { toast } from "sonner";
 import CustomModal from "@/components/ui/CustomModal";
 import NewVoucherForm from "../forms/NewVoucherForm";
-import EditVoucherForm, { EditVoucherFormData } from "../forms/EditVoucherForm";
+import EditVoucherForm, { EditVoucherPatch } from "../forms/EditVoucherForm";
 import RemoveVoucherForm from "../forms/RemoveVoucherForm";
 
 export interface FormattedPlan {
@@ -112,7 +115,7 @@ export default function ActiveVouchersPanel({
 
   const handleEditVoucher = async (
     planId: string,
-    formData: EditVoucherFormData,
+    formData: EditVoucherPatch,
   ) => {
     setIsSubmittingEditVoucher(true);
     try {
@@ -175,7 +178,12 @@ export default function ActiveVouchersPanel({
     }
   };
   const activeVouchersCount = activePlans.filter(
-    (plan) => plan.status === "active",
+    (plan) => getVoucherEffectiveStatus({
+      status: plan.status,
+      creditsRemaining: plan.remainingCredits,
+      validFrom: plan.validFrom,
+      validUntil: plan.validUntil,
+    }) === "active",
   ).length;
 
   return (
@@ -202,16 +210,22 @@ export default function ActiveVouchersPanel({
         {/* Lista de Planes */}
         <div className="p-5 flex flex-col gap-4">
           {activePlans
-            .filter((plan) => plan.status === "active")
+            .filter((plan) => {
+              const status = getVoucherEffectiveStatus({
+                status: plan.status,
+                creditsRemaining: plan.remainingCredits,
+                validFrom: plan.validFrom,
+                validUntil: plan.validUntil,
+              });
+              return status === "active" || status === "upcoming";
+            })
             .map((plan) => {
-              const temporalStatus =
-                plan.remainingCredits <= 0
-                  ? "exhausted"
-                  : new Date(plan.validFrom).getTime() > Date.now()
-                    ? "upcoming"
-                    : isDateOnlyExpired(plan.validUntil)
-                      ? "expired"
-                      : plan.status;
+              const temporalStatus = getVoucherEffectiveStatus({
+                status: plan.status,
+                creditsRemaining: plan.remainingCredits,
+                validFrom: plan.validFrom,
+                validUntil: plan.validUntil,
+              });
               const percentage =
                 (plan.remainingCredits / plan.totalCredits) * 100;
               const isLow =
@@ -240,11 +254,11 @@ export default function ActiveVouchersPanel({
                         <Calendar size={12} />
                         <span>
                           Expires:{" "}
-                          {new Date(plan.validUntil).toLocaleDateString()}
+                          {formatDateOnlyUtc(plan.validUntil)}
                         </span>
                       </div>
                       <p className="mt-1 text-xs text-gray-600">
-                        {plan.courseNameSnapshot || "Sin curso asignado"} · {new Date(plan.validFrom).toLocaleDateString("es-ES", { month: "long", year: "numeric" })}
+                        {plan.courseNameSnapshot || "Sin curso asignado"} · {formatDateOnlyUtc(plan.validFrom, "es-ES", { month: "long", year: "numeric" })}
                       </p>
                     </div>
 

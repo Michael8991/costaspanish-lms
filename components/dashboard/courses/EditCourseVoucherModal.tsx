@@ -90,17 +90,35 @@ export default function EditCourseVoucherModal({
     try {
       setIsSaving(true);
       setError(null);
+      const payload: Record<string, string | number | null> = {};
+      const originalPeriodStart = dateOnly(voucher.billingPeriodStart);
+      const originalPeriodEnd = dateOnly(voucher.billingPeriodEnd);
+      if (
+        periodStart !== originalPeriodStart ||
+        periodEnd !== originalPeriodEnd
+      ) {
+        payload.billingPeriodStart = periodStart || null;
+        payload.billingPeriodEnd = periodEnd || null;
+      }
+      if (priceTotal !== "") {
+        const parsedPrice = Number(priceTotal);
+        if (parsedPrice !== voucher.priceTotal) {
+          payload.priceTotal = parsedPrice;
+        }
+      }
+      if (internalNotes !== voucher.internalNotes) {
+        payload.internalNotes = internalNotes;
+      }
+      if (Object.keys(payload).length === 0) {
+        onClose();
+        return;
+      }
       const response = await fetch(
         `/api/course/${course.id}/members/${member.studentId}/vouchers/${member.billing.lastVoucherId}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            billingPeriodStart: periodStart || null,
-            billingPeriodEnd: periodEnd || null,
-            priceTotal: priceTotal === "" ? undefined : Number(priceTotal),
-            internalNotes,
-          }),
+          body: JSON.stringify(payload),
         },
       );
       const data = (await response.json().catch(() => null)) as {
@@ -148,13 +166,16 @@ export default function EditCourseVoucherModal({
           <div className="max-h-[68vh] space-y-4 overflow-y-auto rounded-2xl bg-white p-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm font-medium text-slate-700">
-                Periodo inicio
+                Inicio del periodo de facturación
                 <input type="date" value={periodStart} onChange={(event) => setPeriodStart(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" />
               </label>
               <label className="text-sm font-medium text-slate-700">
-                Periodo fin
+                Fin del periodo de facturación
                 <input type="date" value={periodEnd} onChange={(event) => setPeriodEnd(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" />
               </label>
+              <p className="text-xs text-slate-500 sm:col-span-2">
+                Estas fechas corresponden al ciclo de facturación y no modifican la vigencia operativa del bono.
+              </p>
               <label className="text-sm font-medium text-slate-700">
                 Créditos totales
                 <input readOnly value={voucher.creditsTotal} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 py-2" />

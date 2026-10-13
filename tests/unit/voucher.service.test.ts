@@ -3,10 +3,16 @@ import test from "node:test";
 import { Types } from "mongoose";
 
 import {
+  assertNoOverlappingVoucherPeriod,
   resolveVoucherForLesson,
   resolveVoucherForLessonResult,
   VoucherDomainError,
 } from "../../lib/services/voucher.service";
+import {
+  buildCourseVoucherUpdateSet,
+  hasOverlappingCourseVoucher,
+} from "../../lib/server/course-vouchers";
+import type { PlanDoc } from "../../models/StudentProfile";
 import {
   calculateCourseVoucherPeriod,
   calculateIndividualBillingPeriod,
@@ -59,6 +65,104 @@ test("overlapping usable vouchers fail instead of selecting arbitrarily", () => 
     () => resolve([voucher(10), voucher(10)], new Date("2026-10-03T10:00:00Z")),
     VoucherDomainError,
   );
+});
+
+test("editing a voucher rejects inclusive overlap while excluding itself", () => {
+  const edited = voucher(9, 2);
+  const october = voucher(10, 2);
+
+  assert.throws(
+    () => assertNoOverlappingVoucherPeriod({
+      vouchers: [edited, october],
+      enrollmentId: studentEnrollment.toString(),
+      classType: "group_regular",
+      validFrom: new Date("2026-09-30T00:00:00.000Z"),
+      validUntil: new Date("2026-10-03T00:00:00.000Z"),
+      excludeVoucherId: edited._id.toString(),
+    }),
+    VoucherDomainError,
+  );
+});
+
+test("course generation overlap uses validity despite divergent legacy billing dates", () => {
+  const existing = {
+    ...voucher(10, 2),
+    billingPeriodStart: new Date("2027-01-01T00:00:00.000Z"),
+    billingPeriodEnd: new Date("2027-01-31T00:00:00.000Z"),
+  } as PlanDoc;
+
+  assert.equal(
+    hasOverlappingCourseVoucher(
+      [existing],
+      courseId.toString(),
+      new Date("2026-10-20T00:00:00.000Z"),
+      new Date("2026-11-19T00:00:00.000Z"),
+    ),
+    true,
+  );
+  assert.equal(
+    hasOverlappingCourseVoucher(
+      [existing],
+      courseId.toString(),
+      new Date("2027-01-20T00:00:00.000Z"),
+      new Date("2027-02-19T00:00:00.000Z"),
+    ),
+    false,
+  );
+});
+
+test("course generation does not invent overlap when a validity endpoint is missing", () => {
+  const existing = {
+    ...voucher(10, 2),
+    validUntil: undefined,
+    billingPeriodStart: new Date("2026-10-01T00:00:00.000Z"),
+    billingPeriodEnd: new Date("2026-10-31T00:00:00.000Z"),
+  } as unknown as PlanDoc;
+
+  assert.equal(
+    hasOverlappingCourseVoucher(
+      [existing],
+      courseId.toString(),
+      new Date("2026-10-20T00:00:00.000Z"),
+      new Date("2026-11-19T00:00:00.000Z"),
+    ),
+    false,
+  );
+});
+
+test("course voucher price and notes writers omit all temporal fields", () => {
+  const forbiddenFields = [
+    "activePlans.$.validFrom",
+    "activePlans.$.validUntil",
+    "activePlans.$.billingPeriodStart",
+    "activePlans.$.billingPeriodEnd",
+  ];
+  const updates = [
+    buildCourseVoucherUpdateSet({
+      priceTotal: 125,
+      creditsTotal: 5,
+      datePatch: {},
+    }),
+    buildCourseVoucherUpdateSet({
+      internalNotes: "Updated note",
+      datePatch: {},
+    }),
+  ];
+
+  assert.deepEqual(updates[0], {
+    "activePlans.$.price": 125,
+    "activePlans.$.priceTotal": 125,
+    "activePlans.$.priceTotalCents": 12_500,
+    "activePlans.$.unitCreditPriceSnapshot": 25,
+  });
+  assert.deepEqual(updates[1], {
+    "activePlans.$.internalNotes": "Updated note",
+  });
+  for (const update of updates) {
+    for (const field of forbiddenFields) {
+      assert.equal(Object.hasOwn(update, field), false);
+    }
+  }
 });
 
 test("reserved credits prevent two consumers from spending the last credit", () => {

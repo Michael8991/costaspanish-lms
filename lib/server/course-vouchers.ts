@@ -15,7 +15,10 @@ import {
   calculateCourseVoucherPeriod,
   isPrivateManualVoucherCourse,
 } from "@/lib/utils/course-voucher-billing";
+import type { VoucherDatePatch } from "@/lib/utils/voucher-date-policy";
+import { toCents } from "@/lib/utils/money";
 import type { CourseVoucherRequestInput } from "@/lib/validators/course-voucher";
+import { voucherPeriodsOverlap } from "@/lib/utils/voucher-period";
 import {
   CourseProfile,
   type CourseProfileDocument,
@@ -71,29 +74,53 @@ function parseDateOnly(value?: string) {
   return value ? new Date(`${value}T00:00:00.000Z`) : null;
 }
 
-function isSameUtcDay(first?: Date | null, second?: Date | null) {
-  return (
-    Boolean(first) &&
-    Boolean(second) &&
-    first?.getUTCFullYear() === second?.getUTCFullYear() &&
-    first?.getUTCMonth() === second?.getUTCMonth() &&
-    first?.getUTCDate() === second?.getUTCDate()
-  );
+export function buildCourseVoucherUpdateSet(args: {
+  internalNotes?: string;
+  priceTotal?: number;
+  creditsTotal?: number | null;
+  datePatch: VoucherDatePatch;
+}): Record<string, unknown> {
+  const set: Record<string, unknown> = {};
+
+  if (args.internalNotes !== undefined) {
+    set["activePlans.$.internalNotes"] = args.internalNotes;
+  }
+  for (const [field, value] of Object.entries(args.datePatch)) {
+    set[`activePlans.$.${field}`] = value;
+  }
+  if (args.priceTotal !== undefined) {
+    set["activePlans.$.price"] = args.priceTotal;
+    set["activePlans.$.priceTotal"] = args.priceTotal;
+    set["activePlans.$.priceTotalCents"] = toCents(args.priceTotal);
+    set["activePlans.$.unitCreditPriceSnapshot"] =
+      args.creditsTotal && args.creditsTotal > 0
+        ? args.priceTotal / args.creditsTotal
+        : null;
+  }
+
+  return set;
 }
 
-function hasDuplicateVoucher(
+export function hasOverlappingCourseVoucher(
   plans: PlanDoc[],
   courseId: string,
   periodStart: Date,
   periodEnd: Date,
 ) {
-  return plans.some(
-    (plan) =>
+  return plans.some((plan) => {
+    if (!plan.validFrom || !plan.validUntil) return false;
+
+    return (
       plan.status !== "canceled" &&
       plan.courseId?.toString() === courseId &&
-      isSameUtcDay(plan.billingPeriodStart, periodStart) &&
-      isSameUtcDay(plan.billingPeriodEnd, periodEnd),
-  );
+      voucherPeriodsOverlap({
+        firstStart: plan.validFrom,
+        firstEnd: plan.validUntil,
+        secondStart: periodStart,
+        secondEnd: periodEnd,
+      })
+    );
+  });
 }
 
 function hasOwnValue(record: Record<string, unknown>, key: string) {
@@ -266,7 +293,7 @@ export async function buildCourseVoucherContext({
         warnings.add("no_preferred_weekdays_manual_credits_required");
       }
       if (
-        hasDuplicateVoucher(
+        hasOverlappingCourseVoucher(
           student.activePlans ?? [],
           courseIdString,
           period.periodStart,

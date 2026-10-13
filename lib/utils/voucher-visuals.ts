@@ -3,6 +3,7 @@ import type { VoucherPaymentMethod } from "@/models/StudentProfile";
 export function getVoucherStatusLabel(status?: string | null): string {
   const labels: Record<string, string> = {
     active: "Activo",
+    upcoming: "Próximo",
     exhausted: "Agotado",
     expired: "Caducado",
     canceled: "Cancelado",
@@ -17,6 +18,7 @@ export function getVoucherStatusLabel(status?: string | null): string {
 export function getVoucherStatusClassName(status?: string | null): string {
   const classes: Record<string, string> = {
     active: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    upcoming: "border-blue-200 bg-blue-50 text-blue-700",
     exhausted: "border-slate-200 bg-slate-100 text-slate-600",
     expired: "border-amber-200 bg-amber-50 text-amber-700",
     canceled: "border-red-200 bg-red-50 text-red-700",

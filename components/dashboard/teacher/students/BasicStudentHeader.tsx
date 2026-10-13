@@ -3,6 +3,7 @@
 import Breadcrumbs from "@/components/ui/Breadcrumbs";
 import CustomModal from "@/components/ui/CustomModal";
 import { DBPlanDoc } from "@/lib/types/student";
+import { getVoucherEffectiveStatus } from "@/lib/utils/date-only";
 import {
   AlertCircle,
   Archive,
@@ -49,7 +50,9 @@ export default function BasicStudentHeader({
   const router = useRouter();
 
   const hasActiveCredits = student.activePlans.some(
-    (plan) => plan.creditsRemaining! > 0 && plan.status === "active",
+    (plan) =>
+      plan.creditsRemaining! > 0 &&
+      getVoucherEffectiveStatus(plan) === "active",
   );
 
   const breadcrumbItems = [
@@ -121,7 +124,7 @@ export default function BasicStudentHeader({
     }
   };
   const activeVouchersCount = student.activePlans.filter(
-    (plan) => plan.status === "active",
+    (plan) => getVoucherEffectiveStatus(plan) === "active",
   ).length;
   return (
     <div className="container mx-auto py-8 px-4 md:px-8 text-gray-800 max-w-6xl">
