@@ -6,9 +6,6 @@ const isStaging = process.env.APP_ENV === "staging";
 export const metadata: Metadata = {
   title: "CostaSpanish - Aula Virtual",
   description: "Aprende español con expertos",
-  icons: {
-    icon: "/assets/LogoCostaSpanishRojoCoralFuerte.png",
-  },
   robots: isStaging
     ? {
         index: false,
