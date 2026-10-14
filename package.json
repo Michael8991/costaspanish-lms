@@ -10,7 +10,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
-    "test": "tsx --test tests/unit/course-enrollment.service.test.ts && tsx --test tests/unit/voucher.service.test.ts && tsx --test tests/unit/voucher-payment.service.test.ts && tsx --test tests/unit/voucher-dates.test.ts",
+    "test": "tsx --test tests/unit/course-enrollment.service.test.ts && tsx --test tests/unit/course-creation.service.test.ts && tsx --test tests/unit/course-voucher-generation.service.test.ts && tsx --test tests/unit/voucher.service.test.ts && tsx --test tests/unit/voucher-payment.service.test.ts && tsx --test tests/unit/voucher-dates.test.ts",
     "test:integration:payments": "tsx --test tests/integration/voucher-payment.transaction.test.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
@@ -25,7 +25,8 @@
     "fix:staging:resource-indexes": "dotenv -e .env.staging.local -- tsx scripts/staging/fix-resource-indexes.ts",
     "verify:staging:resource-create": "dotenv -e .env.staging.local -- tsx scripts/staging/verify-resource-create.ts",
     "verify:staging:login": "dotenv -e .env.staging.local -- tsx scripts/staging/verify-demo-login.ts",
-    "reset:staging": "dotenv -e .env.staging.local -- tsx scripts/staging/reset-staging.ts"
+    "reset:staging": "dotenv -e .env.staging.local -- tsx scripts/staging/reset-staging.ts",
+    "cleanup:prod:michael": "node --env-file=.env.production.migration.local scripts/production/cleanup-michael-test-data.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

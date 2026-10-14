@@ -38,7 +38,7 @@ export interface NewVoucherFormData {
   validUntil: string;
   status: DBPlanStatus;
   price: number;
-  enrollmentId?: string;
+  enrollmentId: string;
 }
 
 export type VoucherEnrollmentOption = { id: string; courseName: string };
@@ -53,6 +53,8 @@ interface NewVoucherProps {
   initialClassType?: DBClassType;
   submitError?: string;
   enrollments?: VoucherEnrollmentOption[];
+  initialEnrollmentId?: string;
+  enrollmentRequiredMessage?: string;
 }
 
 export default function NewVoucherForm({
@@ -65,6 +67,9 @@ export default function NewVoucherForm({
   initialClassType,
   submitError,
   enrollments = [],
+  initialEnrollmentId = "",
+  enrollmentRequiredMessage =
+    "El alumno debe estar matriculado en un curso antes de crear un bono.",
 }: NewVoucherProps) {
   const isQuick = variant === "quick";
   const [formData, setFormData] = useState<NewVoucherFormData>({
@@ -77,7 +82,7 @@ export default function NewVoucherForm({
     validUntil: "",
     status: "active",
     price: 0,
-    enrollmentId: "",
+    enrollmentId: initialEnrollmentId,
   });
   const [formError, setFormError] = useState("");
 
@@ -116,6 +121,9 @@ export default function NewVoucherForm({
         }
       : formData;
 
+    if (!submissionData.enrollmentId) {
+      return setFormError(enrollmentRequiredMessage);
+    }
     if (!submissionData.name.trim()) {
       return setFormError("Introduce un nombre para el bono.");
     }
@@ -177,11 +185,17 @@ export default function NewVoucherForm({
         </div>
       )}
 
+      {enrollments.length === 0 && (
+        <div className="rounded-md border border-amber-400/50 bg-amber-400/10 px-3 py-2 text-sm text-amber-100">
+          {enrollmentRequiredMessage}
+        </div>
+      )}
+
       {!isQuick && (
         <div className="flex flex-col">
           <label htmlFor="enrollmentId" className={labelClass}>Curso</label>
           <select id="enrollmentId" name="enrollmentId" value={formData.enrollmentId} onChange={handleChange} className={inputClass}>
-            <option value="" className="bg-gray-800">Sin asignar (bono histórico/general)</option>
+            <option value="" disabled className="bg-gray-800">Selecciona una matrícula activa</option>
             {enrollments.map((enrollment) => (
               <option key={enrollment.id} value={enrollment.id} className="bg-gray-800">{enrollment.courseName}</option>
             ))}
@@ -378,9 +392,9 @@ export default function NewVoucherForm({
         <button
           type={isQuick ? "button" : "submit"}
           onClick={isQuick ? submitVoucher : undefined}
-          disabled={isSubmitting}
+          disabled={isSubmitting || enrollments.length === 0 || !formData.enrollmentId}
           className={`rounded-md px-4 py-2 text-sm text-white transition-colors ${
-            isSubmitting
+            isSubmitting || enrollments.length === 0 || !formData.enrollmentId
               ? "cursor-not-allowed bg-red-400"
               : "cursor-pointer bg-red-500 hover:bg-red-400"
           }`}

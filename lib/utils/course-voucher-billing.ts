@@ -1,4 +1,6 @@
 import type { CourseOperationalPolicies } from "@/lib/types/course-policies";
+import { Types } from "mongoose";
+import type { ICourseMember } from "@/models/CourseProfile";
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
@@ -178,6 +180,68 @@ export function resolveNextBillingDateAfterVoucherGeneration({
     return startOfUtcDay(generatedNextBillingDate);
   }
   return currentNextBillingDate ? startOfUtcDay(currentNextBillingDate) : null;
+}
+
+export type GeneratedMemberBillingUpdate = {
+  studentId: string;
+  voucherId: string;
+  periodStart: string;
+  nextBillingDate?: string | null;
+  advancesNextBillingDate: boolean;
+  billingAnchorDay: number;
+};
+
+export function buildCourseMemberBillingBulkOperations(args: {
+  courseId: Types.ObjectId;
+  members: ICourseMember[];
+  generatedItems: GeneratedMemberBillingUpdate[];
+}) {
+  const memberByStudentId = new Map(
+    args.members.map((member) => [member.studentId.toString(), member]),
+  );
+
+  return args.generatedItems.map((generated) => {
+    const member = memberByStudentId.get(generated.studentId);
+    if (!member) {
+      throw new Error(
+        `Course member ${generated.studentId} is missing from the billing projection`,
+      );
+    }
+
+    const currentNextBillingDate = member.billing.nextBillingDate
+      ? new Date(member.billing.nextBillingDate)
+      : null;
+    const nextBillingDate = resolveNextBillingDateAfterVoucherGeneration({
+      currentNextBillingDate,
+      generatedNextBillingDate: generated.nextBillingDate
+        ? new Date(generated.nextBillingDate)
+        : null,
+      advancesNextBillingDate: generated.advancesNextBillingDate,
+    });
+    const voucherId = new Types.ObjectId(generated.voucherId);
+
+    return {
+      updateOne: {
+        filter: {
+          _id: args.courseId,
+          "members.studentId": new Types.ObjectId(generated.studentId),
+        },
+        update: {
+          $set: {
+            "members.$.billing.mode": "individual_cycle" as const,
+            "members.$.billing.billingAnchorDay":
+              member.billing.billingAnchorDay ?? generated.billingAnchorDay,
+            "members.$.billing.billingStartedAt":
+              member.billing.billingStartedAt ?? new Date(generated.periodStart),
+            "members.$.billing.nextBillingDate": nextBillingDate,
+            "members.$.billing.firstVoucherId":
+              member.billing.firstVoucherId ?? voucherId,
+            "members.$.billing.lastVoucherId": voucherId,
+          },
+        },
+      },
+    };
+  });
 }
 
 export function getCourseVoucherPlanDates({

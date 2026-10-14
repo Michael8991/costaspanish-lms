@@ -16,6 +16,10 @@ import {
   deriveStudentIdsFromMembers,
   normalizeCourseMembers,
 } from "@/lib/utils/course-members";
+import {
+  CourseCreationError,
+  createCourseFromTemplateAtomic,
+} from "@/lib/services/course-creation.service";
 
 export const runtime = "nodejs";
 
@@ -122,7 +126,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Invalid user id" }, { status: 500 });
     }
     const students = await StudentProfile.find(studentFilter)
-      .select("_id")
+      .select("_id isActive")
       .lean();
 
     if (students.length !== studentObjectIds.length) {
@@ -137,7 +141,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
       templateDTO.operationalDefaults,
     );
     const courseId = new Types.ObjectId();
-    const course = await CourseProfile.create({
+    const enrolledAt = parsed.data.startDate
+      ? new Date(parsed.data.startDate)
+      : new Date();
+    const courseData = {
       _id: courseId,
       ownerTeacherId: teacherObjectId,
       teacherId: teacherObjectId,
@@ -173,37 +180,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
         enrollmentOpen: false,
       },
       stats: {
-        activeEnrollmentCount: members.filter(
-          (member) => member.status === "active",
-        ).length,
+        activeEnrollmentCount: 0,
         lessonCount: 0,
       },
       name: parsed.data.name,
       classType: parsed.data.classType,
-      studentIds: studentObjectIds,
-      members: members.map((member) => ({
-        studentId: new Types.ObjectId(member.studentId),
-        status: member.status,
-        joinedAt: new Date(member.joinedAt),
-        leftAt: member.leftAt ? new Date(member.leftAt) : null,
-        billing: {
-          mode: member.billing.mode,
-          billingAnchorDay: member.billing.billingAnchorDay ?? undefined,
-          billingStartedAt: member.billing.billingStartedAt
-            ? new Date(member.billing.billingStartedAt)
-            : null,
-          nextBillingDate: member.billing.nextBillingDate
-            ? new Date(member.billing.nextBillingDate)
-            : null,
-          firstVoucherId: member.billing.firstVoucherId
-            ? new Types.ObjectId(member.billing.firstVoucherId)
-            : null,
-          lastVoucherId: member.billing.lastVoucherId
-            ? new Types.ObjectId(member.billing.lastVoucherId)
-            : null,
-          notes: member.billing.notes,
-        },
-      })),
+      studentIds: [],
+      members: [],
       startDate: parsed.data.startDate
         ? new Date(parsed.data.startDate)
         : undefined,
@@ -227,7 +210,40 @@ export async function POST(request: NextRequest, context: RouteContext) {
         curriculumStats: templateDTO.stats,
       },
       policies,
+    };
+
+    await createCourseFromTemplateAtomic({
+      course: courseData,
+      members: members.map((member) => ({
+        studentId: new Types.ObjectId(member.studentId),
+        billing: {
+          mode: member.billing.mode,
+          billingAnchorDay: member.billing.billingAnchorDay ?? undefined,
+          billingStartedAt: member.billing.billingStartedAt
+            ? new Date(member.billing.billingStartedAt)
+            : null,
+          nextBillingDate: member.billing.nextBillingDate
+            ? new Date(member.billing.nextBillingDate)
+            : null,
+          firstVoucherId: member.billing.firstVoucherId
+            ? new Types.ObjectId(member.billing.firstVoucherId)
+            : null,
+          lastVoucherId: member.billing.lastVoucherId
+            ? new Types.ObjectId(member.billing.lastVoucherId)
+            : null,
+          notes: member.billing.notes,
+        },
+      })),
+      students,
+      classType: parsed.data.classType,
+      maxStudents: policies.participantPolicy.maxStudents,
+      enrolledAt,
     });
+
+    const course = await CourseProfile.findById(courseId);
+    if (!course) {
+      throw new Error("Created course was not found");
+    }
 
     await course.populate({
       path: "studentIds",
@@ -249,6 +265,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
       { status: 201 },
     );
   } catch (error) {
+    if (error instanceof CourseCreationError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: 400 },
+      );
+    }
     console.error(
       "POST /api/course-template/[id]/create-course error:",
       error,

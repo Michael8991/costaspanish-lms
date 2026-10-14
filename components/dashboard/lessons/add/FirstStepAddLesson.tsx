@@ -13,6 +13,10 @@ import type { LessonStudent } from "@/lib/hooks/useLessonStudents";
 import { addMinutesToDatetimeLocal } from "@/lib/utils/lesson-datetime";
 import { buildLessonTitle } from "@/lib/utils/lesson-title";
 import {
+  COURSE_ENROLLMENT_REQUIRED_MESSAGE,
+  getQuickVoucherAvailability,
+} from "@/lib/utils/lesson-quick-voucher";
+import {
   formatAssignedVoucherLabel,
   getCompatiblePlans,
   selectBestCompatiblePlan,
@@ -43,11 +47,18 @@ interface FirstStepAddLessonProps {
 type QuickVoucherTarget = {
   attendeeIndex: number;
   studentId: string;
+  enrollmentId: string | null;
+  courseName: string;
 };
 
 type CreatedVoucherResponse = {
   error?: string;
   activePlans?: LessonStudent["activePlans"];
+};
+
+type EnrollmentLookupResponse = {
+  error?: string;
+  item?: { id: string; courseId: string; courseName: string };
 };
 
 export default function FirstStepAddLesson({
@@ -69,6 +80,8 @@ export default function FirstStepAddLesson({
   const [quickVoucherTarget, setQuickVoucherTarget] =
     useState<QuickVoucherTarget | null>(null);
   const [isCreatingVoucher, setIsCreatingVoucher] = useState(false);
+  const [resolvingVoucherStudentId, setResolvingVoucherStudentId] =
+    useState<string | null>(null);
   const [createVoucherError, setCreateVoucherError] = useState("");
 
   const { fields, append, remove, replace } = useFieldArray({
@@ -316,9 +329,66 @@ export default function FirstStepAddLesson({
     setCreateVoucherError("");
   };
 
+  const openCourseQuickVoucher = async (
+    attendeeIndex: number,
+    studentId: string,
+  ) => {
+    if (creationMode !== "course" || !courseId) return;
+
+    setResolvingVoucherStudentId(studentId);
+    setCreateVoucherError("");
+    try {
+      const response = await fetch(
+        `/api/course/${courseId}/members/${studentId}/enrollment`,
+        { cache: "no-store" },
+      );
+      const payload = (await response.json().catch(() => null)) as
+        | EnrollmentLookupResponse
+        | null;
+
+      if (!response.ok || !payload?.item) {
+        setCreateVoucherError(
+          payload?.error || COURSE_ENROLLMENT_REQUIRED_MESSAGE,
+        );
+        setQuickVoucherTarget({
+          attendeeIndex,
+          studentId,
+          enrollmentId: null,
+          courseName: selectedCourse?.name ?? "Curso",
+        });
+        return;
+      }
+
+      setQuickVoucherTarget({
+        attendeeIndex,
+        studentId,
+        enrollmentId: payload.item.id,
+        courseName: payload.item.courseName,
+      });
+    } catch {
+      setCreateVoucherError(COURSE_ENROLLMENT_REQUIRED_MESSAGE);
+      setQuickVoucherTarget({
+        attendeeIndex,
+        studentId,
+        enrollmentId: null,
+        courseName: selectedCourse?.name ?? "Curso",
+      });
+    } finally {
+      setResolvingVoucherStudentId(null);
+    }
+  };
+
   const createQuickVoucher = async (formData: NewVoucherFormData) => {
     if (!quickVoucherTarget || !classType) {
       setCreateVoucherError("Selecciona un alumno y un tipo de clase.");
+      return;
+    }
+    const availability = getQuickVoucherAvailability({
+      creationMode,
+      enrollmentId: quickVoucherTarget.enrollmentId,
+    });
+    if (!availability.allowed) {
+      setCreateVoucherError(COURSE_ENROLLMENT_REQUIRED_MESSAGE);
       return;
     }
 
@@ -506,6 +576,38 @@ export default function FirstStepAddLesson({
                 Los alumnos vienen de los integrantes activos del curso. Los
                 créditos se aplicarán según sus reglas en una fase posterior.
               </p>
+              <div className="md:col-span-3 space-y-2">
+                {(attendees ?? []).map((attendee, index) => {
+                  const student = students.find(
+                    (candidate) => candidate._id === attendee.studentId,
+                  );
+                  const compatiblePlans = classType
+                    ? getCompatiblePlans(student, classType)
+                    : [];
+                  if (!student || compatiblePlans.length > 0) return null;
+
+                  return (
+                    <div
+                      key={attendee.studentId}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2"
+                    >
+                      <p className="text-xs text-amber-800">
+                        {student.fullName || student.contactEmail || "Alumno"} no tiene un bono compatible.
+                      </p>
+                      <button
+                        type="button"
+                        disabled={resolvingVoucherStudentId === attendee.studentId}
+                        onClick={() => void openCourseQuickVoucher(index, attendee.studentId)}
+                        className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {resolvingVoucherStudentId === attendee.studentId
+                          ? "Comprobando matrícula..."
+                          : "Crear bono"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
@@ -722,19 +824,9 @@ export default function FirstStepAddLesson({
                           Este alumno no tiene bonos activos compatibles con
                           este tipo de clase.
                         </p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCreateVoucherError("");
-                            setQuickVoucherTarget({
-                              attendeeIndex: index,
-                              studentId: selectedStudentId,
-                            });
-                          }}
-                          className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 transition hover:bg-amber-50"
-                        >
-                          Crear bono
-                        </button>
+                        <p className="text-xs text-amber-700">
+                          La creación rápida de bonos no está disponible en clases libres.
+                        </p>
                       </div>
                     )}
                   {!isTrial && compatiblePlans.length > 1 && (
@@ -844,6 +936,12 @@ export default function FirstStepAddLesson({
             onSubmitForm={createQuickVoucher}
             isSubmitting={isCreatingVoucher}
             submitError={createVoucherError}
+            enrollments={quickVoucherTarget.enrollmentId ? [{
+              id: quickVoucherTarget.enrollmentId,
+              courseName: quickVoucherTarget.courseName,
+            }] : []}
+            initialEnrollmentId={quickVoucherTarget.enrollmentId ?? ""}
+            enrollmentRequiredMessage={COURSE_ENROLLMENT_REQUIRED_MESSAGE}
             onClose={closeQuickVoucherModal}
           />
         )}

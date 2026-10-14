@@ -14,14 +14,16 @@ import {
   RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import DeactiveStudentForm, {
   DeactiveStudentFormData,
 } from "../forms/DeactiveStudentForm";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { NewVoucherFormData } from "../forms";
-import NewVoucherForm from "../forms/NewVoucherForm";
+import NewVoucherForm, {
+  type VoucherEnrollmentOption,
+} from "../forms/NewVoucherForm";
 
 interface StudentProps {
   id: string;
@@ -46,6 +48,14 @@ export default function BasicStudentHeader({
 
   const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
   const [isSubmittingNewVoucher, setIsSubmittingNewVoucher] = useState(false);
+  const [enrollments, setEnrollments] = useState<VoucherEnrollmentOption[]>([]);
+
+  useEffect(() => {
+    fetch(`/api/students/${id}/enrollments`, { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : { items: [] })
+      .then((payload) => setEnrollments(payload.items ?? []))
+      .catch(() => setEnrollments([]));
+  }, [id]);
 
   const router = useRouter();
 
@@ -260,6 +270,7 @@ export default function BasicStudentHeader({
             isSubmitting={isSubmittingNewVoucher}
             onClose={() => setIsVoucherModalOpen(false)}
             activeVouchersCount={activeVouchersCount}
+            enrollments={enrollments}
           />
         </div>
       </CustomModal>

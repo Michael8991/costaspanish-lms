@@ -105,7 +105,6 @@ const studentSchema = z.object({
   goals: z.array(z.string()).min(1, "You must select a goal"),
   internalNotes: z.string().optional(),
   isActive: z.boolean(),
-  price: z.number().min(0, "Price cannot be negative"),
 });
 
 export default function FormNewStudent({ locale }: { locale: string }) {
@@ -130,7 +129,6 @@ export default function FormNewStudent({ locale }: { locale: string }) {
       goals: formData.getAll("goals").map(String),
       internalNotes: String(formData.get("internalNotes") ?? ""),
       isActive: formData.get("isActive") === "true",
-      price: Number(formData.get("price") || 0),
     };
 
     setFieldErrors({});
@@ -153,17 +151,7 @@ export default function FormNewStudent({ locale }: { locale: string }) {
           "Content-Type": "application/json",
         },
 
-        body: JSON.stringify({
-          ...validPlayload,
-          name: "Plan Inicial por Defecto",
-          billingType: "single",
-          classType: "private",
-          validUntil: new Date(
-            new Date().setFullYear(new Date().getFullYear() + 1),
-          ).toISOString(),
-          price: 0,
-          status: "exhausted",
-        }),
+        body: JSON.stringify(validPlayload),
       }).then(async (res) => {
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));

@@ -17,7 +17,7 @@ import {
     toStudentListDTO,
 } from "@/lib/dto/student.dto";
 import { createStudentProfileSchema } from "@/lib/validators/student";
-import { buildInitialStudentPlan } from "@/lib/utils/student-initial-plan";
+import { buildNewStudentProfileCreateData } from "@/lib/utils/student-creation";
 import type {
     StudentListResponse,
     StudentListSource,
@@ -65,29 +65,13 @@ export async function POST(req: NextRequest){
     }
 
     const payload = parsed.data;
-    const rawEmail = (payload.contactEmail ?? payload.email ?? "").trim();
-    const contactEmailLower = rawEmail.toLowerCase();
-
-    const initialPlan = buildInitialStudentPlan(payload);
 
     await dbConnect();
 
     try {
-        const newStudent = await StudentProfile.create({
-            teacherId: new Types.ObjectId(user.id),
-            contactEmail: rawEmail,
-            contactEmailLower,
-            fullName: payload.fullName,
-            phone: payload.phone,
-            country: payload.country,
-            timezone: payload.timezone,
-            level: payload.level,
-            nativeLanguage: payload.nativeLanguage,
-            goals: payload.goals,
-            internalNotes: payload.internalNotes,
-
-            activePlans: [initialPlan]
-        });
+        const newStudent = await StudentProfile.create(
+            buildNewStudentProfileCreateData(payload, user.id),
+        );
 
         return NextResponse.json(
             { message: "Alumno creado con éxito", student: newStudent },
