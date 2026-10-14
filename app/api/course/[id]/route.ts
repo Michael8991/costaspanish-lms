@@ -3,7 +3,6 @@ import { QueryFilter, Types } from "mongoose";
 import { z } from "zod";
 
 import { requireAuth, requireRole, type Role } from "@/lib/auth/apiAuth";
-import { getStudentOwnershipFilter } from "@/lib/auth/studentOwnership";
 import { toCourseProfileDetailDTO } from "@/lib/utils/course-profile.mapper";
 import { updateCourseProfileSchema } from "@/lib/validators/courseProfile.validator";
 import dbConnect from "@/lib/mongo";
@@ -14,11 +13,7 @@ import {
   type ICourseProfile,
 } from "@/models/CourseProfile";
 import { CourseTemplate } from "@/models/CourseTemplate";
-import { StudentProfile, type ClassType } from "@/models/StudentProfile";
-import {
-  deriveStudentIdsFromMembers,
-  normalizeCourseMembers,
-} from "@/lib/utils/course-members";
+import type { ClassType } from "@/models/StudentProfile";
 import { normalizeCourseOperationalPolicies } from "@/lib/utils/course-policies";
 
 export const runtime = "nodejs";
@@ -76,23 +71,6 @@ async function findCourse(
   user: CurrentUser,
 ): Promise<CourseProfileDocument | null> {
   return CourseProfile.findOne(getCourseQuery(id, user));
-}
-
-function validateCapacity(
-  classType: ClassType,
-  membersCount: number,
-  activeMembersCount: number,
-) {
-  if (membersCount === 0) {
-    return "Selecciona al menos un alumno";
-  }
-  if (classType === "private" && activeMembersCount > 1) {
-    return "Un curso privado admite como máximo un alumno";
-  }
-  if (classType === "pair" && activeMembersCount > 2) {
-    return "Un curso en pareja admite como máximo dos alumnos";
-  }
-  return null;
 }
 
 export async function GET(request: NextRequest, context: RouteContext) {
@@ -181,87 +159,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     if (!course) {
       return NextResponse.json({ error: "Course not found" }, { status: 404 });
-    }
-
-    const classType = parsed.data.classType ?? course.classType ?? "private";
-    const hasMembersUpdate = parsed.data.members !== undefined;
-    const hasStudentIdsUpdate = parsed.data.studentIds !== undefined;
-    const normalizedMembers = normalizeCourseMembers({
-      members: hasMembersUpdate
-        ? parsed.data.members
-        : hasStudentIdsUpdate
-          ? undefined
-          : course.members,
-      legacyStudentIds: hasMembersUpdate
-        ? []
-        : hasStudentIdsUpdate
-          ? parsed.data.studentIds
-          : course.studentIds,
-      fallbackJoinedAt:
-        parsed.data.startDate ?? course.startDate ?? course.createdAt,
-    });
-    const derivedStudentIds =
-      deriveStudentIdsFromMembers(normalizedMembers);
-    const capacityError = validateCapacity(
-      classType,
-      normalizedMembers.length,
-      normalizedMembers.filter((member) => member.status === "active")
-        .length,
-    );
-
-    if (capacityError) {
-      return NextResponse.json({ error: capacityError }, { status: 400 });
-    }
-
-    if (hasMembersUpdate || hasStudentIdsUpdate) {
-      const studentFilter = getStudentOwnershipFilter(user, {
-        _id: {
-          $in: derivedStudentIds.map(
-            (studentId) => new Types.ObjectId(studentId),
-          ),
-        },
-      });
-      if (!studentFilter) {
-        return NextResponse.json({ error: "Invalid user id" }, { status: 500 });
-      }
-      const studentsCount = await StudentProfile.countDocuments(studentFilter);
-
-      if (studentsCount !== derivedStudentIds.length) {
-        return NextResponse.json(
-          { error: "Some students are invalid or not accessible" },
-          { status: 400 },
-        );
-      }
-
-      course.studentIds = derivedStudentIds.map(
-        (studentId) => new Types.ObjectId(studentId),
-      );
-      course.members = normalizedMembers.map((member) => ({
-        studentId: new Types.ObjectId(member.studentId),
-        status: member.status,
-        joinedAt: new Date(member.joinedAt),
-        leftAt: member.leftAt ? new Date(member.leftAt) : null,
-        billing: {
-          mode: member.billing.mode,
-          billingAnchorDay: member.billing.billingAnchorDay ?? undefined,
-          billingStartedAt: member.billing.billingStartedAt
-            ? new Date(member.billing.billingStartedAt)
-            : null,
-          nextBillingDate: member.billing.nextBillingDate
-            ? new Date(member.billing.nextBillingDate)
-            : null,
-          firstVoucherId: member.billing.firstVoucherId
-            ? new Types.ObjectId(member.billing.firstVoucherId)
-            : null,
-          lastVoucherId: member.billing.lastVoucherId
-            ? new Types.ObjectId(member.billing.lastVoucherId)
-            : null,
-          notes: member.billing.notes,
-        },
-      }));
-      course.stats.activeEnrollmentCount = normalizedMembers.filter(
-        (member) => member.status === "active",
-      ).length;
     }
 
     if (parsed.data.name !== undefined) {

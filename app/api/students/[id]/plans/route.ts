@@ -15,6 +15,7 @@ import { StudentProfile, type PlanDoc } from "@/models/StudentProfile";
 import { CourseProfile } from "@/models/CourseProfile";
 import { toCents } from "@/lib/utils/money";
 import { startOfUtcDay } from "@/lib/utils/date-only";
+import { deriveVoucherAssociation } from "@/lib/utils/voucher-enrollment";
 import {
   resolveManualVoucherDates,
   VoucherDatePolicyError,
@@ -121,23 +122,28 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   await dbConnect();
   let enrollment;
   try {
-    enrollment = payload.enrollmentId
-      ? await validateVoucherEnrollment({
-          enrollmentId: payload.enrollmentId,
-          studentId: id,
-          actorId: user.id,
-          actorRole: user.role,
-        })
-      : null;
+    enrollment = await validateVoucherEnrollment({
+      enrollmentId: payload.enrollmentId,
+      studentId: id,
+      actorId: user.id,
+      actorRole: user.role,
+    });
   } catch (error) {
     if (error instanceof VoucherDomainError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
     throw error;
   }
-  const enrollmentCourse = enrollment
-    ? await CourseProfile.findById(enrollment.courseId).select("name internalName").lean()
-    : null;
+  const enrollmentCourse = await CourseProfile.findById(enrollment.courseId)
+    .select("name internalName")
+    .lean();
+  if (!enrollmentCourse) {
+    return NextResponse.json(
+      { error: "El curso de la matrícula seleccionada no existe." },
+      { status: 409 },
+    );
+  }
+  const voucherAssociation = deriveVoucherAssociation(enrollment);
   const plan: PlanDoc = {
     _id: voucherObjectId,
     name: payload.name,
@@ -148,11 +154,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     creditsTotal,
     creditsRemaining,
     status: payload.status,
-    enrollmentId: enrollment?._id,
-    courseId: enrollment?.courseId ?? (payload.courseId
-      ? new mongoose.Types.ObjectId(payload.courseId)
-      : undefined),
-      courseNameSnapshot: payload.courseNameSnapshot ??
+    enrollmentId: voucherAssociation.enrollmentId,
+    courseId: voucherAssociation.courseId,
+    courseNameSnapshot: payload.courseNameSnapshot ??
       (enrollmentCourse?.name?.trim() || enrollmentCourse?.internalName?.trim() || undefined),
     generatedFromCourse: payload.generatedFromCourse,
     generatedFromCourseMember: payload.generatedFromCourseMember,
@@ -185,38 +189,34 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   if (!accessibleStudent) {
     return NextResponse.json({ error: "Student not found" }, { status: 404 });
   }
-  if (enrollment) {
-    const current = await StudentProfile.findOne(ownershipFilter).select("activePlans").lean();
-    try {
-      assertNoOverlappingVoucherPeriod({
-        vouchers: current?.activePlans ?? [],
-        enrollmentId: enrollment._id.toString(),
-        classType: payload.classType,
-        validFrom: plan.validFrom,
-        validUntil: plan.validUntil,
-      });
-    } catch (error) {
-      if (error instanceof VoucherDomainError) {
-        return NextResponse.json({ error: error.message }, { status: error.status });
-      }
-      throw error;
+  const current = await StudentProfile.findOne(ownershipFilter).select("activePlans").lean();
+  try {
+    assertNoOverlappingVoucherPeriod({
+      vouchers: current?.activePlans ?? [],
+      enrollmentId: enrollment._id.toString(),
+      classType: payload.classType,
+      validFrom: plan.validFrom,
+      validUntil: plan.validUntil,
+    });
+  } catch (error) {
+    if (error instanceof VoucherDomainError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
     }
+    throw error;
   }
   const studentFilter = getStudentOwnershipFilter(user, {
     _id: new mongoose.Types.ObjectId(id),
-    ...(enrollment ? {
-      activePlans: {
-        $not: {
-          $elemMatch: {
-            enrollmentId: enrollment._id,
-            classType: payload.classType,
-            status: { $ne: "canceled" },
-            validFrom: { $lte: plan.validUntil },
-            validUntil: { $gte: plan.validFrom },
-          },
+    activePlans: {
+      $not: {
+        $elemMatch: {
+          enrollmentId: enrollment._id,
+          classType: payload.classType,
+          status: { $ne: "canceled" },
+          validFrom: { $lte: plan.validUntil },
+          validUntil: { $gte: plan.validFrom },
         },
       },
-    } : {}),
+    },
   });
   if (!studentFilter) {
     return NextResponse.json({ error: "Invalid user id" }, { status: 500 });
@@ -230,9 +230,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
   if (!updated) {
     return NextResponse.json(
       {
-        error: enrollment
-          ? "Ya existe un bono del mismo tipo para esta matrícula con un periodo solapado."
-          : "No se pudo crear el bono.",
+        error: "Ya existe un bono del mismo tipo para esta matrícula con un periodo solapado.",
       },
       { status: 409 },
     );

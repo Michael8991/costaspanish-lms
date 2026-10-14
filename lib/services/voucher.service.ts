@@ -2,6 +2,7 @@ import { Types } from "mongoose";
 
 import { CourseEnrollment } from "@/models/CourseEnrollment";
 import { CourseProfile } from "@/models/CourseProfile";
+import type { VoucherEnrollmentRecord } from "@/lib/utils/voucher-enrollment";
 import {
   isDateWithinVoucherValidity,
   voucherPeriodsOverlap,
@@ -143,27 +144,46 @@ export function resolveVoucherForLesson<T extends VoucherCandidate>(args: {
   return resolveVoucherForLessonResult(args).voucher;
 }
 
+export function assertVoucherEnrollmentForStudent(
+  enrollment: VoucherEnrollmentRecord | null,
+  studentId: string,
+): asserts enrollment is VoucherEnrollmentRecord {
+  if (!enrollment) {
+    throw new VoucherDomainError("La matrícula seleccionada no existe.", 404);
+  }
+  if (enrollment.studentId.toString() !== studentId) {
+    throw new VoucherDomainError(
+      "La matrícula seleccionada no pertenece al alumno.",
+    );
+  }
+  if (enrollment.status !== "active") {
+    throw new VoucherDomainError("La matrícula seleccionada no está activa.");
+  }
+}
+
 export async function validateVoucherEnrollment(args: {
   enrollmentId: string;
   studentId: string;
   actorId: string;
   actorRole: string;
 }) {
-  const enrollment = await CourseEnrollment.findById(args.enrollmentId).lean();
-  if (!enrollment || enrollment.status !== "active" ||
-      enrollment.studentId.toString() !== args.studentId) {
+  const enrollment = await CourseEnrollment.findById(args.enrollmentId)
+    .lean<VoucherEnrollmentRecord | null>();
+  assertVoucherEnrollmentForStudent(enrollment, args.studentId);
+
+  const courseExists = await CourseProfile.exists({
+    _id: enrollment.courseId,
+    ...(args.actorRole === "admin"
+      ? {}
+      : { ownerTeacherId: new Types.ObjectId(args.actorId) }),
+  });
+  if (!courseExists) {
     throw new VoucherDomainError(
-      "La matrícula seleccionada no pertenece al alumno o no está activa.",
+      args.actorRole === "admin"
+        ? "El curso de la matrícula seleccionada no existe."
+        : "No tienes permiso para usar esta matrícula.",
+      args.actorRole === "admin" ? 404 : 403,
     );
-  }
-  if (args.actorRole !== "admin") {
-    const ownsCourse = await CourseProfile.exists({
-      _id: enrollment.courseId,
-      ownerTeacherId: new Types.ObjectId(args.actorId),
-    });
-    if (!ownsCourse) {
-      throw new VoucherDomainError("No tienes permiso para usar esta matrícula.", 403);
-    }
   }
   return enrollment;
 }

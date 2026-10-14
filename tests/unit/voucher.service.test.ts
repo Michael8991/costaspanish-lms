@@ -4,22 +4,34 @@ import { Types } from "mongoose";
 
 import {
   assertNoOverlappingVoucherPeriod,
+  assertVoucherEnrollmentForStudent,
   resolveVoucherForLesson,
   resolveVoucherForLessonResult,
   VoucherDomainError,
 } from "../../lib/services/voucher.service";
+import { toStudentPlanListDTO } from "../../lib/dto/student.dto";
 import {
   buildCourseVoucherUpdateSet,
   hasOverlappingCourseVoucher,
 } from "../../lib/server/course-vouchers";
 import type { PlanDoc } from "../../models/StudentProfile";
 import {
+  buildCourseMemberBillingBulkOperations,
   calculateCourseVoucherPeriod,
   calculateIndividualBillingPeriod,
   getCourseVoucherPlanDates,
   resolveNextBillingDateAfterVoucherGeneration,
 } from "../../lib/utils/course-voucher-billing";
 import { previewCourseVouchersSchema } from "../../lib/validators/course-voucher";
+import { createStudentProfileSchema } from "../../lib/validators/student";
+import { createStudentVoucherSchema } from "../../lib/validators/voucher";
+import { buildNewStudentProfileCreateData } from "../../lib/utils/student-creation";
+import {
+  deriveVoucherAssociation,
+  preflightCourseVoucherEnrollments,
+  type VoucherEnrollmentRecord,
+} from "../../lib/utils/voucher-enrollment";
+import { getQuickVoucherAvailability } from "../../lib/utils/lesson-quick-voucher";
 
 const studentEnrollment = new Types.ObjectId();
 const courseId = new Types.ObjectId();
@@ -44,6 +56,221 @@ function resolve(vouchers: ReturnType<typeof voucher>[], lessonDate: Date) {
     requiredCredits: 1,
   });
 }
+
+const manualVoucherPayload = {
+  name: "Bono manual",
+  billingType: "package" as const,
+  classType: "private" as const,
+  validUntil: "2026-12-31",
+  creditsTotal: 4,
+  creditsRemaining: 4,
+  price: 100,
+};
+
+test("new student creation persists no initial voucher", () => {
+  const parsed = createStudentProfileSchema.parse({
+    fullName: "Nuevo alumno",
+    contactEmail: "student@example.com",
+  });
+  const createData = buildNewStudentProfileCreateData(
+    parsed,
+    new Types.ObjectId().toString(),
+  );
+
+  assert.deepEqual(createData.activePlans, []);
+});
+
+test("manual voucher creation requires an enrollment id", () => {
+  const parsed = createStudentVoucherSchema.safeParse(manualVoucherPayload);
+
+  assert.equal(parsed.success, false);
+  if (!parsed.success) {
+    assert.ok(parsed.error.issues.some((issue) => issue.path[0] === "enrollmentId"));
+  }
+});
+
+test("missing, inactive and other-student enrollments are rejected", () => {
+  const studentId = new Types.ObjectId();
+  const record: VoucherEnrollmentRecord = {
+    _id: new Types.ObjectId(),
+    courseId: new Types.ObjectId(),
+    studentId,
+    status: "active",
+  };
+
+  assert.throws(
+    () => assertVoucherEnrollmentForStudent(null, studentId.toString()),
+    /no existe/,
+  );
+  assert.throws(
+    () => assertVoucherEnrollmentForStudent(
+      { ...record, status: "inactive" },
+      studentId.toString(),
+    ),
+    /no está activa/,
+  );
+  assert.throws(
+    () => assertVoucherEnrollmentForStudent(
+      { ...record, studentId: new Types.ObjectId() },
+      studentId.toString(),
+    ),
+    /no pertenece al alumno/,
+  );
+});
+
+test("valid enrollment is the only authority for new voucher association", () => {
+  const record: VoucherEnrollmentRecord = {
+    _id: new Types.ObjectId(),
+    courseId: new Types.ObjectId(),
+    studentId: new Types.ObjectId(),
+    status: "active",
+  };
+  assert.doesNotThrow(() =>
+    assertVoucherEnrollmentForStudent(record, record.studentId.toString()),
+  );
+  assert.deepEqual(deriveVoucherAssociation(record), {
+    enrollmentId: record._id,
+    courseId: record.courseId,
+  });
+
+  const maliciousCourseId = new Types.ObjectId().toString();
+  const parsed = createStudentVoucherSchema.safeParse({
+    ...manualVoucherPayload,
+    enrollmentId: record._id.toString(),
+    courseId: maliciousCourseId,
+  });
+  assert.equal(parsed.success, false);
+});
+
+test("course voucher generation preflight succeeds only when every enrollment exists", () => {
+  const generationCourseId = new Types.ObjectId();
+  const studentIds = [new Types.ObjectId(), new Types.ObjectId(), new Types.ObjectId()];
+  const enrollments: VoucherEnrollmentRecord[] = studentIds.map((studentId) => ({
+    _id: new Types.ObjectId(),
+    courseId: generationCourseId,
+    studentId,
+    status: "active",
+  }));
+  const complete = preflightCourseVoucherEnrollments({
+    courseId: generationCourseId,
+    studentIds: studentIds.map(String),
+    enrollments,
+  });
+
+  assert.deepEqual(complete.missingStudentIds, []);
+  assert.equal(complete.enrollmentByStudent.size, 3);
+  for (const studentId of studentIds) {
+    assert.equal(
+      complete.enrollmentByStudent.get(studentId.toString())?.courseId,
+      generationCourseId,
+    );
+  }
+});
+
+test("course voucher billing updates target only the selected member billing fields", () => {
+  const generationCourseId = new Types.ObjectId();
+  const firstStudentId = new Types.ObjectId();
+  const secondStudentId = new Types.ObjectId();
+  const joinedAt = new Date("2026-01-10T00:00:00.000Z");
+  const secondMember = {
+    studentId: secondStudentId,
+    status: "paused" as const,
+    joinedAt: new Date("2025-05-01T00:00:00.000Z"),
+    leftAt: null,
+    billing: {
+      mode: "individual_cycle" as const,
+      billingAnchorDay: 4,
+      notes: "must remain byte-equivalent",
+    },
+  };
+  const operations = buildCourseMemberBillingBulkOperations({
+    courseId: generationCourseId,
+    members: [
+      {
+        studentId: firstStudentId,
+        status: "active",
+        joinedAt,
+        leftAt: null,
+        billing: { mode: "individual_cycle", notes: "keep this too" },
+      },
+      secondMember,
+    ],
+    generatedItems: [{
+      studentId: firstStudentId.toString(),
+      voucherId: new Types.ObjectId().toString(),
+      periodStart: "2026-10-01T00:00:00.000Z",
+      nextBillingDate: "2026-11-01T00:00:00.000Z",
+      advancesNextBillingDate: true,
+      billingAnchorDay: 1,
+    }],
+  });
+
+  assert.equal(operations.length, 1);
+  const operation = operations[0]!.updateOne;
+  assert.equal(operation.filter._id, generationCourseId);
+  assert.equal(
+    operation.filter["members.studentId"].toString(),
+    firstStudentId.toString(),
+  );
+  assert.ok(
+    Object.keys(operation.update.$set).every((path) =>
+      path.startsWith("members.$.billing."),
+    ),
+  );
+  assert.equal("members" in operation.update.$set, false);
+  assert.deepEqual(secondMember, {
+    studentId: secondStudentId,
+    status: "paused",
+    joinedAt: new Date("2025-05-01T00:00:00.000Z"),
+    leftAt: null,
+    billing: {
+      mode: "individual_cycle",
+      billingAnchorDay: 4,
+      notes: "must remain byte-equivalent",
+    },
+  });
+});
+
+test("FirstStep voucher quick-create requires course mode and an enrollment", () => {
+  assert.deepEqual(
+    getQuickVoucherAvailability({
+      creationMode: "course",
+      enrollmentId: new Types.ObjectId().toString(),
+    }),
+    { allowed: true },
+  );
+  assert.deepEqual(
+    getQuickVoucherAvailability({ creationMode: "course", enrollmentId: null }),
+    { allowed: false, reason: "missing_enrollment" },
+  );
+  assert.deepEqual(
+    getQuickVoucherAvailability({
+      creationMode: "free",
+      enrollmentId: new Types.ObjectId().toString(),
+    }),
+    { allowed: false, reason: "free_mode" },
+  );
+});
+
+test("legacy unassigned voucher still serializes without course or enrollment", () => {
+  const id = new Types.ObjectId();
+  const dto = toStudentPlanListDTO({
+    _id: id,
+    name: "Legacy sin asignar",
+    billingType: "package",
+    classType: "private",
+    status: "expired",
+    creditsTotal: 2,
+    creditsRemaining: 1,
+    validFrom: new Date("2025-01-01T00:00:00.000Z"),
+    validUntil: new Date("2025-01-31T00:00:00.000Z"),
+  });
+
+  assert.equal(dto.id, id.toString());
+  assert.equal(dto.enrollmentId, null);
+  assert.equal(dto.courseId, null);
+  assert.equal(dto.createdFrom, "legacy");
+});
 
 test("same voucher type can coexist and lesson date selects its period", () => {
   const september = voucher(9, 2);

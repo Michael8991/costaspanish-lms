@@ -25,36 +25,7 @@ const studentProfileFields = {
 };
 
 export const createStudentProfileSchema = z
-  .object({
-    ...studentProfileFields,
-    name: z.string().trim().min(1).max(160),
-    billingType: z.enum(["single", "package", "subscription"]),
-    classType: z.enum([
-      "private",
-      "pair",
-      "group_regular",
-      "semi_intensive",
-      "intensive",
-    ]),
-    validUntil: z.coerce.date(),
-    creditsTotal: z.coerce.number().min(0).optional(),
-    creditsRemaining: z.coerce.number().min(0).optional(),
-    price: z.preprocess(
-      (value) =>
-        typeof value === "number" || (typeof value === "string" && value.trim() !== "")
-          ? value
-          : undefined,
-      z.coerce.number().finite().min(0).refine(
-        (value) =>
-          Number.isSafeInteger(Math.round(value * 100)) &&
-          Math.round(value * 100) / 100 === value,
-        "Price must be representable in safe integer cents",
-      ),
-    ),
-    status: z
-      .enum(["active", "exhausted", "expired", "canceled"])
-      .optional(),
-  })
+  .object(studentProfileFields)
   .strict()
   .superRefine((value, context) => {
     if (!value.contactEmail && !value.email) {
@@ -62,17 +33,6 @@ export const createStudentProfileSchema = z
         code: "custom",
         path: ["contactEmail"],
         message: "Contact email is required",
-      });
-    }
-    if (
-      value.creditsTotal !== undefined &&
-      value.creditsRemaining !== undefined &&
-      value.creditsRemaining > value.creditsTotal
-    ) {
-      context.addIssue({
-        code: "custom",
-        path: ["creditsRemaining"],
-        message: "creditsRemaining cannot exceed creditsTotal",
       });
     }
   });

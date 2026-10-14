@@ -12,41 +12,28 @@ import {
   buildCourseVoucherContext,
   CourseVoucherRequestError,
 } from "@/lib/server/course-vouchers";
-import { normalizeCourseMembers } from "@/lib/utils/course-members";
+import {
+  CourseVoucherGenerationError,
+  persistCourseVouchersAfterEnrollmentPreflight,
+  type CourseVoucherWrite,
+} from "@/lib/services/course-voucher-generation.service";
 import { toCourseProfileDetailDTO } from "@/lib/utils/course-profile.mapper";
 import { generateCourseVouchersSchema } from "@/lib/validators/course-voucher";
-import { StudentProfile, type PlanDoc } from "@/models/StudentProfile";
+import type { PlanDoc } from "@/models/StudentProfile";
 import { toCents } from "@/lib/utils/money";
 import {
+  buildCourseMemberBillingBulkOperations,
   getCourseVoucherPlanDates,
-  resolveNextBillingDateAfterVoucherGeneration,
 } from "@/lib/utils/course-voucher-billing";
+import { CourseProfile } from "@/models/CourseProfile";
 
 export const runtime = "nodejs";
-
-type AppliedVoucher = {
-  studentId: Types.ObjectId;
-  voucherId: Types.ObjectId;
-};
 
 function formatZodError(error: z.ZodError) {
   return error.issues.map((issue) => ({
     path: issue.path.join("."),
     message: issue.message,
   }));
-}
-
-async function rollbackVouchers(args: {
-  appliedVouchers: AppliedVoucher[];
-}) {
-  await Promise.allSettled(
-    args.appliedVouchers.map(({ studentId, voucherId }) =>
-      StudentProfile.updateOne(
-        { _id: studentId },
-        { $pull: { activePlans: { _id: voucherId } } },
-      ),
-    ),
-  );
 }
 
 export async function POST(
@@ -124,194 +111,134 @@ export async function POST(
       studentId: { $in: context.preview.items.map((item) => new Types.ObjectId(item.studentId)) },
       status: "active",
     }).lean();
-    const enrollmentByStudent = new Map(
-      enrollments.map((enrollment) => [enrollment.studentId.toString(), enrollment._id]),
-    );
-    const generatedItems: GeneratedCourseVoucherDTO[] = [];
-    const plansByStudentId = new Map<string, PlanDoc>();
+    const generation = await persistCourseVouchersAfterEnrollmentPreflight({
+      courseId,
+      studentIds: context.preview.items.map((item) => item.studentId),
+      enrollments,
+      prepare: (enrollmentByStudent) => {
+        const generatedItems: GeneratedCourseVoucherDTO[] = [];
+        const plansByStudentId = new Map<string, PlanDoc>();
 
-    for (const item of context.preview.items) {
-      const voucherId = new Types.ObjectId();
-      const planDates = getCourseVoucherPlanDates(item);
-      const periodStart = planDates.billingPeriodStart;
-      const periodEnd = planDates.billingPeriodEnd;
-      const paidAt = null;
-      const plan: PlanDoc = {
-        _id: voucherId,
-        name: `${courseName} · ${periodStart.toLocaleDateString("es-ES", {
-          month: "short",
-          year: "numeric",
-          timeZone: "UTC",
-        })}`,
-        billingType: "subscription",
-        classType: context.preview.courseSummary.classType,
-        creditsTotal: item.creditsTotal,
-        creditsRemaining: item.creditsTotal,
-        validFrom: planDates.validFrom,
-        validUntil: planDates.validUntil,
-        status: "active",
-        price: item.priceTotal,
-        priceTotalCents: toCents(item.priceTotal),
-        amountPaidCents: 0,
-        enrollmentId: enrollmentByStudent.get(item.studentId),
-        courseId,
-        courseNameSnapshot: courseName,
-        billingPeriodStart: periodStart,
-        billingPeriodEnd: periodEnd,
-        billingMode: "individual_cycle",
-        billingAnchorDay: item.billingAnchorDay,
-        generatedFromCourse: true,
-        generatedFromCourseMember: true,
-        paymentStatus: "pending",
-        amountPaid: 0,
-        paidAt,
-        paymentMethod: "",
-        paymentNotes: "",
-        internalNotes: item.internalNotes,
-        priceTotal: item.priceTotal,
-        currency: "EUR",
-        unitCreditPriceSnapshot:
-          item.creditsTotal > 0
-            ? item.priceTotal / item.creditsTotal
-            : null,
-        createdFrom: "course_profile",
-        notes: item.internalNotes,
-      };
+        for (const item of context.preview.items) {
+          const enrollment = enrollmentByStudent.get(item.studentId)!;
+          const voucherId = new Types.ObjectId();
+          const planDates = getCourseVoucherPlanDates(item);
+          const periodStart = planDates.billingPeriodStart;
+          const periodEnd = planDates.billingPeriodEnd;
+          const paidAt = null;
+          const plan: PlanDoc = {
+            _id: voucherId,
+            name: `${courseName} · ${periodStart.toLocaleDateString("es-ES", {
+              month: "short",
+              year: "numeric",
+              timeZone: "UTC",
+            })}`,
+            billingType: "subscription",
+            classType: context.preview.courseSummary.classType,
+            creditsTotal: item.creditsTotal,
+            creditsRemaining: item.creditsTotal,
+            validFrom: planDates.validFrom,
+            validUntil: planDates.validUntil,
+            status: "active",
+            price: item.priceTotal,
+            priceTotalCents: toCents(item.priceTotal),
+            amountPaidCents: 0,
+            enrollmentId: enrollment._id,
+            courseId: enrollment.courseId,
+            courseNameSnapshot: courseName,
+            billingPeriodStart: periodStart,
+            billingPeriodEnd: periodEnd,
+            billingMode: "individual_cycle",
+            billingAnchorDay: item.billingAnchorDay,
+            generatedFromCourse: true,
+            generatedFromCourseMember: true,
+            paymentStatus: "pending",
+            amountPaid: 0,
+            paidAt,
+            paymentMethod: "",
+            paymentNotes: "",
+            internalNotes: item.internalNotes,
+            priceTotal: item.priceTotal,
+            currency: "EUR",
+            unitCreditPriceSnapshot:
+              item.creditsTotal > 0
+                ? item.priceTotal / item.creditsTotal
+                : null,
+            createdFrom: "course_profile",
+            notes: item.internalNotes,
+          };
 
-      plansByStudentId.set(item.studentId, plan);
-      generatedItems.push({
-        ...item,
-        voucherId: voucherId.toString(),
-        status: "active",
-        paidAt: null,
-      });
-    }
+          plansByStudentId.set(item.studentId, plan);
+          generatedItems.push({
+            ...item,
+            voucherId: voucherId.toString(),
+            status: "active",
+            paidAt: null,
+          });
+        }
 
-    const appliedVouchers: AppliedVoucher[] = [];
-
-    try {
-      for (const [studentId, plan] of plansByStudentId) {
-        const duplicateGuard = parsed.data.allowDuplicatePeriod
-          ? {}
-          : {
-              activePlans: {
-                $not: {
-                  $elemMatch: {
-                    courseId,
-                    validFrom: { $lte: plan.validUntil },
-                    validUntil: { $gte: plan.validFrom },
-                    status: { $ne: "canceled" },
+        const voucherWrites: CourseVoucherWrite[] = [];
+        for (const [studentId, plan] of plansByStudentId) {
+          const duplicateGuard = parsed.data.allowDuplicatePeriod
+            ? {}
+            : {
+                activePlans: {
+                  $not: {
+                    $elemMatch: {
+                      courseId,
+                      validFrom: { $lte: plan.validUntil },
+                      validUntil: { $gte: plan.validFrom },
+                      status: { $ne: "canceled" },
+                    },
                   },
                 },
-              },
-            };
-        const studentFilter = getStudentOwnershipFilter(user, {
+              };
+          const studentFilter = getStudentOwnershipFilter(user, {
             _id: new Types.ObjectId(studentId),
             ...duplicateGuard,
-        });
-        if (!studentFilter) {
-          throw new CourseVoucherRequestError("Invalid user id", 500);
-        }
-        const result = await StudentProfile.updateOne(
-          studentFilter,
-          { $push: { activePlans: plan } },
-          { runValidators: true },
-        );
-
-        if (result.modifiedCount !== 1) {
-          throw new CourseVoucherRequestError(
-            "Otro proceso creó uno de los bonos para el mismo periodo.",
-            409,
-          );
+          });
+          if (!studentFilter) {
+            throw new CourseVoucherRequestError("Invalid user id", 500);
+          }
+          voucherWrites.push({ studentFilter, plan });
         }
 
-        appliedVouchers.push({
-          studentId: new Types.ObjectId(studentId),
-          voucherId: plan._id,
+        const billingOperations = buildCourseMemberBillingBulkOperations({
+          courseId,
+          members: context.course.members,
+          generatedItems,
         });
-
-      }
-
-      const normalizedMembers = normalizeCourseMembers({
-        members: context.course.members,
-        legacyStudentIds: context.course.studentIds,
-        fallbackJoinedAt:
-          context.course.startDate ?? context.course.createdAt,
-      });
-      const generatedByStudentId = new Map(
-        generatedItems.map((item) => [item.studentId, item]),
-      );
-      const storedMembersByStudentId = new Map(
-        context.course.members.map((member) => [
-          member.studentId.toString(),
-          member,
-        ]),
-      );
-
-      context.course.members = normalizedMembers.map((member) => {
-        const generated = generatedByStudentId.get(member.studentId);
-        const storedMember = storedMembersByStudentId.get(member.studentId);
-        const currentFirstVoucherId = member.billing.firstVoucherId;
-        const currentNextBillingDate = member.billing.nextBillingDate
-          ? new Date(member.billing.nextBillingDate)
-          : null;
-        const resolvedNextBillingDate = generated
-          ? resolveNextBillingDateAfterVoucherGeneration({
-              currentNextBillingDate,
-              generatedNextBillingDate: generated.nextBillingDate
-                ? new Date(generated.nextBillingDate)
-                : null,
-              advancesNextBillingDate: generated.advancesNextBillingDate,
-            })
-          : currentNextBillingDate;
 
         return {
-          studentId: new Types.ObjectId(member.studentId),
-          status: member.status,
-          joinedAt: new Date(member.joinedAt),
-          leftAt: member.leftAt ? new Date(member.leftAt) : null,
-          billing: {
-            mode: "individual_cycle" as const,
-            billingAnchorDay:
-              storedMember?.billing.billingAnchorDay ??
-              generated?.billingAnchorDay,
-            billingStartedAt: member.billing.billingStartedAt
-              ? new Date(member.billing.billingStartedAt)
-              : generated
-                ? new Date(generated.periodStart)
-                : null,
-            nextBillingDate: resolvedNextBillingDate,
-            firstVoucherId: currentFirstVoucherId
-              ? new Types.ObjectId(currentFirstVoucherId)
-              : generated
-                ? new Types.ObjectId(generated.voucherId)
-                : null,
-            lastVoucherId: generated
-              ? new Types.ObjectId(generated.voucherId)
-              : member.billing.lastVoucherId
-                ? new Types.ObjectId(member.billing.lastVoucherId)
-                : null,
-            notes: member.billing.notes,
-          },
+          voucherWrites,
+          billingOperations,
+          result: generatedItems,
         };
-      });
-      context.course.markModified("members");
-      await context.course.save();
-    } catch (generationError) {
-      await rollbackVouchers({
-        appliedVouchers,
-      });
-      throw generationError;
+      },
+    });
+    if (!generation.ok) {
+      return NextResponse.json(
+        {
+          error: "Todos los alumnos seleccionados deben tener una matrícula activa en el curso antes de generar bonos.",
+          details: { missingStudentIds: generation.missingStudentIds },
+        },
+        { status: 409 },
+      );
     }
+    const generatedItems = generation.value;
 
-    await context.course.populate({
+    const updatedCourse = await CourseProfile.findById(courseId);
+    if (!updatedCourse) {
+      throw new Error("Course disappeared after voucher generation");
+    }
+    await updatedCourse.populate({
       path: "members.studentId",
       select: "fullName contactEmail level isActive activePlans",
       ...(user.role === "admin"
         ? {}
         : { match: { teacherId: new Types.ObjectId(user.id) } }),
     });
-    await context.course.populate({
+    await updatedCourse.populate({
       path: "studentIds",
       select: "fullName contactEmail level isActive",
       ...(user.role === "admin"
@@ -323,11 +250,17 @@ export async function POST(
     return NextResponse.json(
       {
         items: generatedItems,
-        course: toCourseProfileDetailDTO(context.course.toObject()),
+        course: toCourseProfileDetailDTO(updatedCourse.toObject()),
       },
       { status: 201 },
     );
   } catch (error) {
+    if (error instanceof CourseVoucherGenerationError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.code === "VOUCHER_WRITE_CONFLICT" ? 409 : 500 },
+      );
+    }
     if (error instanceof CourseVoucherRequestError) {
       return NextResponse.json(
         { error: error.message, details: error.details },

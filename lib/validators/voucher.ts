@@ -22,8 +22,6 @@ const nullableDateSchema = z.preprocess(
 );
 
 const voucherMetadataShape = {
-  enrollmentId: optionalObjectIdSchema,
-  courseId: optionalObjectIdSchema,
   courseNameSnapshot: z.string().trim().max(160).optional(),
   generatedFromCourse: z.boolean().optional().default(false),
   generatedFromCourseMember: z.boolean().optional().default(false),
@@ -114,6 +112,7 @@ export const createStudentVoucherSchema = z
       .optional()
       .default("active"),
     price: z.coerce.number().min(0).optional(),
+    enrollmentId: objectIdSchema,
     ...voucherMetadataShape,
   })
   .strict()

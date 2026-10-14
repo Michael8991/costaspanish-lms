@@ -169,8 +169,6 @@ export const updateCourseProfileSchema = z
     name: z.string().trim().min(1).max(140).optional(),
     status: z.enum(COURSE_STATUSES).optional(),
     classType: z.enum(COURSE_PROFILE_CLASS_TYPES).optional(),
-    studentIds: studentIdsSchema.optional(),
-    members: courseMembersSchema.optional(),
     policies: courseOperationalDefaultsSchema.optional(),
     startDate: optionalDateSchema,
     targetEndDate: optionalDateSchema,
@@ -185,24 +183,7 @@ export const updateCourseProfileSchema = z
       .strict()
       .optional(),
   })
-  .strict()
-  .superRefine((data, ctx) => {
-    if (data.classType && data.members) {
-      validateStudentCapacity(
-        data.classType,
-        data.members.filter((member) => member.status === "active").length,
-        "members",
-        ctx,
-      );
-    } else if (data.classType && data.studentIds) {
-      validateStudentCapacity(
-        data.classType,
-        data.studentIds.length,
-        "studentIds",
-        ctx,
-      );
-    }
-  });
+  .strict();
 
 export type CreateCourseProfileInput = z.infer<
   typeof createCourseProfileSchema
