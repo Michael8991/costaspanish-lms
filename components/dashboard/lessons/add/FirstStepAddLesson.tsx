@@ -379,7 +379,7 @@ export default function FirstStepAddLesson({
   };
 
   const createQuickVoucher = async (formData: NewVoucherFormData) => {
-    if (!quickVoucherTarget || !classType) {
+    if (!quickVoucherTarget || !classType || !courseId) {
       setCreateVoucherError("Selecciona un alumno y un tipo de clase.");
       return;
     }
@@ -397,7 +397,7 @@ export default function FirstStepAddLesson({
       setCreateVoucherError("");
 
       const response = await fetch(
-        `/api/students/${quickVoucherTarget.studentId}/plans`,
+        `/api/course/${courseId}/members/${quickVoucherTarget.studentId}/vouchers`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
