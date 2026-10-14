@@ -10,20 +10,15 @@ import {
   ArrowLeft,
   Mail,
   Phone,
-  Plus,
   RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import DeactiveStudentForm, {
   DeactiveStudentFormData,
 } from "../forms/DeactiveStudentForm";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { NewVoucherFormData } from "../forms";
-import NewVoucherForm, {
-  type VoucherEnrollmentOption,
-} from "../forms/NewVoucherForm";
 
 interface StudentProps {
   id: string;
@@ -45,17 +40,6 @@ export default function BasicStudentHeader({
 }) {
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isSubmittingStatus, setIsSubmittingStatus] = useState(false);
-
-  const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
-  const [isSubmittingNewVoucher, setIsSubmittingNewVoucher] = useState(false);
-  const [enrollments, setEnrollments] = useState<VoucherEnrollmentOption[]>([]);
-
-  useEffect(() => {
-    fetch(`/api/students/${id}/enrollments`, { cache: "no-store" })
-      .then((response) => response.ok ? response.json() : { items: [] })
-      .then((payload) => setEnrollments(payload.items ?? []))
-      .catch(() => setEnrollments([]));
-  }, [id]);
 
   const router = useRouter();
 
@@ -101,41 +85,6 @@ export default function BasicStudentHeader({
     }
   };
 
-  const handleNewVoucher = async (formData: NewVoucherFormData) => {
-    try {
-      setIsSubmittingNewVoucher(true);
-      const res = await fetch(`/api/students/${id}/plans`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-        cache: "no-store",
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || "Error al crear el bono.");
-      }
-
-      toast.success("Nuevo bono creado con exito.");
-
-      setIsVoucherModalOpen(false);
-
-      router.refresh();
-      window.location.reload();
-    } catch (error: unknown) {
-      //   console.error(error);
-      if (error instanceof Error) {
-        toast.error(error.message);
-      } else {
-        toast.error("Ocurrió un error inesperado al crear el bono.");
-      }
-    } finally {
-      setIsSubmittingNewVoucher(false);
-    }
-  };
-  const activeVouchersCount = student.activePlans.filter(
-    (plan) => getVoucherEffectiveStatus(plan) === "active",
-  ).length;
   return (
     <div className="container mx-auto py-8 px-4 md:px-8 text-gray-800 max-w-6xl">
       <Breadcrumbs items={breadcrumbItems} locale={locale} />
@@ -245,36 +194,10 @@ export default function BasicStudentHeader({
                 ? "Archive Student"
                 : "Reactivate Student"}
           </button>
-          {/* //TODO: Poner enlace correcto */}
-          <button
-            disabled={isSubmittingNewVoucher}
-            onClick={() => setIsVoucherModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#9e2727] text-white text-sm font-medium rounded-lg hover:bg-[#8a2222] transition-colors shadow-sm cursor-pointer"
-          >
-            <Plus size={16} />
-            Add New Voucher
-          </button>
         </div>
       </section>
 
       {/* Modals */}
-      <CustomModal
-        isOpen={isVoucherModalOpen}
-        onClose={() => setIsVoucherModalOpen(false)}
-        title="Add New Voucher"
-      >
-        <div className="p-4">
-          <NewVoucherForm
-            student={student.name}
-            onSubmitForm={handleNewVoucher}
-            isSubmitting={isSubmittingNewVoucher}
-            onClose={() => setIsVoucherModalOpen(false)}
-            activeVouchersCount={activeVouchersCount}
-            enrollments={enrollments}
-          />
-        </div>
-      </CustomModal>
-
       {/* Modal de cambio de estado de estudiante */}
       <CustomModal
         isOpen={isStatusModalOpen}

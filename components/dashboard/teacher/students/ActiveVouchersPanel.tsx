@@ -11,21 +11,17 @@ import {
   CircleAlert,
   CreditCard,
   Pencil,
-  Plus,
   Trash,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   formatDateOnlyUtc,
   getVoucherEffectiveStatus,
 } from "@/lib/utils/date-only";
 import type { VoucherEnrollmentOption } from "../forms/NewVoucherForm";
-import { NewVoucherFormData } from "../forms";
 import { toast } from "sonner";
 import CustomModal from "@/components/ui/CustomModal";
-import NewVoucherForm from "../forms/NewVoucherForm";
 import EditVoucherForm, { EditVoucherPatch } from "../forms/EditVoucherForm";
 import RemoveVoucherForm from "../forms/RemoveVoucherForm";
 
@@ -65,9 +61,6 @@ export default function ActiveVouchersPanel({
   activePlans,
   locale,
 }: ActivePlansPanelProps) {
-  const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
-  const [isSubmittingNewVoucher, setIsSubmittingNewVoucher] = useState(false);
-
   const [isEditVoucherModalOpen, setIsEditVoucherModalOpen] = useState(false);
   const [isSubmittingEditVoucher, setIsSubmittingEditVoucher] = useState(false);
 
@@ -85,8 +78,6 @@ export default function ActiveVouchersPanel({
       .then((payload) => setEnrollments(payload.items ?? []))
       .catch(() => setEnrollments([]));
   }, [studentId]);
-
-  const router = useRouter();
 
   const handleRemoveVoucher = async (planId: string) => {
     setIsSubmittingRemoveVoucher(true);
@@ -145,47 +136,6 @@ export default function ActiveVouchersPanel({
     }
   };
 
-  const handleNewVoucher = async (formData: NewVoucherFormData) => {
-    try {
-      setIsSubmittingNewVoucher(true);
-      const res = await fetch(`/api/students/${studentId}/plans`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-        cache: "no-store",
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || "Error al crear el bono.");
-      }
-
-      toast.success("Nuevo bono creado con exito.");
-
-      setIsVoucherModalOpen(false);
-
-      router.refresh();
-      window.location.reload();
-    } catch (error: unknown) {
-      //   console.error(error);
-      if (error instanceof Error) {
-        toast.error(error.message);
-      } else {
-        toast.error("Ocurrió un error inesperado al crear el bono.");
-      }
-    } finally {
-      setIsSubmittingNewVoucher(false);
-    }
-  };
-  const activeVouchersCount = activePlans.filter(
-    (plan) => getVoucherEffectiveStatus({
-      status: plan.status,
-      creditsRemaining: plan.remainingCredits,
-      validFrom: plan.validFrom,
-      validUntil: plan.validUntil,
-    }) === "active",
-  ).length;
-
   return (
     <div className="xl:col-span-2 flex flex-col gap-6 my-5">
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -194,16 +144,6 @@ export default function ActiveVouchersPanel({
           <div className="flex items-center gap-2">
             <CreditCard size={18} className="text-[#9e2727]" />
             <h2 className="font-semibold text-gray-900">Active & Past Plans</h2>
-          </div>
-          <div className="flex flex-wrap gap-2 items-center">
-            <button
-              disabled={isSubmittingNewVoucher}
-              onClick={() => setIsVoucherModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#9e2727] text-white text-sm font-medium rounded-lg hover:bg-[#8a2222] transition-colors shadow-sm cursor-pointer"
-            >
-              <Plus size={16} />
-              Add New Voucher
-            </button>
           </div>
         </div>
 
@@ -365,22 +305,6 @@ export default function ActiveVouchersPanel({
         </div>
       </CustomModal>
 
-      <CustomModal
-        isOpen={isVoucherModalOpen}
-        onClose={() => setIsVoucherModalOpen(false)}
-        title="Add New Voucher"
-      >
-        <div className="p-4">
-          <NewVoucherForm
-            student={studentName}
-            onSubmitForm={handleNewVoucher}
-            isSubmitting={isSubmittingNewVoucher}
-            onClose={() => setIsVoucherModalOpen(false)}
-            activeVouchersCount={activeVouchersCount}
-            enrollments={enrollments}
-          />
-        </div>
-      </CustomModal>
     </div>
   );
 }
