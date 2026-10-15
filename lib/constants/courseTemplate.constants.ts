@@ -42,6 +42,12 @@ export const DEFAULT_OPERATIONAL_DEFAULTS = {
     trialConsumesCredit: false,
     cancellationConsumesCredit: false,
     noShowConsumesCredit: true,
+    consumptionByAttendance: {
+      attended: true,
+      no_show: true,
+      canceled_late: true,
+      canceled_early: false,
+    },
   },
   participantPolicy: {
     participantMode: "solo",

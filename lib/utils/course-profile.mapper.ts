@@ -249,7 +249,11 @@ export function toCourseProfileListItemDTO(
       ),
     ),
   );
-  const policies = normalizeCourseOperationalPolicies(source.policies);
+  const classType = source.classType ?? getFallbackClassType(source.courseType);
+  const policies = normalizeCourseOperationalPolicies(
+    source.policies,
+    classType,
+  );
 
   return {
     id: toIdString(source._id),
@@ -259,7 +263,7 @@ export function toCourseProfileListItemDTO(
     templateVersion: source.templateVersion,
 
     name: source.name?.trim() || source.internalName,
-    classType: source.classType ?? getFallbackClassType(source.courseType),
+    classType,
     studentsCount,
     membersCount: members.length,
     activeMembersCount,
@@ -313,6 +317,7 @@ export function toCourseProfileDetailDTO(
       : "default_fallback";
   const policies = normalizeCourseOperationalPolicies(
     source.policies ?? options.templateOperationalDefaults,
+    source.classType ?? getFallbackClassType(source.courseType),
   );
   const members = normalizeCourseMembers({
     members: source.members,

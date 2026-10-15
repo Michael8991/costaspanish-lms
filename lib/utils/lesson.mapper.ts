@@ -23,6 +23,11 @@ import {
   calculateTotalEstimatedMinutes,
 } from "@/lib/utils/lesson-duration";
 import { normalizeLessonBlockCategories } from "@/lib/utils/lesson-block-categories";
+import type {
+  CourseOperationalPolicies,
+  TemplateClassType,
+} from "@/lib/types/course-policies";
+import { normalizeCourseOperationalPolicies } from "@/lib/utils/course-policies";
 
 interface RawLessonAttendee {
   studentId: Types.ObjectId;
@@ -91,6 +96,8 @@ interface RawCourseReference {
   _id: Types.ObjectId;
   name?: string;
   internalName?: string;
+  classType?: TemplateClassType;
+  policies?: Partial<CourseOperationalPolicies> | null;
 }
 
 interface RawMongoLesson {
@@ -131,6 +138,12 @@ interface RawMongoLesson {
       trialConsumesCredit: boolean;
       cancellationConsumesCredit: boolean;
       noShowConsumesCredit: boolean;
+      consumptionByAttendance?: {
+        attended: boolean;
+        no_show: boolean;
+        canceled_late: boolean;
+        canceled_early: boolean;
+      };
     };
     preparationPolicy: {
       copyTemplateBlocksToLesson: boolean;
@@ -149,6 +162,17 @@ interface RawMongoLesson {
     settledAt?: Date | string | null;
     settledBy?: Types.ObjectId | string | null;
     totalCreditsConsumed?: number;
+    appliedPolicySnapshot?: {
+      creditsPerLesson: number;
+      consumeOn: "completion" | "scheduled";
+      trialConsumesCredit: boolean;
+      consumptionByAttendance: {
+        attended: boolean;
+        no_show: boolean;
+        canceled_late: boolean;
+        canceled_early: boolean;
+      };
+    };
     items?: Array<{
       studentId: Types.ObjectId | string;
       voucherId?: Types.ObjectId | string | null;
@@ -161,6 +185,10 @@ interface RawMongoLesson {
         | "trial_free"
         | "no_show_charged"
         | "no_show_free"
+        | "canceled_late_charged"
+        | "canceled_late_free"
+        | "canceled_early_charged"
+        | "canceled_early_free"
         | "absent_free"
         | "scheduled_policy_not_processed_on_completion"
         | "legacy"
@@ -363,11 +391,35 @@ export function toLessonDetailDTO(lesson: RawMongoLesson): LessonDetailDTO {
     lesson.scheduledStart,
     lesson.scheduledEnd,
   );
+  const populatedCourse =
+    lesson.courseId &&
+    typeof lesson.courseId === "object" &&
+    !(lesson.courseId instanceof Types.ObjectId)
+      ? lesson.courseId
+      : null;
+  const currentCourseCreditPolicy = populatedCourse
+    ? normalizeCourseOperationalPolicies(
+        populatedCourse.policies,
+        populatedCourse.classType ?? lesson.classType,
+      ).creditPolicy
+    : null;
 
   return {
     ...toLessonListDTO(lesson),
 
     teacherId: String(lesson.teacherId),
+    currentCourseCreditPolicy: currentCourseCreditPolicy
+      ? {
+          creditsPerLesson: currentCourseCreditPolicy.creditsPerLesson,
+          consumeOn: currentCourseCreditPolicy.consumeOn,
+          trialConsumesCredit: currentCourseCreditPolicy.trialConsumesCredit,
+          consumptionByAttendance: {
+            ...currentCourseCreditPolicy.consumptionByAttendance,
+          },
+        }
+      : lesson.courseId
+        ? null
+        : undefined,
     creditSettlement: lesson.creditSettlement
       ? {
           status: lesson.creditSettlement.status,
@@ -380,6 +432,15 @@ export function toLessonDetailDTO(lesson: RawMongoLesson): LessonDetailDTO {
           settledBy: toId(lesson.creditSettlement.settledBy) ?? null,
           totalCreditsConsumed:
             lesson.creditSettlement.totalCreditsConsumed ?? 0,
+          appliedPolicySnapshot: lesson.creditSettlement.appliedPolicySnapshot
+            ? {
+                ...lesson.creditSettlement.appliedPolicySnapshot,
+                consumptionByAttendance: {
+                  ...lesson.creditSettlement.appliedPolicySnapshot
+                    .consumptionByAttendance,
+                },
+              }
+            : undefined,
           items: (lesson.creditSettlement.items ?? []).map((item) => ({
             studentId: String(item.studentId),
             voucherId: toId(item.voucherId) ?? null,

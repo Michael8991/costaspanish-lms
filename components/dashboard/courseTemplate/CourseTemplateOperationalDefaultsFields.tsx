@@ -297,19 +297,11 @@ export default function CourseTemplateOperationalDefaultsFields({
           </div>
         </div>
 
-        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+        <div className="mt-4 grid gap-2 sm:grid-cols-1">
           {[
             {
               name: "operationalDefaults.creditPolicy.trialConsumesCredit" as const,
               label: "Trial consume crédito",
-            },
-            {
-              name: "operationalDefaults.creditPolicy.cancellationConsumesCredit" as const,
-              label: "Cancelación consume crédito",
-            },
-            {
-              name: "operationalDefaults.creditPolicy.noShowConsumesCredit" as const,
-              label: "No-show consume crédito",
             },
           ].map((option) => (
             <label
@@ -324,6 +316,48 @@ export default function CourseTemplateOperationalDefaultsFields({
               {option.label}
             </label>
           ))}
+        </div>
+
+        <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <h4 className="text-sm font-semibold text-slate-900">
+            Política de consumo
+          </h4>
+          <p className="mt-1 text-xs text-slate-500">
+            Cambiar el tipo de clase conserva estos valores para no sobrescribir
+            una configuración manual.
+          </p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {[
+              {
+                name: "operationalDefaults.creditPolicy.consumptionByAttendance.attended" as const,
+                label: "Asistió",
+              },
+              {
+                name: "operationalDefaults.creditPolicy.consumptionByAttendance.no_show" as const,
+                label: "No-show",
+              },
+              {
+                name: "operationalDefaults.creditPolicy.consumptionByAttendance.canceled_late" as const,
+                label: "Cancelación tardía",
+              },
+              {
+                name: "operationalDefaults.creditPolicy.consumptionByAttendance.canceled_early" as const,
+                label: "Cancelación anticipada",
+              },
+            ].map((option) => (
+              <label
+                key={option.name}
+                className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700"
+              >
+                <input
+                  type="checkbox"
+                  {...register(option.name)}
+                  className="rounded border-slate-300 text-[#9e2727] focus:ring-[#9e2727]"
+                />
+                {option.label}
+              </label>
+            ))}
+          </div>
         </div>
       </div>
 

@@ -200,6 +200,16 @@ const CourseSchedulingDefaultsSchema =
     { _id: false },
   );
 
+const ConsumptionByAttendanceSchema = new Schema(
+  {
+    attended: { type: Boolean, required: true },
+    no_show: { type: Boolean, required: true },
+    canceled_late: { type: Boolean, required: true },
+    canceled_early: { type: Boolean, required: true },
+  },
+  { _id: false },
+);
+
 const CourseCreditPolicySchema = new Schema<ICourseCreditPolicy>(
   {
     creditsPerLesson: {
@@ -228,6 +238,10 @@ const CourseCreditPolicySchema = new Schema<ICourseCreditPolicy>(
       type: Boolean,
       required: true,
       default: true,
+    },
+    consumptionByAttendance: {
+      type: ConsumptionByAttendanceSchema,
+      required: false,
     },
   },
   { _id: false },
@@ -300,7 +314,13 @@ const CourseOperationalDefaultsSchema =
       creditPolicy: {
         type: CourseCreditPolicySchema,
         required: true,
-        default: () => ({ ...DEFAULT_OPERATIONAL_DEFAULTS.creditPolicy }),
+        default: () => ({
+          ...DEFAULT_OPERATIONAL_DEFAULTS.creditPolicy,
+          consumptionByAttendance: {
+            ...DEFAULT_OPERATIONAL_DEFAULTS.creditPolicy
+              .consumptionByAttendance,
+          },
+        }),
       },
       participantPolicy: {
         type: CourseParticipantPolicySchema,
@@ -697,7 +717,13 @@ const CourseTemplateSchema = new Schema<ICourseTemplate>(
           ...DEFAULT_OPERATIONAL_DEFAULTS.schedulingDefaults,
           preferredWeekdays: [],
         },
-        creditPolicy: { ...DEFAULT_OPERATIONAL_DEFAULTS.creditPolicy },
+        creditPolicy: {
+          ...DEFAULT_OPERATIONAL_DEFAULTS.creditPolicy,
+          consumptionByAttendance: {
+            ...DEFAULT_OPERATIONAL_DEFAULTS.creditPolicy
+              .consumptionByAttendance,
+          },
+        },
         participantPolicy: {
           ...DEFAULT_OPERATIONAL_DEFAULTS.participantPolicy,
         },

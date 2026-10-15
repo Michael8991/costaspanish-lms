@@ -31,6 +31,8 @@ import type {
 import type { CourseTemplateDetailDTO } from "@/lib/dto/course-template.dto";
 import type { LessonListDTO } from "@/lib/dto/lesson.dto";
 import type { CourseEnrollmentListItemDTO } from "@/lib/dto/course-enrollment.dto";
+import { getDefaultConsumptionByAttendance } from "@/lib/utils/course-policies";
+import type { ConsumptionByAttendance } from "@/lib/types/course-policies";
 import {
   COURSE_PROFILE_CLASS_TYPES,
 } from "@/lib/validators/courseProfile.validator";
@@ -426,6 +428,11 @@ function EditCourseModal({
   const [status, setStatus] =
     useState<CourseProfileDetailDTO["status"]>(course.status);
   const [classType, setClassType] = useState<ClassType>(course.classType);
+  const [consumptionByAttendance, setConsumptionByAttendance] =
+    useState<ConsumptionByAttendance>({
+      ...(course.policies.creditPolicy.consumptionByAttendance ??
+        getDefaultConsumptionByAttendance(course.classType)),
+    });
   const [startDate, setStartDate] = useState(
     course.startDate?.slice(0, 10) ?? "",
   );
@@ -454,6 +461,13 @@ function EditCourseModal({
           targetEndDate: targetEndDate || null,
           scheduleNotes,
           internalNotes,
+          policies: {
+            ...course.policies,
+            creditPolicy: {
+              ...course.policies.creditPolicy,
+              consumptionByAttendance,
+            },
+          },
         }),
       });
       const data = (await response.json().catch(() => null)) as {
@@ -568,6 +582,42 @@ function EditCourseModal({
               className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5"
             />
           </label>
+          <fieldset className="rounded-xl border border-slate-200 bg-slate-50 p-4 sm:col-span-2">
+            <legend className="px-1 text-sm font-semibold text-slate-900">
+              Política de consumo de este curso
+            </legend>
+            <p className="mt-1 text-xs text-slate-500">
+              Cambiar el tipo de clase no modifica automáticamente estas reglas.
+            </p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {[
+                ["attended", "Asistió"],
+                ["no_show", "No-show"],
+                ["canceled_late", "Cancelación tardía"],
+                ["canceled_early", "Cancelación anticipada"],
+              ].map(([key, label]) => (
+                <label
+                  key={key}
+                  className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700"
+                >
+                  <input
+                    type="checkbox"
+                    checked={consumptionByAttendance[
+                      key as keyof ConsumptionByAttendance
+                    ]}
+                    onChange={(event) =>
+                      setConsumptionByAttendance((current) => ({
+                        ...current,
+                        [key]: event.target.checked,
+                      }))
+                    }
+                    className="rounded border-slate-300 text-[#9e2727] focus:ring-[#9e2727]"
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <label className="block text-sm font-medium text-slate-700 sm:col-span-2">
             Notas de horario
             <textarea

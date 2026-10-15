@@ -11,6 +11,9 @@ import {
   LESSON_SKILLS,
 } from "@/lib/constants/lesson.constants";
 import { toLessonDetailDTO } from "@/lib/utils/lesson.mapper";
+import { validateUniqueLessonAttendees } from "@/lib/utils/lesson-attendees";
+import { normalizeCourseOperationalPolicies } from "@/lib/utils/course-policies";
+import { buildLessonPolicySnapshotFromCoursePolicies } from "@/lib/utils/lesson-policy-snapshot";
 import { createLessonFromCourseSchema } from "@/lib/validators/courseLesson.validator";
 import dbConnect from "@/lib/mongo";
 import type {
@@ -234,6 +237,36 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
+    const attendees = studentIds.map((studentId) => ({
+      studentId,
+      attendanceStatus: "pending" as const,
+      creditsToConsume: 1,
+      isTrial: false,
+    }));
+    const attendeeUniqueness = validateUniqueLessonAttendees(attendees);
+    if (!attendeeUniqueness.ok) {
+      return NextResponse.json(
+        {
+          error: attendeeUniqueness.error,
+          code: attendeeUniqueness.code,
+        },
+        { status: attendeeUniqueness.status },
+      );
+    }
+
+    const policies = normalizeCourseOperationalPolicies(
+      courseProfile.policies ?? template.operationalDefaults,
+      courseProfile.classType,
+    );
+    const durationMinutes = Math.max(
+      1,
+      Math.round(
+        (parsed.data.scheduledEnd.getTime() -
+          parsed.data.scheduledStart.getTime()) /
+          60_000,
+      ),
+    );
+
     const teacherId =
       courseProfile.teacherId ?? courseProfile.ownerTeacherId;
     const title =
@@ -261,6 +294,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
         moduleTitle: templateModule.title,
         lessonTitle: templateLesson.title,
       },
+      policySnapshot: buildLessonPolicySnapshotFromCoursePolicies({
+        policies,
+        durationMinutes,
+        timezone: parsed.data.timezone,
+        classType: courseProfile.classType,
+      }),
       title,
       scheduledStart: parsed.data.scheduledStart,
       scheduledEnd: parsed.data.scheduledEnd,
@@ -269,11 +308,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
       preparationStatus: "needs_preparation",
       classType: courseProfile.classType,
       isTrial: false,
-      attendees: studentIds.map((studentId) => ({
-        studentId,
-        attendanceStatus: "pending",
-        creditsToConsume: 1,
-        isTrial: false,
+      attendees: attendees.map((attendee) => ({
+        ...attendee,
+        creditsToConsume: policies.creditPolicy.creditsPerLesson,
       })),
       blocks,
       preparationNotes: "",

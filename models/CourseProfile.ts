@@ -664,6 +664,16 @@ const CoursePolicySchedulingDefaultsSchema =
     { _id: false },
   );
 
+const ConsumptionByAttendanceSchema = new Schema(
+  {
+    attended: { type: Boolean, required: true },
+    no_show: { type: Boolean, required: true },
+    canceled_late: { type: Boolean, required: true },
+    canceled_early: { type: Boolean, required: true },
+  },
+  { _id: false },
+);
+
 const CoursePolicyCreditSchema = new Schema<CourseCreditPolicy>(
   {
     creditsPerLesson: { type: Number, required: true, min: 0 },
@@ -675,6 +685,10 @@ const CoursePolicyCreditSchema = new Schema<CourseCreditPolicy>(
     trialConsumesCredit: { type: Boolean, required: true },
     cancellationConsumesCredit: { type: Boolean, required: true },
     noShowConsumesCredit: { type: Boolean, required: true },
+    consumptionByAttendance: {
+      type: ConsumptionByAttendanceSchema,
+      required: false,
+    },
   },
   { _id: false },
 );

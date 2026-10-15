@@ -286,6 +286,16 @@ const CourseLinkSchema = new Schema(
   { _id: false },
 );
 
+const ConsumptionByAttendanceSchema = new Schema(
+  {
+    attended: { type: Boolean, required: true },
+    no_show: { type: Boolean, required: true },
+    canceled_late: { type: Boolean, required: true },
+    canceled_early: { type: Boolean, required: true },
+  },
+  { _id: false },
+);
+
 const LessonPolicySnapshotSchema = new Schema(
   {
     lessonDefaults: {
@@ -327,6 +337,10 @@ const LessonPolicySnapshotSchema = new Schema(
       noShowConsumesCredit: {
         type: Boolean,
         required: true,
+      },
+      consumptionByAttendance: {
+        type: ConsumptionByAttendanceSchema,
+        required: false,
       },
     },
     preparationPolicy: {
@@ -387,6 +401,10 @@ const LessonCreditSettlementItemSchema = new Schema(
         "trial_free",
         "no_show_charged",
         "no_show_free",
+        "canceled_late_charged",
+        "canceled_late_free",
+        "canceled_early_charged",
+        "canceled_early_free",
         "absent_free",
         "scheduled_policy_not_processed_on_completion",
         "legacy",
@@ -409,6 +427,30 @@ const LessonCreditSettlementItemSchema = new Schema(
     notes: {
       type: String,
       trim: true,
+    },
+  },
+  { _id: false },
+);
+
+const AppliedLessonCreditPolicySnapshotSchema = new Schema(
+  {
+    creditsPerLesson: {
+      type: Number,
+      min: 0,
+      required: true,
+    },
+    consumeOn: {
+      type: String,
+      enum: ["completion", "scheduled"],
+      required: true,
+    },
+    trialConsumesCredit: {
+      type: Boolean,
+      required: true,
+    },
+    consumptionByAttendance: {
+      type: ConsumptionByAttendanceSchema,
+      required: true,
     },
   },
   { _id: false },
@@ -456,6 +498,10 @@ const LessonCreditSettlementSchema = new Schema(
       min: 0,
       required: true,
       default: 0,
+    },
+    appliedPolicySnapshot: {
+      type: AppliedLessonCreditPolicySnapshotSchema,
+      required: false,
     },
     items: {
       type: [LessonCreditSettlementItemSchema],

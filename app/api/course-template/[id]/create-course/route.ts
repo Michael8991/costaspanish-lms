@@ -138,7 +138,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const templateDTO = toCourseTemplateDetailDTO(template);
     const policies = cloneCourseOperationalPolicies(
-      templateDTO.operationalDefaults,
+      template.operationalDefaults,
+      parsed.data.classType,
     );
     const courseId = new Types.ObjectId();
     const enrolledAt = parsed.data.startDate

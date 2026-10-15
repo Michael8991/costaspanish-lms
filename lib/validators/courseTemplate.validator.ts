@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeCourseOperationalPolicies } from "@/lib/utils/course-policies";
 import {
   COURSETEMPLATE_STATUS,
   CURRENCY_CODES,
@@ -257,6 +258,14 @@ export const courseCreditPolicySchema = z.object({
   trialConsumesCredit: z.boolean().default(false),
   cancellationConsumesCredit: z.boolean().default(false),
   noShowConsumesCredit: z.boolean().default(true),
+  consumptionByAttendance: z
+    .object({
+      attended: z.boolean(),
+      no_show: z.boolean(),
+      canceled_late: z.boolean(),
+      canceled_early: z.boolean(),
+    })
+    .optional(),
 });
 
 export const courseParticipantPolicySchema = z
@@ -314,7 +323,8 @@ export const coursePreparationPolicySchema = z.object({
     .default("needs_preparation"),
 });
 
-const courseOperationalDefaultsObjectSchema = z.object({
+const courseOperationalDefaultsObjectSchema = z
+  .object({
     lessonDefaults: courseLessonDefaultsSchema.default({
       ...DEFAULT_OPERATIONAL_DEFAULTS.lessonDefaults,
     }),
@@ -323,7 +333,14 @@ const courseOperationalDefaultsObjectSchema = z.object({
       preferredWeekdays: [],
     }),
     creditPolicy: courseCreditPolicySchema.default({
-      ...DEFAULT_OPERATIONAL_DEFAULTS.creditPolicy,
+      creditsPerLesson: DEFAULT_OPERATIONAL_DEFAULTS.creditPolicy.creditsPerLesson,
+      consumeOn: DEFAULT_OPERATIONAL_DEFAULTS.creditPolicy.consumeOn,
+      trialConsumesCredit:
+        DEFAULT_OPERATIONAL_DEFAULTS.creditPolicy.trialConsumesCredit,
+      cancellationConsumesCredit:
+        DEFAULT_OPERATIONAL_DEFAULTS.creditPolicy.cancellationConsumesCredit,
+      noShowConsumesCredit:
+        DEFAULT_OPERATIONAL_DEFAULTS.creditPolicy.noShowConsumesCredit,
     }),
     participantPolicy: courseParticipantPolicySchema.default({
       ...DEFAULT_OPERATIONAL_DEFAULTS.participantPolicy,
@@ -331,7 +348,13 @@ const courseOperationalDefaultsObjectSchema = z.object({
     preparationPolicy: coursePreparationPolicySchema.default({
       ...DEFAULT_OPERATIONAL_DEFAULTS.preparationPolicy,
     }),
-  });
+  })
+  .transform((policies) =>
+    normalizeCourseOperationalPolicies(
+      policies,
+      policies.lessonDefaults.defaultClassType,
+    ),
+  );
 
 export const courseOperationalDefaultsSchema =
   courseOperationalDefaultsObjectSchema.default({

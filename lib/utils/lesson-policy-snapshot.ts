@@ -18,7 +18,10 @@ export function buildLessonPolicySnapshotFromCoursePolicies({
   timezone,
   classType,
 }: BuildLessonPolicySnapshotArgs): LessonPolicySnapshot {
-  const normalized = normalizeCourseOperationalPolicies(policies);
+  const normalized = normalizeCourseOperationalPolicies(
+    policies,
+    classType,
+  );
   const resolvedDuration =
     durationMinutes !== undefined &&
     Number.isFinite(durationMinutes) &&
@@ -36,7 +39,12 @@ export function buildLessonPolicySnapshotFromCoursePolicies({
       defaultClassType:
         classType ?? normalized.lessonDefaults.defaultClassType,
     },
-    creditPolicy: { ...normalized.creditPolicy },
+    creditPolicy: {
+      ...normalized.creditPolicy,
+      consumptionByAttendance: {
+        ...normalized.creditPolicy.consumptionByAttendance,
+      },
+    },
     preparationPolicy: { ...normalized.preparationPolicy },
   };
 }

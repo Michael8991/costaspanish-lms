@@ -51,6 +51,7 @@ import {
   getParticipantModeLabel,
 } from "@/lib/utils/course-template-visuals";
 import { normalizeBlockCategories } from "@/lib/utils/lesson-block-categories";
+import { getDefaultConsumptionByAttendance } from "@/lib/utils/course-policies";
 import z from "zod";
 import { toast } from "sonner";
 import type { ImportedLessonResult } from "@/components/dashboard/courses/templates/SaveLessonAsTemplateModal";
@@ -221,6 +222,8 @@ function getDefaultValues(
           trialConsumesCredit: false,
           cancellationConsumesCredit: false,
           noShowConsumesCredit: true,
+          consumptionByAttendance:
+            getDefaultConsumptionByAttendance("private"),
         },
         participantPolicy: {
           participantMode: "solo",
@@ -318,6 +321,13 @@ function getDefaultValues(
             .cancellationConsumesCredit,
         noShowConsumesCredit:
           initialData.operationalDefaults.creditPolicy.noShowConsumesCredit,
+        consumptionByAttendance: {
+          ...(initialData.operationalDefaults.creditPolicy
+            .consumptionByAttendance ??
+            getDefaultConsumptionByAttendance(
+              initialData.operationalDefaults.lessonDefaults.defaultClassType,
+            )),
+        },
       },
       participantPolicy: {
         participantMode:
@@ -571,6 +581,14 @@ function normalizeBeforeSubmit(
         noShowConsumesCredit:
           values.operationalDefaults?.creditPolicy?.noShowConsumesCredit ??
           true,
+        consumptionByAttendance: {
+          ...(values.operationalDefaults?.creditPolicy
+            ?.consumptionByAttendance ??
+            getDefaultConsumptionByAttendance(
+              values.operationalDefaults?.lessonDefaults?.defaultClassType ??
+                "private",
+            )),
+        },
       },
       participantPolicy: {
         participantMode:

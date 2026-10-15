@@ -1,12 +1,20 @@
-import type { CourseOperationalPolicies } from "@/lib/types/course-policies";
 import type {
+  ConsumptionByAttendance,
+  CourseOperationalPolicies,
+  TemplateClassType,
+} from "@/lib/types/course-policies";
+import type {
+  AppliedLessonCreditPolicySnapshot,
   LessonAttendanceStatus,
   LessonCreditPolicySource,
   LessonCreditSettlementReason,
   LessonCreditSettlementSource,
   LessonPolicySnapshot,
 } from "@/lib/types/lesson";
-import { normalizeCourseOperationalPolicies } from "@/lib/utils/course-policies";
+import {
+  getDefaultConsumptionByAttendance,
+  normalizeCourseOperationalPolicies,
+} from "@/lib/utils/course-policies";
 
 export interface EffectiveLessonCreditPolicy {
   mode: "course" | "legacy";
@@ -15,6 +23,7 @@ export interface EffectiveLessonCreditPolicy {
   trialConsumesCredit: boolean;
   cancellationConsumesCredit: boolean;
   noShowConsumesCredit: boolean;
+  consumptionByAttendance: ConsumptionByAttendance;
 }
 
 export interface EffectiveLessonCreditPolicyResult {
@@ -25,10 +34,15 @@ export interface EffectiveLessonCreditPolicyResult {
 
 interface LessonPolicyInput {
   courseId?: unknown;
-  policySnapshot?: Pick<LessonPolicySnapshot, "creditPolicy"> | null;
+  classType?: TemplateClassType;
+  policySnapshot?: Pick<
+    LessonPolicySnapshot,
+    "creditPolicy" | "lessonDefaults"
+  > | null;
 }
 
 interface CoursePolicyInput {
+  classType?: TemplateClassType;
   policies?: Partial<CourseOperationalPolicies> | null;
 }
 
@@ -44,6 +58,14 @@ function nonNegativeCredits(value: number | undefined, fallback: number) {
     : fallback;
 }
 
+function getLessonClassType(lesson: LessonPolicyInput): TemplateClassType {
+  return (
+    lesson.classType ??
+    lesson.policySnapshot?.lessonDefaults.defaultClassType ??
+    "private"
+  );
+}
+
 export function resolveEffectiveLessonCreditPolicy({
   lesson,
   courseProfile,
@@ -51,30 +73,10 @@ export function resolveEffectiveLessonCreditPolicy({
   lesson: LessonPolicyInput;
   courseProfile?: CoursePolicyInput | null;
 }): EffectiveLessonCreditPolicyResult {
-  if (lesson.policySnapshot?.creditPolicy) {
-    const creditPolicy = lesson.policySnapshot.creditPolicy;
-
-    return {
-      policy: {
-        mode: "course",
-        creditsPerLesson: nonNegativeCredits(
-          creditPolicy.creditsPerLesson,
-          0,
-        ),
-        consumeOn: creditPolicy.consumeOn,
-        trialConsumesCredit: creditPolicy.trialConsumesCredit,
-        cancellationConsumesCredit:
-          creditPolicy.cancellationConsumesCredit,
-        noShowConsumesCredit: creditPolicy.noShowConsumesCredit,
-      },
-      source: "course_policy",
-      policySource: "lesson_snapshot",
-    };
-  }
-
   if (lesson.courseId && courseProfile) {
     const creditPolicy = normalizeCourseOperationalPolicies(
       courseProfile.policies,
+      courseProfile.classType ?? getLessonClassType(lesson),
     ).creditPolicy;
 
     return {
@@ -86,10 +88,19 @@ export function resolveEffectiveLessonCreditPolicy({
         cancellationConsumesCredit:
           creditPolicy.cancellationConsumesCredit,
         noShowConsumesCredit: creditPolicy.noShowConsumesCredit,
+        consumptionByAttendance: {
+          ...creditPolicy.consumptionByAttendance,
+        },
       },
-      source: "course_policy_fallback",
+      source: "course_policy",
       policySource: "course_profile",
     };
+  }
+
+  if (lesson.courseId) {
+    throw new Error(
+      "CourseProfile is required to resolve credit policy for a course lesson",
+    );
   }
 
   return {
@@ -100,9 +111,25 @@ export function resolveEffectiveLessonCreditPolicy({
       trialConsumesCredit: false,
       cancellationConsumesCredit: false,
       noShowConsumesCredit: true,
+      consumptionByAttendance: getDefaultConsumptionByAttendance(
+        getLessonClassType(lesson),
+      ),
     },
     source: "legacy_attendees",
     policySource: "legacy",
+  };
+}
+
+export function buildAppliedPolicySnapshot(
+  policy: EffectiveLessonCreditPolicy,
+): AppliedLessonCreditPolicySnapshot | undefined {
+  if (policy.mode !== "course") return undefined;
+
+  return {
+    creditsPerLesson: policy.creditsPerLesson,
+    consumeOn: policy.consumeOn,
+    trialConsumesCredit: policy.trialConsumesCredit,
+    consumptionByAttendance: { ...policy.consumptionByAttendance },
   };
 }
 
@@ -164,28 +191,31 @@ export function calculateCreditsForAttendee({
     };
   }
 
-  if (attendee.attendanceStatus === "attended") {
+  const attendanceStatus = attendee.attendanceStatus;
+  if (attendanceStatus === "pending") {
     return {
       creditsPlanned,
-      creditsConsumed: creditsPlanned,
-      reason: creditsPlanned > 0 ? "attended" : "no_voucher_required",
+      creditsConsumed: 0,
+      reason: "absent_free",
     };
   }
 
-  if (attendee.attendanceStatus === "no_show") {
-    return {
-      creditsPlanned,
-      creditsConsumed: policy.noShowConsumesCredit ? creditsPlanned : 0,
-      reason: policy.noShowConsumesCredit
-        ? "no_show_charged"
-        : "no_show_free",
-    };
-  }
+  const shouldConsume =
+    policy.consumptionByAttendance[attendanceStatus];
+  const reasonByAttendance = {
+    attended: shouldConsume ? "attended" : "no_voucher_required",
+    no_show: shouldConsume ? "no_show_charged" : "no_show_free",
+    canceled_late: shouldConsume
+      ? "canceled_late_charged"
+      : "canceled_late_free",
+    canceled_early: shouldConsume
+      ? "canceled_early_charged"
+      : "canceled_early_free",
+  } as const;
 
-  // TODO: Apply cancellationConsumesCredit in the cancellation endpoint.
   return {
     creditsPlanned,
-    creditsConsumed: 0,
-    reason: "absent_free",
+    creditsConsumed: shouldConsume ? creditsPlanned : 0,
+    reason: reasonByAttendance[attendanceStatus],
   };
 }

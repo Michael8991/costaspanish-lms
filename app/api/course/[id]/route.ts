@@ -14,7 +14,7 @@ import {
 } from "@/models/CourseProfile";
 import { CourseTemplate } from "@/models/CourseTemplate";
 import type { ClassType } from "@/models/StudentProfile";
-import { normalizeCourseOperationalPolicies } from "@/lib/utils/course-policies";
+import { normalizeCourseProfilePoliciesForWrite } from "@/lib/utils/course-policies";
 
 export const runtime = "nodejs";
 
@@ -212,8 +212,27 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       };
     }
     if (parsed.data.policies) {
-      course.policies = normalizeCourseOperationalPolicies(
+      const rawPolicies =
+        typeof body === "object" && body !== null && "policies" in body
+          ? body.policies
+          : null;
+      const rawCreditPolicy =
+        typeof rawPolicies === "object" &&
+        rawPolicies !== null &&
+        "creditPolicy" in rawPolicies
+          ? rawPolicies.creditPolicy
+          : null;
+      const consumptionMapWasProvided =
+        typeof rawCreditPolicy === "object" &&
+        rawCreditPolicy !== null &&
+        Object.prototype.hasOwnProperty.call(
+          rawCreditPolicy,
+          "consumptionByAttendance",
+        );
+      course.policies = normalizeCourseProfilePoliciesForWrite(
         parsed.data.policies,
+        parsed.data.classType ?? course.classType ?? "private",
+        consumptionMapWasProvided,
       );
       course.markModified("policies");
     }

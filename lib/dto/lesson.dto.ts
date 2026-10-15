@@ -11,6 +11,14 @@ import {
 } from "@/lib/types/lesson";
 import { normalizeLessonBlockCategories } from "@/lib/utils/lesson-block-categories";
 import { isoToDatetimeLocalValue } from "@/lib/utils/time-zone";
+import type { ConsumptionByAttendance } from "@/lib/types/course-policies";
+
+export interface AppliedLessonCreditPolicySnapshotDTO {
+  creditsPerLesson: number;
+  consumeOn: "completion" | "scheduled";
+  trialConsumesCredit: boolean;
+  consumptionByAttendance: ConsumptionByAttendance;
+}
 
 export interface LessonBlockResourceDTO{
   id: string;
@@ -121,6 +129,7 @@ export interface LessonPolicySnapshotDTO {
     trialConsumesCredit: boolean;
     cancellationConsumesCredit: boolean;
     noShowConsumesCredit: boolean;
+    consumptionByAttendance?: ConsumptionByAttendance;
   };
   preparationPolicy: {
     copyTemplateBlocksToLesson: boolean;
@@ -141,6 +150,10 @@ export interface LessonCreditSettlementItemDTO {
     | "trial_free"
     | "no_show_charged"
     | "no_show_free"
+    | "canceled_late_charged"
+    | "canceled_late_free"
+    | "canceled_early_charged"
+    | "canceled_early_free"
     | "absent_free"
     | "scheduled_policy_not_processed_on_completion"
     | "legacy"
@@ -161,6 +174,7 @@ export interface LessonCreditSettlementDTO {
   settledAt: string | null;
   settledBy: string | null;
   totalCreditsConsumed: number;
+  appliedPolicySnapshot?: AppliedLessonCreditPolicySnapshotDTO;
   items: LessonCreditSettlementItemDTO[];
   warnings: string[];
 }
@@ -198,6 +212,7 @@ export interface LessonListDTO {
 export interface LessonDetailDTO extends LessonListDTO {
   teacherId: string;
   creditSettlement: LessonCreditSettlementDTO | null;
+  currentCourseCreditPolicy?: AppliedLessonCreditPolicySnapshotDTO | null;
 
   attendees: LessonAttendeeDTO[];
   blocks: LessonBlockDTO[];

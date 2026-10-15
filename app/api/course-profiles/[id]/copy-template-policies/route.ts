@@ -6,7 +6,6 @@ import { requireAuth, requireRole } from "@/lib/auth/apiAuth";
 import dbConnect from "@/lib/mongo";
 import { toCourseProfileDetailDTO } from "@/lib/utils/course-profile.mapper";
 import { cloneCourseOperationalPolicies } from "@/lib/utils/course-policies";
-import { toCourseTemplateDetailDTO } from "@/lib/utils/course-template.mapper";
 import { CourseProfile } from "@/models/CourseProfile";
 import { CourseTemplate } from "@/models/CourseTemplate";
 
@@ -69,9 +68,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    const templateDTO = toCourseTemplateDetailDTO(template);
     course.policies = cloneCourseOperationalPolicies(
-      templateDTO.operationalDefaults,
+      template.operationalDefaults,
+      course.classType,
     );
     course.markModified("policies");
     await course.save();
