@@ -1,6 +1,10 @@
 import { Types } from "mongoose";
 
 import type { Role } from "@/lib/auth/apiAuth";
+import {
+  BUSINESS_MONTH_PATTERN,
+  getBusinessMonthRange,
+} from "@/lib/utils/finance-month";
 
 export class FinanceLedgerQueryError extends Error {}
 
@@ -52,22 +56,14 @@ export function parseFinanceMonth(month: string | null): {
   end: Date;
 } | null {
   if (!month) return null;
-  const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(month);
-  if (!match) {
+  if (!BUSINESS_MONTH_PATTERN.test(month)) {
     throw new FinanceLedgerQueryError("month must use YYYY-MM format");
   }
 
-  const year = Number(match[1]);
-  const monthIndex = Number(match[2]) - 1;
   return {
     month,
-    start: new Date(Date.UTC(year, monthIndex, 1)),
-    end: new Date(Date.UTC(year, monthIndex + 1, 1)),
+    ...getBusinessMonthRange(month),
   };
-}
-
-export function getCurrentUtcMonth(): string {
-  return new Date().toISOString().slice(0, 7);
 }
 
 export function buildFinanceOwnershipFilter(args: {
