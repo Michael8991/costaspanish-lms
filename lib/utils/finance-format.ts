@@ -1,3 +1,8 @@
+import {
+  BUSINESS_MONTH_PATTERN,
+  getCurrentBusinessMonth,
+} from "@/lib/utils/finance-month";
+
 const currencyFormatter = new Intl.NumberFormat("es-ES", {
   style: "currency",
   currency: "EUR",
@@ -21,7 +26,7 @@ const monthFormatter = new Intl.DateTimeFormat("es-ES", {
   timeZone: "UTC",
 });
 
-export const FINANCE_MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+export const FINANCE_MONTH_PATTERN = BUSINESS_MONTH_PATTERN;
 
 export function formatCurrencyEUR(value: number): string {
   return currencyFormatter.format(Number.isFinite(value) ? value : 0);
@@ -49,8 +54,8 @@ export function formatFinanceMonth(month: string): string {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
-export function getCurrentFinanceMonth(): string {
-  return new Date().toISOString().slice(0, 7);
+export function getCurrentFinanceMonth(now = new Date()): string {
+  return getCurrentBusinessMonth(now);
 }
 
 export function shiftFinanceMonth(month: string, offset: number): string {

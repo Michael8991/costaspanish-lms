@@ -5,9 +5,9 @@ import dbConnect from "@/lib/mongo";
 import {
   buildFinanceOwnershipFilter,
   FinanceLedgerQueryError,
-  getCurrentUtcMonth,
   parseFinanceMonth,
 } from "@/lib/server/finance-ledger.query";
+import { getCurrentBusinessMonth } from "@/lib/utils/finance-month";
 import { CreditLedgerEntry } from "@/models/CreditLedgerEntry";
 import { PaymentLedgerEntry } from "@/models/PaymentLedgerEntry";
 import { fromCents } from "@/lib/utils/money";
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const month =
       parseFinanceMonth(
-        searchParams.get("month") ?? getCurrentUtcMonth(),
+        searchParams.get("month") ?? getCurrentBusinessMonth(),
       );
     if (!month) {
       throw new FinanceLedgerQueryError("month is required");
