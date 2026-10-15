@@ -13,6 +13,10 @@ import {
 } from "@/lib/constants/lesson.constants";
 import { Types } from "mongoose";
 import { WEEKDAY_VALUES } from "@/lib/utils/lesson-recurrence";
+import {
+  DUPLICATE_LESSON_ATTENDEE_ERROR,
+  validateUniqueLessonAttendees,
+} from "@/lib/utils/lesson-attendees";
 
 
 const objectIdSchema = z
@@ -62,6 +66,14 @@ const lessonPolicySnapshotSchema = z.object({
     trialConsumesCredit: z.boolean(),
     cancellationConsumesCredit: z.boolean(),
     noShowConsumesCredit: z.boolean(),
+    consumptionByAttendance: z
+      .object({
+        attended: z.boolean(),
+        no_show: z.boolean(),
+        canceled_late: z.boolean(),
+        canceled_early: z.boolean(),
+      })
+      .optional(),
   }),
   preparationPolicy: z.object({
     copyTemplateBlocksToLesson: z.boolean(),
@@ -139,6 +151,41 @@ const lessonAttendeePatchSchema = lessonAttendeeBaseSchema.transform(
     };
   },
 );
+
+function addDuplicateAttendeeIssue(
+  attendees: Array<{ studentId: string }>,
+  ctx: z.RefinementCtx,
+) {
+  const result = validateUniqueLessonAttendees(attendees);
+  if (result.ok) return;
+
+  const duplicateIndex = attendees.findIndex(
+    (attendee, index) =>
+      index > 0 &&
+      attendees
+        .slice(0, index)
+        .some(
+          (candidate) =>
+            candidate.studentId.toLowerCase() ===
+            attendee.studentId.toLowerCase(),
+        ),
+  );
+
+  ctx.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: [Math.max(duplicateIndex, 0), "studentId"],
+    message: DUPLICATE_LESSON_ATTENDEE_ERROR,
+  });
+}
+
+const lessonAttendeesSchema = z
+  .array(lessonAttendeeSchema)
+  .min(1)
+  .superRefine(addDuplicateAttendeeIssue);
+
+const lessonAttendeesPatchSchema = z
+  .array(lessonAttendeePatchSchema)
+  .superRefine(addDuplicateAttendeeIssue);
 export const lessonBlockSchema = z
   .object({
     lineageId: z.string().trim().min(1).optional(),
@@ -205,7 +252,7 @@ const lessonBaseSchema = z.object({
   classType: z.enum(LESSON_CLASS_TYPES),
   isTrial: z.boolean().default(false),
 
-  attendees: z.array(lessonAttendeeSchema).min(1),
+  attendees: lessonAttendeesSchema,
   blocks: z.array(lessonBlockSchema).default([]),
 
   preparationNotes: z.string().trim().optional(),
@@ -304,7 +351,7 @@ const courseLessonCreationSchema = lessonBaseSchema
     timezone: z.string().trim().min(1).optional(),
     classType: z.enum(LESSON_CLASS_TYPES).optional(),
     isTrial: z.boolean().optional(),
-    attendees: z.array(z.unknown()).optional(),
+    attendees: lessonAttendeesPatchSchema.optional(),
     preparationStatus: z.enum(LESSON_PREPARATION_STATUSES).optional(),
     recurrence: lessonRecurrenceSchema.optional(),
   })
@@ -351,7 +398,7 @@ const updateLessonBaseSchema = z.object({
   classType: z.enum(LESSON_CLASS_TYPES).optional(),
   isTrial: z.boolean().optional(),
 
-  attendees: z.array(lessonAttendeePatchSchema).optional(),
+  attendees: lessonAttendeesPatchSchema.optional(),
   blocks: z.array(lessonBlockSchema).optional(),
 
   preparationNotes: z.string().trim().optional(),

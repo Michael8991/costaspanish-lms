@@ -6,9 +6,11 @@ import {
 } from "@/lib/constants/courseTemplate.constants";
 import { LESSON_CLASS_TYPES } from "@/lib/constants/lesson.constants";
 import type {
+  ConsumptionByAttendance,
   CourseOperationalPolicies,
   CourseTemplateFrequency,
   CreditConsumeOn,
+  NormalizedCourseOperationalPolicies,
   ParticipantMode,
   TemplateClassType,
 } from "@/lib/types/course-policies";
@@ -48,14 +50,31 @@ function isParticipantMode(value: unknown): value is ParticipantMode {
   return PARTICIPANT_MODES.some((candidate) => candidate === value);
 }
 
-export function getDefaultCourseOperationalPolicies(): CourseOperationalPolicies {
+export function getDefaultConsumptionByAttendance(
+  classType?: TemplateClassType,
+): ConsumptionByAttendance {
+  return {
+    attended: true,
+    no_show: true,
+    canceled_late: true,
+    canceled_early: classType === "group_regular",
+  };
+}
+
+export function getDefaultCourseOperationalPolicies(): NormalizedCourseOperationalPolicies {
   return {
     lessonDefaults: { ...DEFAULT_OPERATIONAL_DEFAULTS.lessonDefaults },
     schedulingDefaults: {
       ...DEFAULT_OPERATIONAL_DEFAULTS.schedulingDefaults,
       preferredWeekdays: [],
     },
-    creditPolicy: { ...DEFAULT_OPERATIONAL_DEFAULTS.creditPolicy },
+    creditPolicy: {
+      ...DEFAULT_OPERATIONAL_DEFAULTS.creditPolicy,
+      consumptionByAttendance: {
+        ...DEFAULT_OPERATIONAL_DEFAULTS.creditPolicy
+          .consumptionByAttendance,
+      },
+    },
     participantPolicy: { ...DEFAULT_OPERATIONAL_DEFAULTS.participantPolicy },
     preparationPolicy: { ...DEFAULT_OPERATIONAL_DEFAULTS.preparationPolicy },
   };
@@ -63,8 +82,19 @@ export function getDefaultCourseOperationalPolicies(): CourseOperationalPolicies
 
 export function normalizeCourseOperationalPolicies(
   source?: Partial<CourseOperationalPolicies> | null,
-): CourseOperationalPolicies {
+  classTypeOverride?: TemplateClassType,
+): NormalizedCourseOperationalPolicies {
   const defaults = getDefaultCourseOperationalPolicies();
+  const defaultClassType = isTemplateClassType(
+    source?.lessonDefaults?.defaultClassType,
+  )
+    ? source.lessonDefaults.defaultClassType
+    : defaults.lessonDefaults.defaultClassType;
+  const targetConsumptionByAttendance = getDefaultConsumptionByAttendance(
+    classTypeOverride ?? defaultClassType,
+  );
+  const sourceConsumptionByAttendance =
+    source?.creditPolicy?.consumptionByAttendance;
   const minStudents = positiveInteger(
     source?.participantPolicy?.minStudents,
     defaults.participantPolicy.minStudents,
@@ -130,6 +160,22 @@ export function normalizeCourseOperationalPolicies(
       noShowConsumesCredit:
         source?.creditPolicy?.noShowConsumesCredit ??
         defaults.creditPolicy.noShowConsumesCredit,
+      consumptionByAttendance: sourceConsumptionByAttendance
+        ? {
+            attended:
+              sourceConsumptionByAttendance.attended ??
+              targetConsumptionByAttendance.attended,
+            no_show:
+              sourceConsumptionByAttendance.no_show ??
+              targetConsumptionByAttendance.no_show,
+            canceled_late:
+              sourceConsumptionByAttendance.canceled_late ??
+              targetConsumptionByAttendance.canceled_late,
+            canceled_early:
+              sourceConsumptionByAttendance.canceled_early ??
+              targetConsumptionByAttendance.canceled_early,
+          }
+        : targetConsumptionByAttendance,
     },
     participantPolicy: {
       participantMode: isParticipantMode(
@@ -155,10 +201,34 @@ export function normalizeCourseOperationalPolicies(
   };
 }
 
+export function normalizeCourseProfilePoliciesForWrite(
+  source: Partial<CourseOperationalPolicies>,
+  classType: TemplateClassType,
+  consumptionMapWasProvided: boolean,
+): NormalizedCourseOperationalPolicies {
+  const normalized = normalizeCourseOperationalPolicies(source, classType);
+  if (consumptionMapWasProvided) {
+    return normalized;
+  }
+
+  const creditPolicy: CourseOperationalPolicies["creditPolicy"] = {
+    ...normalized.creditPolicy,
+  };
+  delete creditPolicy.consumptionByAttendance;
+  return normalizeCourseOperationalPolicies(
+    { ...normalized, creditPolicy },
+    classType,
+  );
+}
+
 export function cloneCourseOperationalPolicies(
   source?: Partial<CourseOperationalPolicies> | null,
-): CourseOperationalPolicies {
-  const normalized = normalizeCourseOperationalPolicies(source);
+  classTypeOverride?: TemplateClassType,
+): NormalizedCourseOperationalPolicies {
+  const normalized = normalizeCourseOperationalPolicies(
+    source,
+    classTypeOverride,
+  );
 
   return {
     lessonDefaults: { ...normalized.lessonDefaults },
@@ -166,7 +236,12 @@ export function cloneCourseOperationalPolicies(
       ...normalized.schedulingDefaults,
       preferredWeekdays: [...normalized.schedulingDefaults.preferredWeekdays],
     },
-    creditPolicy: { ...normalized.creditPolicy },
+    creditPolicy: {
+      ...normalized.creditPolicy,
+      consumptionByAttendance: {
+        ...normalized.creditPolicy.consumptionByAttendance,
+      },
+    },
     participantPolicy: { ...normalized.participantPolicy },
     preparationPolicy: { ...normalized.preparationPolicy },
   };

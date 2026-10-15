@@ -16,6 +16,7 @@ import {
   getPreparationStatusLabel,
   getWeekdayLabel,
 } from "@/lib/utils/course-template-visuals";
+import { getDefaultConsumptionByAttendance } from "@/lib/utils/course-policies";
 
 interface CourseTemplateOperationalDefaultsSummaryProps {
   template: CourseTemplateDetailDTO;
@@ -69,6 +70,9 @@ export default function CourseTemplateOperationalDefaultsSummary({
   const preferredDays = schedulingDefaults.preferredWeekdays
     .map(getWeekdayLabel)
     .join(", ");
+  const consumptionByAttendance =
+    creditPolicy.consumptionByAttendance ??
+    getDefaultConsumptionByAttendance(lessonDefaults.defaultClassType);
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -131,16 +135,24 @@ export default function CourseTemplateOperationalDefaultsSummary({
         />
         <SummaryItem
           icon={Coins}
-          label="Casos especiales"
+          label="Trial"
           value={`Trial: ${
             creditPolicy.trialConsumesCredit ? "consume" : "no consume"
           }`}
-          detail={`Cancelación: ${
-            creditPolicy.cancellationConsumesCredit ? "consume" : "no consume"
-          } · No-show: ${
-            creditPolicy.noShowConsumesCredit ? "consume" : "no consume"
-          }`}
         />
+        {[
+          ["Asistió", consumptionByAttendance.attended],
+          ["No-show", consumptionByAttendance.no_show],
+          ["Cancelación tardía", consumptionByAttendance.canceled_late],
+          ["Cancelación anticipada", consumptionByAttendance.canceled_early],
+        ].map(([label, consumes]) => (
+          <SummaryItem
+            key={String(label)}
+            icon={Coins}
+            label={String(label)}
+            value={consumes ? "Consume crédito" : "No consume crédito"}
+          />
+        ))}
       </div>
     </section>
   );

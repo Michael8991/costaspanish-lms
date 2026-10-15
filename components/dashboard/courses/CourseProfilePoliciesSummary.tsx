@@ -22,6 +22,7 @@ import {
   getPreparationStatusLabel,
   getWeekdayLabel,
 } from "@/lib/utils/course-template-visuals";
+import { getDefaultConsumptionByAttendance } from "@/lib/utils/course-policies";
 
 interface CourseProfilePoliciesSummaryProps {
   course: CourseProfileDetailDTO;
@@ -81,6 +82,9 @@ export default function CourseProfilePoliciesSummary({
   const preferredDays = schedulingDefaults.preferredWeekdays
     .map(getWeekdayLabel)
     .join(", ");
+  const consumptionByAttendance =
+    creditPolicy.consumptionByAttendance ??
+    getDefaultConsumptionByAttendance(course.classType);
 
   const copyPolicies = async () => {
     if (
@@ -229,24 +233,19 @@ export default function CourseProfilePoliciesSummary({
               : "No consume crédito"
           }
         />
-        <PolicyItem
-          icon={RefreshCw}
-          label="Cancelación"
-          value={
-            creditPolicy.cancellationConsumesCredit
-              ? "Consume crédito"
-              : "No consume crédito"
-          }
-        />
-        <PolicyItem
-          icon={Users}
-          label="No-show"
-          value={
-            creditPolicy.noShowConsumesCredit
-              ? "Consume crédito"
-              : "No consume crédito"
-          }
-        />
+        {[
+          ["Asistió", consumptionByAttendance.attended],
+          ["No-show", consumptionByAttendance.no_show],
+          ["Cancelación tardía", consumptionByAttendance.canceled_late],
+          ["Cancelación anticipada", consumptionByAttendance.canceled_early],
+        ].map(([label, consumes]) => (
+          <PolicyItem
+            key={String(label)}
+            icon={Coins}
+            label={String(label)}
+            value={consumes ? "Consume crédito" : "No consume crédito"}
+          />
+        ))}
       </div>
     </section>
   );

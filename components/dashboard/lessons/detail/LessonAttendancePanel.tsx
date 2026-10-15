@@ -9,6 +9,7 @@ import { formatLabel } from "@/lib/utils/lessonDetail-helpers";
 import { normalizeLessonBlockCategories } from "@/lib/utils/lesson-block-categories";
 import {
   calculateCreditsForAttendee,
+  resolveEffectiveLessonCreditPolicy,
   type EffectiveLessonCreditPolicy,
 } from "@/lib/utils/lesson-credit-policy";
 import CustomModal from "@/components/ui/CustomModal";
@@ -195,6 +196,10 @@ function getSettlementReasonLabel(
     trial_free: "Trial sin cargo",
     no_show_charged: "No-show con cargo",
     no_show_free: "No-show sin cargo",
+    canceled_late_charged: "Cancelación tardía con cargo",
+    canceled_late_free: "Cancelación tardía sin cargo",
+    canceled_early_charged: "Cancelación anticipada con cargo",
+    canceled_early_free: "Cancelación anticipada sin cargo",
     absent_free: "Ausencia sin cargo",
     scheduled_policy_not_processed_on_completion:
       "Consumo previsto al programar",
@@ -269,21 +274,21 @@ export default function LessonAttendancePanel({
   const hasNextLessonFocusChanges =
     nextLessonFocusDraft !== nextLessonFocus;
   const previewPolicy: EffectiveLessonCreditPolicy | null =
-    lesson.policySnapshot
+    lesson.currentCourseCreditPolicy
       ? {
           mode: "course",
-          ...lesson.policySnapshot.creditPolicy,
+          ...lesson.currentCourseCreditPolicy,
+          // Legacy compatibility fields are deliberately not authoritative.
+          cancellationConsumesCredit: false,
+          noShowConsumesCredit: true,
         }
-      : lesson.courseId
-        ? null
-        : {
-            mode: "legacy",
-            creditsPerLesson: 0,
-            consumeOn: "completion",
-            trialConsumesCredit: false,
-            cancellationConsumesCredit: false,
-            noShowConsumesCredit: true,
-          };
+      : !lesson.courseId
+        ? resolveEffectiveLessonCreditPolicy({
+          lesson: {
+            classType: lesson.classType,
+          },
+        }).policy
+        : null;
   const creditPreview = attendees.map((attendee) => ({
     attendee,
     calculation: previewPolicy
@@ -750,9 +755,7 @@ export default function LessonAttendancePanel({
                 </h3>
                 <p className="mt-1 text-xs text-gray-300">
                   {lesson.courseId
-                    ? lesson.policySnapshot
-                      ? "Se aplicarán las reglas guardadas en esta clase."
-                      : "Se aplicarán las reglas actuales del curso y se guardará una copia."
+                    ? "Se aplicarán las reglas actuales del curso y se guardará una copia en la liquidación."
                     : "Se aplicará el consumo configurado en los asistentes de esta clase."}
                 </p>
               </div>
@@ -781,19 +784,33 @@ export default function LessonAttendancePanel({
                   </dd>
                 </div>
                 <div className="rounded-xl bg-gray-700/70 p-2">
-                  <dt className="text-gray-400">No-show</dt>
-                  <dd className="mt-0.5 font-medium text-white">
-                    {previewPolicy.noShowConsumesCredit
-                      ? "Con cargo"
-                      : "Sin cargo"}
-                  </dd>
-                </div>
-                <div className="rounded-xl bg-gray-700/70 p-2">
                   <dt className="text-gray-400">Créditos</dt>
                   <dd className="mt-0.5 font-medium text-white">
                     {formatCredits(previewPolicy.creditsPerLesson)}
                   </dd>
                 </div>
+                {[
+                  ["Asistió", previewPolicy.consumptionByAttendance.attended],
+                  ["No-show", previewPolicy.consumptionByAttendance.no_show],
+                  [
+                    "Cancelación tardía",
+                    previewPolicy.consumptionByAttendance.canceled_late,
+                  ],
+                  [
+                    "Cancelación anticipada",
+                    previewPolicy.consumptionByAttendance.canceled_early,
+                  ],
+                ].map(([label, consumes]) => (
+                  <div
+                    key={String(label)}
+                    className="rounded-xl bg-gray-700/70 p-2"
+                  >
+                    <dt className="text-gray-400">{String(label)}</dt>
+                    <dd className="mt-0.5 font-medium text-white">
+                      {consumes ? "Con cargo" : "Sin cargo"}
+                    </dd>
+                  </div>
+                ))}
               </dl>
             )}
 

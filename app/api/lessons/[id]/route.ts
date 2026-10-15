@@ -77,7 +77,10 @@ export async function GET(
           };
 
     const lesson = await Lesson.findOne(lessonFilter)
-      .populate({ path: "courseId", select: "name internalName classType" })
+      .populate({
+        path: "courseId",
+        select: "name internalName classType policies",
+      })
       .lean();
 
     if (!lesson) {

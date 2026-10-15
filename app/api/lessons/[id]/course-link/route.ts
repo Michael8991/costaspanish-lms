@@ -220,7 +220,10 @@ export async function PATCH(
       lesson,
       courseActiveStudentIds: activeStudentIds,
     });
-    const policies = normalizeCourseOperationalPolicies(course.policies);
+    const policies = normalizeCourseOperationalPolicies(
+      course.policies,
+      course.classType,
+    );
     const durationMinutes = Math.max(
       1,
       Math.round(
@@ -263,7 +266,10 @@ export async function PATCH(
       { $set: set },
       { new: true },
     )
-      .populate({ path: "courseId", select: "name internalName classType" })
+      .populate({
+        path: "courseId",
+        select: "name internalName classType policies",
+      })
       .lean<Parameters<typeof toLessonDetailDTO>[0]>();
 
     if (!updatedLesson) {

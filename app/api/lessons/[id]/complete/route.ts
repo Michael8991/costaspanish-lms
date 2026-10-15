@@ -14,6 +14,7 @@ import type {
   LessonPolicySnapshot,
 } from "@/lib/types/lesson";
 import {
+  buildAppliedPolicySnapshot,
   calculateCreditsForAttendee,
   resolveEffectiveLessonCreditPolicy,
 } from "@/lib/utils/lesson-credit-policy";
@@ -24,6 +25,10 @@ import {
 } from "@/lib/services/voucher.service";
 import { CourseEnrollment } from "@/models/CourseEnrollment";
 import { normalizeCourseOperationalPolicies } from "@/lib/utils/course-policies";
+import {
+  getLessonCompletionBlocker,
+  isLessonSettlementFinal,
+} from "@/lib/utils/lesson-completion-guard";
 import { toLessonDetailDTO } from "@/lib/utils/lesson.mapper";
 import { CourseProfile } from "@/models/CourseProfile";
 import Lesson from "@/models/Lesson";
@@ -58,6 +63,7 @@ type LessonForComplete = {
 
 type CourseForComplete = {
   _id: Types.ObjectId;
+  classType?: ClassType;
   policies?: Partial<CourseOperationalPolicies> | null;
   members?: Array<{
     studentId: Types.ObjectId | string;
@@ -115,7 +121,7 @@ function getPlanCredits(plan: StudentPlanForComplete) {
 async function getResponseLesson(filter: Record<string, unknown>) {
   const lesson = await Lesson.findOne(filter).populate({
     path: "courseId",
-    select: "name internalName",
+    select: "name internalName classType policies",
   });
 
   return lesson ? toLessonDetailDTO(lesson.toObject()) : null;
@@ -218,9 +224,10 @@ export async function POST(
     }
 
     if (
-      lesson.status === "completed" ||
-      lesson.creditSettlement?.status === "settled" ||
-      lesson.creditSettlement?.status === "skipped"
+      isLessonSettlementFinal({
+        lessonStatus: lesson.status,
+        settlementStatus: lesson.creditSettlement?.status,
+      })
     ) {
       if (lesson.creditSettlement?.status === "settled") {
         await syncCreditLedger({
@@ -254,37 +261,22 @@ export async function POST(
       );
     }
 
-    if (
-      lesson.status === "voided" ||
-      lesson.status === "canceled_by_teacher"
-    ) {
-      return NextResponse.json(
-        { ok: false, error: "This lesson cannot be completed" },
-        { status: 409 },
-      );
-    }
-
     const attendees = lesson.attendees ?? [];
+    const completionBlocker = getLessonCompletionBlocker({
+      status: lesson.status,
+      attendees,
+    });
 
-    if (attendees.length === 0) {
-      return NextResponse.json(
-        { ok: false, error: "Lesson has no attendees" },
-        { status: 400 },
-      );
-    }
-
-    if (
-      attendees.some(
-        (attendee) => attendee.attendanceStatus === "pending",
-      )
-    ) {
+    if (completionBlocker) {
       return NextResponse.json(
         {
           ok: false,
-          error:
-            "All attendees must have attendance marked before completing the lesson",
+          error: completionBlocker.error,
+          ...(completionBlocker.code
+            ? { code: completionBlocker.code }
+            : {}),
         },
-        { status: 400 },
+        { status: completionBlocker.status },
       );
     }
 
@@ -303,16 +295,17 @@ export async function POST(
             };
 
       course = await CourseProfile.findOne(courseFilter)
-        .select("policies members studentIds")
+        .select("classType policies members studentIds")
         .lean<CourseForComplete>();
     }
 
-    if (hasCourseReference && !lesson.policySnapshot && !course) {
+    if (hasCourseReference && !course) {
       return NextResponse.json(
         {
           ok: false,
           error:
-            "No se puede completar la clase: no existe el curso ni una copia de sus reglas.",
+            "No se puede completar la clase: el CourseProfile asociado no existe o no es accesible.",
+          code: "course_profile_required_for_settlement",
         },
         { status: 400 },
       );
@@ -326,7 +319,10 @@ export async function POST(
         warnings.push("course_policies_missing_using_defaults");
       }
 
-      const policies = normalizeCourseOperationalPolicies(course.policies);
+      const policies = normalizeCourseOperationalPolicies(
+        course.policies,
+        course.classType ?? lesson.classType,
+      );
       const scheduledDurationMinutes = Math.max(
         1,
         Math.round(
@@ -342,16 +338,19 @@ export async function POST(
         timezone: lesson.timezone,
         classType: lesson.classType,
       });
-      warnings.push("using_course_policy_fallback");
     }
 
     const effectivePolicy = resolveEffectiveLessonCreditPolicy({
       lesson: {
         courseId: lesson.courseId,
+        classType: lesson.classType,
         policySnapshot: lesson.policySnapshot,
       },
       courseProfile: course,
     });
+    const appliedPolicySnapshot = buildAppliedPolicySnapshot(
+      effectivePolicy.policy,
+    );
     const calculatedItems = attendees.map((attendee) => ({
       attendee,
       studentObjectId: toValidObjectId(attendee.studentId),
@@ -417,6 +416,7 @@ export async function POST(
         settledAt: now,
         settledBy: currentUserObjectId,
         totalCreditsConsumed: 0,
+        ...(appliedPolicySnapshot ? { appliedPolicySnapshot } : {}),
         items: settlementItems,
         warnings: Array.from(new Set(warnings)),
       };
@@ -443,7 +443,7 @@ export async function POST(
         { new: true },
       ).populate({
         path: "courseId",
-        select: "name internalName",
+        select: "name internalName classType policies",
       });
 
       if (!completedLesson) {
@@ -617,6 +617,7 @@ export async function POST(
       settledAt: null,
       settledBy: currentUserObjectId,
       totalCreditsConsumed,
+      ...(appliedPolicySnapshot ? { appliedPolicySnapshot } : {}),
       items: settlementItems,
       warnings: Array.from(new Set(warnings)),
     };

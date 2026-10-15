@@ -85,6 +85,7 @@ export default function LessonDetailClient({
         courseTemplateVersion: data.item.courseTemplateVersion,
         courseLink: data.item.courseLink,
         policySnapshot: data.item.policySnapshot,
+        currentCourseCreditPolicy: data.item.currentCourseCreditPolicy,
       });
     } catch (unlinkCourseError) {
       setUnlinkError(
@@ -218,6 +219,8 @@ export default function LessonDetailClient({
               courseTemplateVersion: assignedLesson.courseTemplateVersion,
               courseLink: assignedLesson.courseLink,
               policySnapshot: assignedLesson.policySnapshot,
+              currentCourseCreditPolicy:
+                assignedLesson.currentCourseCreditPolicy,
             })
           }
         />

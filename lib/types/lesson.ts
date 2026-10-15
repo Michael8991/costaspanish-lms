@@ -2,6 +2,7 @@ import { Types } from "mongoose";
 import { CEFR_LEVELS, LESSON_ATTENDANCE_STATUSES, LESSON_BLOCK_TYPES, LESSON_CLASS_TYPES, LESSON_CREATION_SOURCES, LESSON_ERROR_CATEGORIES, LESSON_SKILLS, LESSON_STATUSES } from "../constants/lesson.constants";
 import { LESSON_PREPARATION_STATUSES } from "@/lib/constants/lesson.constants";
 import { LESSON_BLOCK_COMPLETION_STATUSES } from "@/lib/constants/lesson.constants";
+import type { ConsumptionByAttendance } from "@/lib/types/course-policies";
 
 
 export type LessonBlockCompletionStatus =
@@ -62,6 +63,7 @@ export interface LessonPolicySnapshot {
     trialConsumesCredit: boolean;
     cancellationConsumesCredit: boolean;
     noShowConsumesCredit: boolean;
+    consumptionByAttendance?: ConsumptionByAttendance;
   };
   preparationPolicy: {
     copyTemplateBlocksToLesson: boolean;
@@ -91,10 +93,21 @@ export type LessonCreditSettlementReason =
   | "trial_free"
   | "no_show_charged"
   | "no_show_free"
+  | "canceled_late_charged"
+  | "canceled_late_free"
+  | "canceled_early_charged"
+  | "canceled_early_free"
   | "absent_free"
   | "scheduled_policy_not_processed_on_completion"
   | "legacy"
   | "no_voucher_required";
+
+export interface AppliedLessonCreditPolicySnapshot {
+  creditsPerLesson: number;
+  consumeOn: "completion" | "scheduled";
+  trialConsumesCredit: boolean;
+  consumptionByAttendance: ConsumptionByAttendance;
+}
 
 export interface LessonCreditSettlementItem {
   studentId: Types.ObjectId;
@@ -117,6 +130,7 @@ export interface LessonCreditSettlement {
   settledAt?: Date | null;
   settledBy?: Types.ObjectId | null;
   totalCreditsConsumed: number;
+  appliedPolicySnapshot?: AppliedLessonCreditPolicySnapshot;
   items: LessonCreditSettlementItem[];
   warnings?: string[];
 }

@@ -4,6 +4,7 @@ import dbConnect from '@/lib/mongo';
 import { getLessonDateRange } from '@/lib/utils/lesson-date-range';
 import { normalizeCourseMembers } from '@/lib/utils/course-members';
 import { normalizeCourseOperationalPolicies } from '@/lib/utils/course-policies';
+import { validateUniqueLessonAttendees } from '@/lib/utils/lesson-attendees';
 import { buildLessonPolicySnapshotFromCoursePolicies } from '@/lib/utils/lesson-policy-snapshot';
 import {
   generateWeeklyRecurringLessonDates,
@@ -278,9 +279,15 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const policies = normalizeCourseOperationalPolicies(course.policies);
+      const policyDefaults = normalizeCourseOperationalPolicies(
+        course.policies,
+      );
       const classType =
-        course.classType ?? policies.lessonDefaults.defaultClassType;
+        course.classType ?? policyDefaults.lessonDefaults.defaultClassType;
+      const policies = normalizeCourseOperationalPolicies(
+        course.policies,
+        classType,
+      );
       const timezone =
         payload.timezone?.trim() ||
         policies.lessonDefaults.timezone ||
@@ -372,6 +379,20 @@ export async function POST(req: NextRequest) {
       void ignoredCourseLink;
       void ignoredPolicySnapshot;
       basePayload = freeBasePayload;
+    }
+
+    const attendeeUniqueness = validateUniqueLessonAttendees(
+      basePayload.attendees,
+    );
+    if (!attendeeUniqueness.ok) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: attendeeUniqueness.error,
+          code: attendeeUniqueness.code,
+        },
+        { status: attendeeUniqueness.status },
+      );
     }
 
     const normalizedBlocks = basePayload.blocks.map((block, index) => ({
